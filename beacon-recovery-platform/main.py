@@ -75,10 +75,16 @@ async def get_app_page():
 GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
+# Split analysis and speech tasks across models to distribute free tier quota
+ANALYSIS_MODEL = "gemini-1.5-flash"
+TTS_MODEL = "gemini-2.0-flash"
+TTS_VOICE = "Kore"
 
 
 def gemini_auth_error_detail(e: Exception, context: str) -> str:
     msg = str(e)
+    if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
+        return f"{context}: Rate limit/Quota exceeded on Gemini API. Please wait ~20 seconds before trying again."
     if "UNAUTHENTICATED" in msg or "401" in msg or "PERMISSION_DENIED" in msg or "403" in msg:
         return (
             f"{context}: Gemini rejected the API key (invalid or malformed GEMINI_API_KEY). "
@@ -88,14 +94,10 @@ def gemini_auth_error_detail(e: Exception, context: str) -> str:
     return f"{context}: {msg}"
 
 
-ANALYSIS_MODEL = "gemini-2.0-flash"
-TTS_MODEL = "gemini-2.0-flash"
-TTS_VOICE = "Kore"
-
-def synthesize_speech(text: str, retries: int = 2) -> Optional[str]:
+def synthesize_speech(text: str, retries: int = 1) -> Optional[str]:
     """
-    Synthesizes spoken audio from text using Gemini 2.0 Flash audio output modality.
-    Returns base64-encoded WAV string.
+    Turns text into spoken audio using Gemini TTS and returns base64-encoded WAV data.
+    Gracefully returns None if quota limit (429) is hit so the text response still works.
     """
     if not client or not text:
         print("[TTS Error]: Client or text missing")
@@ -103,47 +105,46 @@ def synthesize_speech(text: str, retries: int = 2) -> Optional[str]:
 
     for attempt in range(retries + 1):
         try:
-            # Request audio output explicitly
             response = client.models.generate_content(
                 model=TTS_MODEL,
-                contents=f"Say the following phrase out loud in a calm tone: {text}",
+                contents=f"Say this out loud clearly: {text}",
                 config=types.GenerateContentConfig(
                     response_modalities=["AUDIO"],
                     speech_config=types.SpeechConfig(
                         voice_config=types.VoiceConfig(
                             prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=TTS_VOICE)
                         )
-                    )
-                )
+                    ),
+                ),
             )
-
-            # Inspect candidate parts for audio bytes
+            
             candidates = getattr(response, "candidates", None)
             if not candidates or not candidates[0].content or not candidates[0].content.parts:
                 continue
-
+            
             for part in candidates[0].content.parts:
                 inline_data = getattr(part, "inline_data", None)
                 if inline_data and getattr(inline_data, "data", None):
                     pcm_data = inline_data.data
 
-                    # Encode raw PCM into standard WAV format (1 channel, 16-bit, 24kHz)
                     buf = io.BytesIO()
                     with wave.open(buf, "wb") as wf:
                         wf.setnchannels(1)
                         wf.setsampwidth(2)
                         wf.setframerate(24000)
                         wf.writeframes(pcm_data)
-
-                    print(f"[TTS Success]: Speech generated on attempt {attempt + 1}")
+                        
+                    print(f"[TTS Success]: Generated audio bytes on attempt {attempt + 1}")
                     return base64.b64encode(buf.getvalue()).decode("utf-8")
-
         except Exception as tts_err:
             print(f"[TTS Exception Attempt {attempt + 1}]: {tts_err}")
+            if "429" in str(tts_err) or "RESOURCE_EXHAUSTED" in str(tts_err):
+                print("[TTS Quota Warning]: Quota hit during audio synthesis. Falling back to text-only output.")
+                return None
             continue
 
-    print("[TTS Error]: All synthesis attempts failed")
     return None
+
 
 @app.get("/api/health")
 async def health_check():
@@ -227,7 +228,7 @@ async def process_voice_crisis(
         if not spoken_text.strip():
             spoken_text = "I am listening. Please stay calm and locate a safe place to sit down while I assist you."
 
-        # Generate Audio Response
+        # Generate Audio Response (safely falls back if quota is reached)
         audio_b64 = synthesize_speech(spoken_text)
 
         return {
