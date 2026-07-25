@@ -1,28 +1,24 @@
-import os
-
-from dotenv import load_dotenv
-load_dotenv()  # local dev convenience — no-op if no .env file is present (e.g. on Render)
-
 import base64
 import io
+import os
 import wave
 
-import uvicorn
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
+from auth import User, auth_router, get_current_user
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.exceptions import RequestValidationError
-from typing import Optional
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from google import genai
 from google.genai import types
+from dotenv import load_dotenv
 
-from auth import router as auth_router, get_current_user, User
+load_dotenv()  # local dev convenience — no-op if no .env file is present (e.g. on Render)
 
 app = FastAPI(
     title="Beacon - GenAI Recovery & Prevention Platform",
     version="1.0.0",
-    description="Zero-Typing Voice Emergency Intervention Engine"
+    description="Zero-Typing Voice Emergency Intervention Engine",
 )
 
 # Enable CORS for public access
@@ -52,7 +48,11 @@ async def validation_exception_handler(request, exc: RequestValidationError):
         # Pydantic v2 prefixes custom @field_validator ValueErrors with this.
         msg = msg.replace("Value error, ", "")
         messages.append(msg)
-    return JSONResponse(status_code=422, content={"detail": "; ".join(messages) or "Invalid input."})
+    return JSONResponse(
+        status_code=422,
+        content={"detail": "; ".join(messages) or "Invalid input."},
+    )
+
 
 # Account system: signup / login / forgot-password / reset-password
 app.include_router(auth_router)
@@ -68,7 +68,9 @@ async def root():
     return FileResponse("templates/login.html")
 
 
-GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
+GEMINI_API_KEY = (
+    (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
+)
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
 ANALYSIS_MODEL = "gemini-3.5-flash"
@@ -84,7 +86,12 @@ def gemini_auth_error_detail(e: Exception, context: str) -> str:
     credentials, not a code bug -- so point straight at fixing the key.
     """
     msg = str(e)
-    if "UNAUTHENTICATED" in msg or "401" in msg or "PERMISSION_DENIED" in msg or "403" in msg:
+    if (
+        "UNAUTHENTICATED" in msg
+        or "401" in msg
+        or "PERMISSION_DENIED" in msg
+        or "403" in msg
+    ):
         return (
             f"{context}: Gemini rejected the API key (invalid or malformed GEMINI_API_KEY). "
             "Generate a fresh key at https://aistudio.google.com/apikey, set it as GEMINI_API_KEY "
@@ -112,7 +119,9 @@ def synthesize_speech(text: str, retries: int = 1) -> Optional[str]:
                     response_modalities=["AUDIO"],
                     speech_config=types.SpeechConfig(
                         voice_config=types.VoiceConfig(
-                            prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=TTS_VOICE)
+                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                                voice_name=TTS_VOICE
+                            )
                         )
                     ),
                 ),
@@ -140,45 +149,68 @@ def synthesize_speech(text: str, retries: int = 1) -> Optional[str]:
 @app.get("/api/health")
 async def health_check():
     if not client:
-        return {"status": "online", "gemini_configured": False, "gemini_key_valid": False}
+        return {
+            "status": "online",
+            "gemini_configured": False,
+            "gemini_key_valid": False,
+        }
     try:
         # A minimal real call -- this is the only way to know the key is
         # actually accepted by Google, not just present in the environment.
         next(iter(client.models.list()))
-        return {"status": "online", "gemini_configured": True, "gemini_key_valid": True}
+        return {
+            "status": "online",
+            "gemini_configured": True,
+            "gemini_key_valid": True,
+        }
     except Exception as e:
         return {
             "status": "online",
             "gemini_configured": True,
             "gemini_key_valid": False,
-            "gemini_error": gemini_auth_error_detail(e, "Key check failed")
+            "gemini_error": gemini_auth_error_detail(e, "Key check failed"),
         }
 
 
 @app.post("/api/voice-intervention")
-async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Form("individual"),
-                                current_user: User = Depends(get_current_user)):
+async def process_voice_crisis(
+    file: UploadFile = File(...),
+    user_type: str = Form("individual"),
+    current_user: User = Depends(get_current_user),
+):
     if not client:
-        raise HTTPException(status_code=500, detail="Gemini Engine missing. Set GEMINI_API_KEY env variable.")
+        raise HTTPException(
+            status_code=500,
+            detail="Gemini Engine missing. Set GEMINI_API_KEY env variable.",
+        )
 
     try:
         audio_bytes = await file.read()
         if not audio_bytes:
-            raise HTTPException(status_code=400, detail="No audio received. Please try recording again.")
+            raise HTTPException(
+                status_code=400,
+                detail="No audio received. Please try recording again.",
+            )
 
         # Use the real mime type the browser sent -- not a hardcoded guess --
         # so Gemini decodes the actual codec that was recorded.
         mime_type = file.content_type or "audio/webm"
-        audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
+        audio_part = types.Part.from_bytes(
+            data=audio_bytes, mime_type=mime_type
+        )
 
         prompt = f"""
         Analyze this emergency audio clip from a {user_type} navigating a high-cognitive-load recovery crisis.
-        1. Identify emotional state and risk level from tone and vocal markers.
-        2. Provide an immediate calming response script written as warm, spoken words directly to the
-           person (2-4 short sentences, natural to read out loud -- this will be converted to speech).
-        3. Give 2 immediate de-escalation actions.
 
-        Return JSON with keys: "vocal_risk_analysis", "deescalation_script", "immediate_safety_steps"
+        1. Identify emotional state and risk level from tone and vocal markers.
+        2. Provide 2 immediate de-escalation/safety actions.
+        3. Provide an immediate spoken response script written as warm, spoken words directly to the person.
+           CRITICAL REQUIREMENT: This script MUST contain BOTH empathetic validation AND the immediate, step-by-step physical action/first-aid instructions (e.g., instructions on keeping an injured limb still, pressure, breathing). Combine both into a cohesive, spoken paragraph (3-5 short sentences).
+
+        Return JSON with keys:
+        - "vocal_risk_analysis": Brief summary of tone, panic level, and risk assessment.
+        - "immediate_safety_steps": Concise text list of immediate physical actions.
+        - "deescalation_script": The COMPLETE spoken response containing both reassuring empathy AND the immediate physical safety steps combined.
         """
 
         response = client.models.generate_content(
@@ -186,32 +218,40 @@ async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Fo
             contents=[prompt, audio_part],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json"
-            )
+            ),
         )
         result_text = response.text
 
-        # Speak the calming script back -- this is the actual voice reply.
+        # Extract the complete script (empathy + action steps) to synthesize into speech
         spoken_text = ""
         try:
             import json as _json
-            spoken_text = _json.loads(result_text).get("deescalation_script", "")
+
+            parsed_data = _json.loads(result_text)
+            spoken_text = parsed_data.get("deescalation_script", "")
         except Exception:
             pass
+
         audio_b64 = synthesize_speech(spoken_text)
 
         return {
             "status": "success",
             "data": result_text,
             "audio_base64": audio_b64,
-            "audio_mime": "audio/wav"
+            "audio_mime": "audio/wav",
         }
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=gemini_auth_error_detail(e, "Audio Processing Error"))
+        raise HTTPException(
+            status_code=500,
+            detail=gemini_auth_error_detail(e, "Audio Processing Error"),
+        )
 
 
-app.mount("/", StaticFiles(directory="templates", html=True), name="templates")
+app.mount(
+    "/", StaticFiles(directory="templates", html=True), name="templates"
+)
 
 if __name__ == "__main__":
     # Binds dynamically to cloud host port (Render, Railway, Heroku)
