@@ -25,6 +25,7 @@ app = FastAPI(
     description="Zero-Typing Voice Emergency Intervention Engine"
 )
 
+# Enable CORS for public access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -36,6 +37,11 @@ app.add_middleware(
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc: RequestValidationError):
+    """
+    FastAPI's default 422 response puts `detail` as a LIST of error objects.
+    Flatten it into one readable string so signup/login/forgot/reset all 
+    show the actual validation message.
+    """
     messages = []
     for err in exc.errors():
         msg = err.get("msg", "Invalid input")
@@ -43,12 +49,15 @@ async def validation_exception_handler(request, exc: RequestValidationError):
         messages.append(msg)
     return JSONResponse(status_code=422, content={"detail": "; ".join(messages) or "Invalid input."})
 
-# Include Account System Router
+# Account system: signup / login / forgot-password / reset-password
 app.include_router(auth_router)
 
 
 @app.get("/", include_in_schema=False)
 async def root():
+    """
+    Landing page. No account -> straight to sign in (link to sign up from there).
+    """
     if os.path.exists("templates/login.html"):
         return FileResponse("templates/login.html")
     elif os.path.exists("login.html"):
@@ -58,6 +67,10 @@ async def root():
 
 @app.get("/app.html", include_in_schema=False)
 async def get_app_page():
+    """
+    Serves the main application page /app.html.
+    Checks common locations (root, templates/, static/) automatically.
+    """
     possible_paths = [
         "app.html",
         "templates/app.html",
@@ -65,26 +78,76 @@ async def get_app_page():
         "beacon-recovery-platform/app.html",
         "beacon-recovery-platform/templates/app.html"
     ]
+    
     for path in possible_paths:
         if os.path.exists(path):
             return FileResponse(path)
+            
     raise HTTPException(status_code=404, detail="app.html file not found on server.")
 
 
 GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-MODEL_ID = "gemini-2.0-flash"
+ANALYSIS_MODEL = "gemini-3.5-flash"
+TTS_MODEL = "gemini-2.5-flash-preview-tts"  # gemini-3.5-flash is text-output only; TTS needs its own model
 TTS_VOICE = "Kore"
 
 
 def gemini_auth_error_detail(e: Exception, context: str) -> str:
+    """
+    Turn Google's raw 401/403 errors into a message that actually tells you
+    what to do, instead of a wall of JSON.
+    """
     msg = str(e)
-    if "RESOURCE_EXHAUSTED" in msg or "429" in msg:
-        return f"{context}: Rate limit hit. Please wait 15 seconds before retrying."
     if "UNAUTHENTICATED" in msg or "401" in msg or "PERMISSION_DENIED" in msg or "403" in msg:
-        return f"{context}: Invalid GEMINI_API_KEY. Please verify key in environment settings."
+        return (
+            f"{context}: Gemini rejected the API key (invalid or malformed GEMINI_API_KEY). "
+            "Generate a fresh key at https://aistudio.google.com/apikey, set it as GEMINI_API_KEY "
+            "in your host's environment variables (no quotes, no extra spaces/newlines), then redeploy."
+        )
     return f"{context}: {msg}"
+
+
+def synthesize_speech(text: str, retries: int = 1) -> Optional[str]:
+    """
+    Turns a line of text into spoken audio using Gemini TTS and returns it as
+    base64-encoded WAV.
+    """
+    if not client or not text:
+        return None
+    for _ in range(retries + 1):
+        try:
+            response = client.models.generate_content(
+                model=TTS_MODEL,
+                contents=text,
+                config=types.GenerateContentConfig(
+                    response_modalities=["AUDIO"],
+                    speech_config=types.SpeechConfig(
+                        voice_config=types.VoiceConfig(
+                            prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=TTS_VOICE)
+                        )
+                    ),
+                ),
+            )
+            candidates = getattr(response, "candidates", None)
+            if not candidates:
+                continue
+            parts = candidates[0].content.parts
+            if not parts or not getattr(parts[0], "inline_data", None):
+                continue
+            pcm_data = parts[0].inline_data.data
+
+            buf = io.BytesIO()
+            with wave.open(buf, "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(24000)
+                wf.writeframes(pcm_data)
+            return base64.b64encode(buf.getvalue()).decode("utf-8")
+        except Exception:
+            continue
+    return None
 
 
 @app.get("/api/health")
@@ -104,103 +167,67 @@ async def health_check():
 
 
 @app.post("/api/voice-intervention")
-async def process_voice_crisis(file: UploadFile = File(...)):
+async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Form("individual"),
+                                current_user: User = Depends(get_current_user)):
     if not client:
         raise HTTPException(status_code=500, detail="Gemini Engine missing. Set GEMINI_API_KEY env variable.")
 
     try:
         audio_bytes = await file.read()
         if not audio_bytes:
-            raise HTTPException(status_code=400, detail="No audio received. Please record again.")
+            raise HTTPException(status_code=400, detail="No audio received. Please try recording again.")
 
-        raw_mime = file.content_type or "audio/webm"
-        clean_mime = raw_mime.split(";")[0].strip()
-        
-        audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=clean_mime)
+        mime_type = file.content_type or "audio/webm"
+        audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
 
-        # 1. Transcribe speech and formulate emergency response script
-        prompt = """
-        You are an emergency voice intervention system.
-        
-        Tasks:
-        1. Transcribe the exact speech spoken by the user in the audio clip verbatim.
-        2. Draft a warm 2-sentence emergency response script combining reassuring words and 2 immediate action steps tailored to what they said.
+        prompt = f"""
+        Analyze this emergency audio clip from a {user_type} navigating a high-cognitive-load recovery crisis.
+        1. Identify emotional state and risk level from tone and vocal markers.
+        2. Provide an immediate calming response script written as warm, spoken words directly to the
+           person (2-4 short sentences, natural to read out loud -- this will be converted to speech).
+        3. Give 2 immediate de-escalation actions.
 
-        Return strictly valid raw JSON:
-        {
-          "transcription": "<exact user spoken words>",
-          "deescalation_script": "<warm spoken response script with immediate actions>"
-        }
+        Return strictly valid raw JSON with keys: "vocal_risk_analysis", "deescalation_script", "immediate_safety_steps"
         """
 
-        analysis_response = client.models.generate_content(
-            model=MODEL_ID,
+        response = client.models.generate_content(
+            model=ANALYSIS_MODEL,
             contents=[prompt, audio_part],
-            config=types.GenerateContentConfig(response_mime_type="application/json")
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json"
+            )
         )
+        result_text = response.text
 
-        transcription = "Audio processed."
+        # Extract the spoken script cleanly
         spoken_text = ""
         try:
             import json as _json
-            clean_json = analysis_response.text.strip().replace("```json", "").replace("```", "").strip()
-            parsed = _json.loads(clean_json)
-            transcription = parsed.get("transcription", transcription)
-            spoken_text = parsed.get("deescalation_script", "")
-        except Exception as parse_err:
-            print(f"[JSON Parse Error]: {parse_err}")
-            spoken_text = analysis_response.text
+            clean_json_str = result_text.strip().replace("```json", "").replace("```", "").strip()
+            parsed_data = _json.loads(clean_json_str)
+            spoken_text = parsed_data.get("deescalation_script", "")
+        except Exception as json_err:
+            print(f"JSON Parsing Error: {json_err}. Raw text was: {result_text}")
+            spoken_text = result_text
 
         if not spoken_text.strip():
-            spoken_text = "I received your message and I am here to help. Please take a slow, deep breath."
+            spoken_text = "I received your message and I am here to support you. Let's take a deep breath together."
 
-        # 2. Convert response text into audio output
-        audio_b64 = None
-        try:
-            tts_response = client.models.generate_content(
-                model=MODEL_ID,
-                contents=f"Say out loud clearly and calmly: {spoken_text}",
-                config=types.GenerateContentConfig(
-                    response_modalities=["AUDIO"],
-                    speech_config=types.SpeechConfig(
-                        voice_config=types.VoiceConfig(
-                            prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=TTS_VOICE)
-                        )
-                    )
-                )
-            )
+        audio_b64 = synthesize_speech(spoken_text)
 
-            if tts_response.candidates and tts_response.candidates[0].content:
-                for part in tts_response.candidates[0].content.parts:
-                    inline_data = getattr(part, "inline_data", None)
-                    if inline_data and getattr(inline_data, "data", None):
-                        pcm_data = inline_data.data
-                        buf = io.BytesIO()
-                        with wave.open(buf, "wb") as wf:
-                            wf.setnchannels(1)
-                            wf.setsampwidth(2)
-                            wf.setframerate(24000)
-                            wf.writeframes(pcm_data)
-                        audio_b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
-                        break
-        except Exception as tts_err:
-            print(f"[TTS Fallback Triggered]: {tts_err}")
-
-        # Return transcription, script, and base64 audio payload
         return {
             "status": "success",
-            "transcription": transcription,
-            "deescalation_script": spoken_text,
+            "data": result_text,
             "audio_base64": audio_b64,
             "audio_mime": "audio/wav"
         }
-
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=gemini_auth_error_detail(e, "Audio Processing Error"))
 
 
+# Mount static files folder if present
 if os.path.exists("templates"):
     app.mount("/templates", StaticFiles(directory="templates"), name="templates")
 if os.path.exists("static"):
