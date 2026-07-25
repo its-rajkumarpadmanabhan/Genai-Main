@@ -227,11 +227,11 @@
                 if (!response.ok) {
                     let msg = 'Signup failed.';
 
-                    // Safely extract string from object/array
+                    // Safely extract string message from object/array
                     if (typeof data.detail === 'string') {
                         msg = data.detail;
                     } else if (Array.isArray(data.detail)) {
-                        msg = data.detail.map(e => e.msg || e.detail).join(', ');
+                        msg = data.detail.map(e => e.msg || e.detail || 'Validation error').join(', ');
                     } else if (typeof data.detail === 'object' && data.detail !== null) {
                         msg = data.detail.msg || data.detail.message || JSON.stringify(data.detail);
                     } else if (data.message) {
@@ -249,7 +249,18 @@
                 setTimeout(() => window.location.href = '/app.html', 1500);
 
             } catch (err) {
-                errBox.innerText = err.message;
+                // Safe string parsing in catch block to prevent [object Object]
+                let displayError = "An unexpected error occurred.";
+
+                if (typeof err === 'string') {
+                    displayError = err;
+                } else if (err instanceof Error) {
+                    displayError = err.message;
+                } else if (typeof err === 'object' && err !== null) {
+                    displayError = err.message || err.msg || JSON.stringify(err);
+                }
+
+                errBox.innerText = displayError;
                 errBox.classList.remove('hidden');
                 btn.disabled = false;
                 btn.innerHTML = '<span>Create Account</span><i class="fa-solid fa-arrow-right text-xs"></i>';
