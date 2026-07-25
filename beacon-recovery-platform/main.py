@@ -10,8 +10,9 @@ import wave
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 from typing import Optional
 from google import genai
 from google.genai import types
@@ -32,6 +33,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc: RequestValidationError):
+    """
+    FastAPI's default 422 response puts `detail` as a LIST of error objects,
+    e.g. {"detail": [{"msg": "Value error, Password needs 8+ characters...", ...}]}.
+    Every frontend page here does `throw new Error(data.detail)` expecting a
+    plain string -- with a list of objects, JS stringifies it as
+    "[object Object]" and the real message (from our @field_validators in
+    auth.py) never reaches the user. Flatten it into one readable string so
+    signup/login/forgot/reset all show the actual validation message.
+    """
+    messages = []
+    for err in exc.errors():
+        msg = err.get("msg", "Invalid input")
+        # Pydantic v2 prefixes custom @field_validator ValueErrors with this.
+        msg = msg.replace("Value error, ", "")
+        messages.append(msg)
+    return JSONResponse(status_code=422, content={"detail": "; ".join(messages) or "Invalid input."})
 
 # Account system: signup / login / forgot-password / reset-password
 app.include_router(auth_router)

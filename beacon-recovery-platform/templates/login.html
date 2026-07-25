@@ -97,6 +97,18 @@
     <script>
         const API_BASE = '';
 
+        // Turns a FastAPI error `detail` into plain text no matter its shape --
+        // usually a string, but validation errors can come back as a list of
+        // {msg: ...} objects, which JS would otherwise render as "[object Object]".
+        function safeDetail(detail) {
+            if (!detail) return '';
+            if (typeof detail === 'string') return detail;
+            if (Array.isArray(detail)) {
+                return detail.map(d => (typeof d === 'string' ? d : d.msg || JSON.stringify(d))).join('; ');
+            }
+            return detail.msg || JSON.stringify(detail);
+        }
+
         function togglePassword(id, btn) {
             const input = document.getElementById(id);
             const icon = btn.querySelector('i');
@@ -136,7 +148,7 @@
                 const data = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(data.detail || 'Login failed.');
+                    throw new Error(safeDetail(data.detail) || 'Login failed.');
                 }
 
                 localStorage.setItem('beacon_token', data.access_token);
