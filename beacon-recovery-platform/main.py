@@ -50,8 +50,8 @@ async def root():
 GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-ANALYSIS_MODEL = "gemini-2.5-flash"
-TTS_MODEL = "gemini-2.5-flash-preview-tts"
+ANALYSIS_MODEL = "gemini-3.5-flash"
+TTS_MODEL = "gemini-2.5-flash-preview-tts"  # gemini-3.5-flash is text-output only; TTS needs its own model
 TTS_VOICE = "Kore"
 
 
@@ -164,8 +164,7 @@ async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Fo
             model=ANALYSIS_MODEL,
             contents=[prompt, audio_part],
             config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.3
+                response_mime_type="application/json"
             )
         )
         result_text = response.text
