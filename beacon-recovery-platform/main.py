@@ -38,9 +38,10 @@ app.add_middleware(
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc: RequestValidationError):
     """
-    FastAPI's default 422 response puts `detail` as a LIST of error objects.
-    Flatten it into one readable string so signup/login/forgot/reset all 
-    show the actual validation message.
+    FastAPI's default 422 response puts `detail` as a LIST of error objects,
+    e.g. {"detail": [{"msg": "Value error, Password needs 8+ characters...", ...}]}.
+    Flatten it into one readable string so signup/login/forgot/reset all show
+    the actual validation message.
     """
     messages = []
     for err in exc.errors():
@@ -57,39 +58,16 @@ app.include_router(auth_router)
 async def root():
     """
     Landing page. No account -> straight to sign in (link to sign up from there).
+    The protected main tool lives at /app.html and is guarded client-side +
+    by the '/api/...' endpoints requiring a valid session below.
     """
-    if os.path.exists("templates/login.html"):
-        return FileResponse("templates/login.html")
-    elif os.path.exists("login.html"):
-        return FileResponse("login.html")
-    raise HTTPException(status_code=404, detail="login.html not found")
-
-
-@app.get("/app.html", include_in_schema=False)
-async def get_app_page():
-    """
-    Serves the main application page /app.html.
-    Checks common locations (root, templates/, static/) automatically.
-    """
-    possible_paths = [
-        "app.html",
-        "templates/app.html",
-        "static/app.html",
-        "beacon-recovery-platform/app.html",
-        "beacon-recovery-platform/templates/app.html"
-    ]
-    
-    for path in possible_paths:
-        if os.path.exists(path):
-            return FileResponse(path)
-            
-    raise HTTPException(status_code=404, detail="app.html file not found on server.")
+    return FileResponse("templates/login.html")
 
 
 GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-ANALYSIS_MODEL = "gemini-3.5-flash"
+ANALYSIS_MODEL = "gemini-2.5-flash"
 TTS_MODEL = "gemini-2.5-flash-preview-tts"  # gemini-3.5-flash is text-output only; TTS needs its own model
 TTS_VOICE = "Kore"
 
@@ -177,17 +155,27 @@ async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Fo
         if not audio_bytes:
             raise HTTPException(status_code=400, detail="No audio received. Please try recording again.")
 
-        mime_type = file.content_type or "audio/webm"
-        audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
+        raw_mime = file.content_type or "audio/webm"
+        clean_mime = raw_mime.split(";")[0].strip()
+        
+        audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=clean_mime)
 
         prompt = f"""
-        Analyze this emergency audio clip from a {user_type} navigating a high-cognitive-load recovery crisis.
-        1. Identify emotional state and risk level from tone and vocal markers.
-        2. Provide an immediate calming response script written as warm, spoken words directly to the
-           person (2-4 short sentences, natural to read out loud -- this will be converted to speech).
-        3. Give 2 immediate de-escalation actions.
+        You are an emergency voice intervention system for a {user_type}.
 
-        Return strictly valid raw JSON with keys: "vocal_risk_analysis", "deescalation_script", "immediate_safety_steps"
+        Tasks:
+        1. Transcribe what the user said in the audio verbatim.
+        2. Analyze their vocal risk state based on their words and tone.
+        3. Formulate 2 immediate action steps tailored strictly to their specific emergency (e.g., direct pressure on head wound, sit down, call emergency contacts).
+        4. Draft the SPOKEN SCRIPT (`deescalation_script`). THIS SCRIPT WILL BE CONVERTED TO VOICE AUDIO. 
+           It MUST directly combine a short, warm, grounding statement AND the immediate action steps into natural spoken sentences.
+           Example format: "I hear you, stay calm. [Insert immediate safety actions here]. I am right here with you."
+
+        Return strictly valid raw JSON with keys:
+        - "transcription": "<exact user spoken words>",
+        - "vocal_risk_analysis": "<analysis of risk and emotion>",
+        - "deescalation_script": "<the complete spoken response combining reassuring words AND the action steps to be read aloud>",
+        - "immediate_safety_steps": ["<step 1>", "<step 2>"]
         """
 
         response = client.models.generate_content(
@@ -199,24 +187,35 @@ async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Fo
         )
         result_text = response.text
 
-        # Extract the spoken script cleanly
         spoken_text = ""
+        transcription = ""
         try:
             import json as _json
             clean_json_str = result_text.strip().replace("```json", "").replace("```", "").strip()
             parsed_data = _json.loads(clean_json_str)
+            
+            transcription = parsed_data.get("transcription", "")
             spoken_text = parsed_data.get("deescalation_script", "")
+            
+            if not spoken_text.strip():
+                steps = parsed_data.get("immediate_safety_steps", [])
+                if isinstance(steps, list) and len(steps) > 0:
+                    spoken_text = "Please follow these steps right now: " + " ".join(steps)
+                else:
+                    spoken_text = result_text
         except Exception as json_err:
             print(f"JSON Parsing Error: {json_err}. Raw text was: {result_text}")
             spoken_text = result_text
 
         if not spoken_text.strip():
-            spoken_text = "I received your message and I am here to support you. Let's take a deep breath together."
+            spoken_text = "I am listening. Please stay calm and locate a safe place to sit down while I assist you."
 
         audio_b64 = synthesize_speech(spoken_text)
 
         return {
             "status": "success",
+            "transcription": transcription,
+            "deescalation_script": spoken_text,
             "data": result_text,
             "audio_base64": audio_b64,
             "audio_mime": "audio/wav"
@@ -225,14 +224,3 @@ async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Fo
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=gemini_auth_error_detail(e, "Audio Processing Error"))
-
-
-# Mount static files folder if present
-if os.path.exists("templates"):
-    app.mount("/templates", StaticFiles(directory="templates"), name="templates")
-if os.path.exists("static"):
-    app.mount("/static", StaticFiles(directory="static"), name="static")
-
-
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
