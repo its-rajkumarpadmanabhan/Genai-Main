@@ -1,15 +1,16 @@
 import os
 import requests
 import uvicorn
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from typing import Optional
 from google import genai
 from google.genai import types
 
-from auth import router as auth_router
+from auth import router as auth_router, get_current_user, User
 
 app = FastAPI(
     title="Beacon - GenAI Recovery & Prevention Platform",
@@ -28,6 +29,16 @@ app.add_middleware(
 
 # Account system: signup / login / forgot-password / reset-password
 app.include_router(auth_router)
+
+
+@app.get("/", include_in_schema=False)
+async def root():
+    """
+    Landing page. No account -> straight to sign in (link to sign up from there).
+    The protected main tool lives at /app.html and is guarded client-side +
+    by the '/api/...' endpoints requiring a valid session below.
+    """
+    return FileResponse("templates/login.html")
 
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -64,7 +75,7 @@ async def health_check():
     return {"status": "online", "gemini_configured": client is not None}
 
 @app.post("/api/emergency-script")
-async def generate_emergency_script(payload: ZeroTypingRequest):
+async def generate_emergency_script(payload: ZeroTypingRequest, current_user: User = Depends(get_current_user)):
     if not client:
         raise HTTPException(status_code=500, detail="Gemini Engine missing. Set GEMINI_API_KEY env variable.")
 
@@ -105,7 +116,8 @@ async def generate_emergency_script(payload: ZeroTypingRequest):
         raise HTTPException(status_code=500, detail=f"Gemini Inference Error: {str(e)}")
 
 @app.post("/api/voice-intervention")
-async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Form("individual")):
+async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Form("individual"),
+                                current_user: User = Depends(get_current_user)):
     if not client:
         raise HTTPException(status_code=500, detail="Gemini Engine missing. Set GEMINI_API_KEY env variable.")
 
@@ -136,7 +148,7 @@ async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Fo
         raise HTTPException(status_code=500, detail=f"Audio Processing Error: {str(e)}")
 
 @app.post("/api/educational-resources")
-async def generate_educational_module(payload: EducationQuery):
+async def generate_educational_module(payload: EducationQuery, current_user: User = Depends(get_current_user)):
     if not client:
         raise HTTPException(status_code=500, detail="Gemini Engine missing.")
 

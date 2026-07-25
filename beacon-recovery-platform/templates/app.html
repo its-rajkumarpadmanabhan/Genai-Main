@@ -4,7 +4,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BEACON | Public GenAI Harm Reduction & Prevention Platform</title>
+    <title>BEACON | GenAI Recovery & Prevention Platform</title>
+
+    <!-- Auth guard: runs before anything renders. No valid session -> straight to login. -->
+    <script>
+        (function () {
+            const token = localStorage.getItem('beacon_token');
+            if (!token) {
+                window.location.replace('/login.html');
+            }
+        })();
+    </script>
+    <style>
+        /* Hidden until the token is confirmed valid, to avoid flashing protected content. */
+        body { visibility: hidden; }
+        body.beacon-authed { visibility: visible; }
+    </style>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -203,37 +219,74 @@
     </main>
 
     <script>
+        // --- Session verification -----------------------------------------
+        // The blocking <head> script already redirected if there's no token
+        // at all. Now confirm the token is actually still valid server-side
+        // (it may have expired or the account may have been removed).
+        async function verifySession() {
+            const token = localStorage.getItem('beacon_token');
+            try {
+                const res = await fetch('/api/auth/me', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('invalid session');
+                const user = await res.json();
+                localStorage.setItem('beacon_user', JSON.stringify(user));
+                document.body.classList.add('beacon-authed');
+                renderAccountWidget();
+            } catch (err) {
+                localStorage.removeItem('beacon_token');
+                localStorage.removeItem('beacon_user');
+                window.location.replace('/login.html');
+            }
+        }
+        verifySession();
+
+        // Re-check whenever the page is restored from the browser's
+        // back/forward cache (e.g. hitting "back" right after logout).
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted) verifySession();
+        });
+
+        // Helper: attach the bearer token to every protected API call and
+        // force a re-login if the server ever rejects it (expired, revoked).
+        async function authFetch(url, options = {}) {
+            const token = localStorage.getItem('beacon_token');
+            const headers = Object.assign({}, options.headers, {
+                'Authorization': `Bearer ${token}`
+            });
+            const response = await fetch(url, { ...options, headers });
+            if (response.status === 401) {
+                localStorage.removeItem('beacon_token');
+                localStorage.removeItem('beacon_user');
+                window.location.replace('/login.html');
+                throw new Error('Session expired. Redirecting to login...');
+            }
+            return response;
+        }
+
         function renderAccountWidget() {
             const widget = document.getElementById('account-widget');
-            const token = localStorage.getItem('beacon_token');
             const userRaw = localStorage.getItem('beacon_user');
-
-            if (token && userRaw) {
-                const user = JSON.parse(userRaw);
-                widget.innerHTML = `
-                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-200">
-                        <i class="fa-solid fa-circle-user text-teal-400"></i>
-                        <span>${user.username}</span>
-                    </div>
-                    <button onclick="logout()" class="px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-400 hover:text-rose-400 hover:border-rose-500/40 transition">
-                        <i class="fa-solid fa-arrow-right-from-bracket"></i>
-                    </button>
-                `;
-            } else {
-                widget.innerHTML = `
-                    <a href="/login.html" class="px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-300 hover:border-teal-500/60 hover:text-teal-400 transition">Sign In</a>
-                    <a href="/signup.html" class="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white font-semibold transition">Sign Up</a>
-                `;
-            }
+            if (!userRaw) return;
+            const user = JSON.parse(userRaw);
+            widget.innerHTML = `
+                <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-200">
+                    <i class="fa-solid fa-circle-user text-teal-400"></i>
+                    <span>${user.username}</span>
+                </div>
+                <button onclick="logout()" class="px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-400 hover:text-rose-400 hover:border-rose-500/40 transition">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                </button>
+            `;
         }
 
         function logout() {
             localStorage.removeItem('beacon_token');
             localStorage.removeItem('beacon_user');
-            renderAccountWidget();
+            // Hard redirect (not a soft re-render) so nothing protected stays mounted.
+            window.location.replace('/login.html');
         }
-
-        renderAccountWidget();
 
         let mediaRecorder;
         let audioChunks = [];
@@ -249,7 +302,7 @@
             results.innerHTML = '';
 
             try {
-                const response = await fetch('/api/emergency-script', {
+                const response = await authFetch('/api/emergency-script', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -341,7 +394,7 @@
             formData.append('user_type', 'individual');
 
             try {
-                const response = await fetch('/api/voice-intervention', { method: 'POST', body: formData });
+                const response = await authFetch('/api/voice-intervention', { method: 'POST', body: formData });
                 const res = await response.json();
                 const parsed = JSON.parse(res.data);
 
@@ -369,7 +422,7 @@
             resBox.innerHTML = '<span class="text-slate-400"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</span>';
 
             try {
-                const response = await fetch('/api/educational-resources', {
+                const response = await authFetch('/api/educational-resources', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ query_topic: query, audience: 'family_and_patient' })
