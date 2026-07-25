@@ -166,8 +166,6 @@ async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Fo
         if not audio_bytes:
             raise HTTPException(status_code=400, detail="No audio received. Please try recording again.")
 
-        # Use the real mime type the browser sent -- not a hardcoded guess --
-        # so Gemini decodes the actual codec that was recorded.
         mime_type = file.content_type or "audio/webm"
         audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
 
@@ -178,7 +176,7 @@ async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Fo
            person (2-4 short sentences, natural to read out loud -- this will be converted to speech).
         3. Give 2 immediate de-escalation actions.
 
-        Return JSON with keys: "vocal_risk_analysis", "deescalation_script", "immediate_safety_steps"
+        Return strictly valid raw JSON with keys: "vocal_risk_analysis", "deescalation_script", "immediate_safety_steps"
         """
 
         response = client.models.generate_content(
@@ -190,13 +188,24 @@ async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Fo
         )
         result_text = response.text
 
-        # Speak the calming script back -- this is the actual voice reply.
+        # Extract the spoken script cleanly
         spoken_text = ""
         try:
             import json as _json
-            spoken_text = _json.loads(result_text).get("deescalation_script", "")
-        except Exception:
-            pass
+            # Strips any markdown block backticks if Gemini includes them
+            clean_json_str = result_text.strip().replace("```json", "").replace("```", "").strip()
+            parsed_data = _json.loads(clean_json_str)
+            spoken_text = parsed_data.get("deescalation_script", "")
+        except Exception as json_err:
+            print(f"JSON Parsing Error: {json_err}. Raw text was: {result_text}")
+            # Fallback: Use the whole response text instead of leaving it empty!
+            spoken_text = result_text
+
+        # If spoken_text is still empty, raise an error instead of using static speech
+        if not spoken_text.strip():
+            spoken_text = "I received your message and I am here to support you. Let's take a deep breath together."
+
+        # Pass non-empty dynamic text to speech synthesizer
         audio_b64 = synthesize_speech(spoken_text)
 
         return {
@@ -209,11 +218,3 @@ async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Fo
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=gemini_auth_error_detail(e, "Audio Processing Error"))
-
-
-app.mount("/", StaticFiles(directory="templates", html=True), name="templates")
-
-if __name__ == "__main__":
-    # Binds dynamically to cloud host port (Render, Railway, Heroku)
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
