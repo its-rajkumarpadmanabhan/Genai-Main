@@ -75,8 +75,8 @@ async def get_app_page():
 GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-ANALYSIS_MODEL = "gemini-3.5-flash"
-TTS_MODEL = "gemini-2.5-flash-preview-tts"
+ANALYSIS_MODEL = "gemini-2.5-flash"
+TTS_MODEL = "gemini-2.5-flash"
 TTS_VOICE = "Kore"
 
 
@@ -91,14 +91,19 @@ def gemini_auth_error_detail(e: Exception, context: str) -> str:
     return f"{context}: {msg}"
 
 
-def synthesize_speech(text: str, retries: int = 1) -> Optional[str]:
+def synthesize_speech(text: str, retries: int = 2) -> Optional[str]:
+    """
+    Turns text into spoken audio using Gemini TTS and returns base64-encoded WAV data.
+    """
     if not client or not text:
+        print("[TTS Error]: Client or text missing")
         return None
-    for _ in range(retries + 1):
+
+    for attempt in range(retries + 1):
         try:
             response = client.models.generate_content(
                 model=TTS_MODEL,
-                contents=text,
+                contents=f"Please read this aloud clearly and naturally: {text}",
                 config=types.GenerateContentConfig(
                     response_modalities=["AUDIO"],
                     speech_config=types.SpeechConfig(
@@ -108,12 +113,15 @@ def synthesize_speech(text: str, retries: int = 1) -> Optional[str]:
                     ),
                 ),
             )
+            
             candidates = getattr(response, "candidates", None)
             if not candidates:
                 continue
+            
             parts = candidates[0].content.parts
             if not parts or not getattr(parts[0], "inline_data", None):
                 continue
+                
             pcm_data = parts[0].inline_data.data
 
             buf = io.BytesIO()
@@ -122,9 +130,13 @@ def synthesize_speech(text: str, retries: int = 1) -> Optional[str]:
                 wf.setsampwidth(2)
                 wf.setframerate(24000)
                 wf.writeframes(pcm_data)
+                
+            print(f"[TTS Success]: Generated audio bytes on attempt {attempt + 1}")
             return base64.b64encode(buf.getvalue()).decode("utf-8")
-        except Exception:
+        except Exception as tts_err:
+            print(f"[TTS Exception Attempt {attempt + 1}]: {tts_err}")
             continue
+
     return None
 
 
@@ -210,6 +222,7 @@ async def process_voice_crisis(
         if not spoken_text.strip():
             spoken_text = "I am listening. Please stay calm and locate a safe place to sit down while I assist you."
 
+        # Generate Audio Response
         audio_b64 = synthesize_speech(spoken_text)
 
         return {
