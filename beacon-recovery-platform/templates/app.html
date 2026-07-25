@@ -17,8 +17,13 @@
     </script>
     <style>
         /* Hidden until the token is confirmed valid, to avoid flashing protected content. */
-        body { visibility: hidden; }
-        body.beacon-authed { visibility: visible; }
+        body {
+            visibility: hidden;
+        }
+
+        body.beacon-authed {
+            visibility: visible;
+        }
     </style>
 
     <script src="https://cdn.tailwindcss.com"></script>
@@ -416,26 +421,55 @@
         }
 
         async function fetchEducationalResource() {
-            const query = document.getElementById('edu-query').value;
-            const resBox = document.getElementById('edu-results');
-            resBox.classList.remove('hidden');
-            resBox.innerHTML = '<span class="text-slate-400"><i class="fa-solid fa-spinner fa-spin"></i> Loading...</span>';
+            const outputElement = document.getElementById('educational-guide-output') || document.getElementById('guide-output');
+            const topicInput = document.getElementById('guide-topic-select') || document.getElementById('guide-topic');
+
+            // Get chosen topic or fall back to default
+            const topic = topicInput ? topicInput.value : 'Neurobiology of cravings in early recovery';
+
+            if (outputElement) {
+                outputElement.innerText = 'Generating clinical guide with Gemini...';
+            }
 
             try {
-                const response = await authFetch('/api/educational-resources', {
+                const response = await fetch(`${API_BASE}/api/clinical-guide`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ query_topic: query, audience: 'family_and_patient' })
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('beacon_token') || ''}`
+                    },
+                    body: JSON.stringify({ topic: topic })
                 });
-                const res = await response.json();
-                const parsed = JSON.parse(res.data);
 
-                resBox.innerHTML = `
-          <p class="font-semibold text-teal-400">${parsed.clinical_summary}</p>
-          <div class="text-slate-300 mt-1"><strong>Caregiver Note:</strong> ${parsed.caregiver_guidance}</div>
-        `;
+                // 1. Read as text first to avoid JSON syntax crash
+                const rawText = await response.text();
+
+                if (!rawText || rawText.trim() === '') {
+                    throw new Error(`Server returned an empty response (Status ${response.status}). Check server logs.`);
+                }
+
+                let data;
+                try {
+                    data = JSON.parse(rawText);
+                } catch (e) {
+                    throw new Error(`Endpoint returned non-JSON response (${response.status}): ${rawText.substring(0, 100)}...`);
+                }
+
+                if (!response.ok) {
+                    const errDetail = typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail);
+                    throw new Error(errDetail || `Server Error ${response.status}`);
+                }
+
+                // 2. Safely display response
+                if (outputElement) {
+                    outputElement.innerText = data.guide || data.content || data.result || JSON.stringify(data, null, 2);
+                }
+
             } catch (err) {
-                resBox.innerHTML = `<span class="text-red-400">Failed to load guide.</span>`;
+                console.error("Clinical Guide Error:", err);
+                if (outputElement) {
+                    outputElement.innerText = `Error: ${err.message}`;
+                }
             }
         }
     </script>
