@@ -41,7 +41,7 @@ async def root():
     return FileResponse("templates/login.html")
 
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
 class ZeroTypingRequest(BaseModel):
@@ -70,9 +70,38 @@ def fetch_live_environmental_context(lat: float, lon: float) -> dict:
         pass
     return {"temperature": "Unknown", "is_day": "Unknown"}
 
+def gemini_auth_error_detail(e: Exception, context: str) -> str:
+    """
+    Turn Google's raw 401/403 errors into a message that actually tells you
+    what to do, instead of a wall of JSON. UNAUTHENTICATED / PERMISSION_DENIED
+    from Gemini almost always means the key itself is wrong -- not expired
+    credentials, not a code bug -- so point straight at fixing the key.
+    """
+    msg = str(e)
+    if "UNAUTHENTICATED" in msg or "401" in msg or "PERMISSION_DENIED" in msg or "403" in msg:
+        return (
+            f"{context}: Gemini rejected the API key (invalid or malformed GEMINI_API_KEY). "
+            "Generate a fresh key at https://aistudio.google.com/apikey, set it as GEMINI_API_KEY "
+            "in your host's environment variables (no quotes, no extra spaces/newlines), then redeploy."
+        )
+    return f"{context}: {msg}"
+
 @app.get("/api/health")
 async def health_check():
-    return {"status": "online", "gemini_configured": client is not None}
+    if not client:
+        return {"status": "online", "gemini_configured": False, "gemini_key_valid": False}
+    try:
+        # A minimal real call -- this is the only way to know the key is
+        # actually accepted by Google, not just present in the environment.
+        next(iter(client.models.list()))
+        return {"status": "online", "gemini_configured": True, "gemini_key_valid": True}
+    except Exception as e:
+        return {
+            "status": "online",
+            "gemini_configured": True,
+            "gemini_key_valid": False,
+            "gemini_error": gemini_auth_error_detail(e, "Key check failed")
+        }
 
 @app.post("/api/emergency-script")
 async def generate_emergency_script(payload: ZeroTypingRequest, current_user: User = Depends(get_current_user)):
@@ -113,7 +142,7 @@ async def generate_emergency_script(payload: ZeroTypingRequest, current_user: Us
         )
         return {"status": "success", "data": response.text, "context": env_context}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Gemini Inference Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=gemini_auth_error_detail(e, "Gemini Inference Error"))
 
 @app.post("/api/voice-intervention")
 async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Form("individual"),
@@ -145,7 +174,7 @@ async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Fo
         )
         return {"status": "success", "data": response.text}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Audio Processing Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=gemini_auth_error_detail(e, "Audio Processing Error"))
 
 @app.post("/api/educational-resources")
 async def generate_educational_module(payload: EducationQuery, current_user: User = Depends(get_current_user)):
@@ -172,7 +201,7 @@ async def generate_educational_module(payload: EducationQuery, current_user: Use
         )
         return {"status": "success", "data": response.text}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=gemini_auth_error_detail(e, "Educational Resource Error"))
 
 app.mount("/", StaticFiles(directory="templates", html=True), name="templates")
 
