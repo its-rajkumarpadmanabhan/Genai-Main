@@ -1,317 +1,325 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
-
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BEACON | Emergency Voice Support</title>
-
-    <!-- Auth guard: runs before anything renders. No valid session -> straight to login. -->
-    <script>
-        (function () {
-            const token = localStorage.getItem('beacon_token');
-            if (!token) {
-                window.location.replace('/login.html');
-            }
-        })();
-    </script>
+    <title>Beacon - GenAI Recovery & Intervention</title>
     <style>
-        /* Hidden until the token is confirmed valid, to avoid flashing protected content. */
-        body { visibility: hidden; }
-        body.beacon-authed { visibility: visible; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #f0f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* Bright & Vivid Modern Container */
+        .ai-voice-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 420px;
+            height: 680px;
+            /* Radiant Bright Cyan/Teal Gradient */
+            background: radial-gradient(circle at 50% 30%, #e0f7fc 0%, #b3ecff 50%, #eefbfd 100%);
+            border-radius: 32px;
+            box-shadow: 0 20px 60px rgba(0, 180, 216, 0.2), inset 0 0 35px rgba(255, 255, 255, 0.8);
+            position: relative;
+            overflow: hidden;
+            padding: 30px 20px;
+            border: 1px solid rgba(255, 255, 255, 0.9);
+        }
+
+        .ai-voice-container::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: 32px;
+            box-shadow: inset 0 0 30px rgba(0, 150, 255, 0.15);
+            pointer-events: none;
+        }
+
+        .header-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #0077b6;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .orb-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        /* High-contrast crisp typography */
+        .transcript-section {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            text-align: center;
+        }
+
+        .box-card {
+            background: rgba(255, 255, 255, 0.65);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.8);
+            border-radius: 16px;
+            padding: 12px 16px;
+            text-align: left;
+        }
+
+        .box-title {
+            font-size: 0.75rem;
+            font-weight: 800;
+            color: #0077b6;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .box-content {
+            font-size: 0.95rem;
+            color: #032b43;
+            font-weight: 600;
+            line-height: 1.4;
+        }
+
+        /* Recording Controls */
+        .controls {
+            display: flex;
+            gap: 15px;
+            width: 100%;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .btn-record {
+            background: linear-gradient(135deg, #00b4d8 0%, #0077b6 100%);
+            color: #ffffff;
+            border: none;
+            padding: 14px 28px;
+            font-size: 1rem;
+            font-weight: 700;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 8px 20px rgba(0, 180, 216, 0.35);
+            transition: all 0.2s ease;
+        }
+
+        .btn-record:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px rgba(0, 180, 216, 0.45);
+        }
+
+        .btn-record.recording {
+            background: linear-gradient(135deg, #e63946 0%, #d62828 100%);
+            box-shadow: 0 8px 20px rgba(230, 57, 70, 0.4);
+            animation: pulse-red 1.5s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.03); }
+            100% { transform: scale(1); }
+        }
     </style>
-
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        brand: { 50: '#f0fdfa', 500: '#14b8a6', 600: '#0d9488', 900: '#134e4a' }
-                    }
-                }
-            }
-        }
-    </script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
+<body>
 
-<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-teal-500 selection:text-white">
+<div class="ai-voice-container">
+    <div class="header-title">Beacon Intervention</div>
 
-    <!-- Public Enterprise Header -->
-    <header class="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-50 px-6 py-3">
-        <div class="max-w-2xl mx-auto flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div
-                    class="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-500 to-emerald-400 flex items-center justify-center font-black text-slate-950 text-xl shadow-lg shadow-teal-500/20">
-                    <i class="fa-solid fa-shield-heart"></i>
-                </div>
-                <div>
-                    <h1 class="text-lg font-bold tracking-tight text-white">BEACON</h1>
-                    <p class="text-xs text-slate-400">Emergency Voice Support</p>
-                </div>
-            </div>
-            <div id="account-widget" class="flex items-center gap-2"></div>
+    <!-- Animated Audio Orb -->
+    <div class="orb-wrapper">
+        <canvas id="voiceOrbCanvas" width="280" height="280"></canvas>
+    </div>
+
+    <!-- Live Transcript & Action Steps -->
+    <div class="transcript-section">
+        <div class="box-card">
+            <div class="box-title">What We Heard (You Said)</div>
+            <div class="box-content" id="userSpeechText">Press Record and speak...</div>
         </div>
-    </header>
 
-    <main class="max-w-2xl mx-auto p-4 sm:p-6 space-y-6">
+        <div class="box-card">
+            <div class="box-title">Spoken Intervention</div>
+            <div class="box-content" id="aiScriptText">Awaiting input...</div>
+        </div>
+    </div>
 
-        <!-- Voice Emergency Mic -->
-        <section class="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-xl text-center">
-            <h2 class="text-lg font-bold text-white mb-1">Speak, and Beacon will speak back</h2>
-            <p class="text-xs text-slate-400 mb-6">When typing is impossible, tap the button below and talk. You'll
-                get a spoken response right away.</p>
+    <!-- Controls -->
+    <div class="controls">
+        <button id="recordBtn" class="btn-record">Start Recording</button>
+    </div>
+</div>
 
-            <div class="flex flex-col items-center gap-3">
-                <button id="record-btn" onclick="toggleRecording()"
-                    class="w-24 h-24 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow-lg shadow-red-600/30 transition-all focus:outline-none">
-                    <i id="record-icon" class="fa-solid fa-microphone text-3xl"></i>
-                </button>
-                <div id="record-status" class="text-sm font-semibold text-slate-200">Tap to speak</div>
-            </div>
-        </section>
+<script>
+    // Canvas & Orb Visualizer Setup
+    const canvas = document.getElementById('voiceOrbCanvas');
+    const ctx = canvas.getContext('2d');
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    const baseRadius = 70;
 
-        <!-- Output Display Console -->
-        <section id="output-pane"
-            class="hidden bg-slate-900 border border-teal-500/30 rounded-2xl p-6 shadow-2xl space-y-4">
-            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-                <span class="text-xs font-mono text-teal-400 flex items-center gap-2">
-                    <i class="fa-solid fa-microchip"></i> Beacon Response
-                </span>
-            </div>
+    let audioContext, analyser, dataArray;
+    let animationFrameId;
+    let rotationAngle = 0;
 
-            <div id="loading-spinner" class="hidden text-center py-8">
-                <i class="fa-solid fa-spinner fa-spin text-teal-400 text-3xl mb-3"></i>
-                <p class="text-xs font-mono text-slate-400">Listening and preparing a response...</p>
-            </div>
+    function drawVoiceOrb() {
+        animationFrameId = requestAnimationFrame(drawVoiceOrb);
 
-            <div id="audio-reply" class="hidden"></div>
-            <div id="script-results" class="space-y-4 text-sm"></div>
-        </section>
+        if (analyser) {
+            analyser.getByteFrequencyData(dataArray);
+        }
 
-        <!-- Emergency Contacts -->
-        <section class="bg-gradient-to-br from-slate-900 to-slate-950 border border-slate-800 rounded-2xl p-5 shadow-xl">
-            <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
-                <i class="fa-solid fa-phone-volume text-emerald-400"></i> Emergency Contacts
-            </h3>
-            <div class="space-y-3">
-                <a href="tel:1-800-662-4357" class="block p-3 bg-slate-900/90 border border-slate-800 rounded-xl hover:border-emerald-500/60 transition">
-                    <div class="text-xs text-slate-400">SAMHSA National Helpline</div>
-                    <div class="text-base font-bold text-emerald-400 font-mono">1-800-662-4357</div>
-                    <div class="text-[10px] text-slate-500 mt-0.5">Free, Confidential, 24/7/365 Support</div>
-                </a>
-                <a href="tel:988" class="block p-3 bg-slate-900/90 border border-slate-800 rounded-xl hover:border-teal-500/60 transition">
-                    <div class="text-xs text-slate-400">Suicide & Crisis Lifeline</div>
-                    <div class="text-base font-bold text-teal-400 font-mono">Call or Text 988</div>
-                    <div class="text-[10px] text-slate-500 mt-0.5">Immediate De-escalation</div>
-                </a>
-                <a href="tel:911" class="block p-3 bg-slate-900/90 border border-red-900/60 rounded-xl hover:border-red-500/60 transition">
-                    <div class="text-xs text-slate-400">Life-Threatening Emergency</div>
-                    <div class="text-base font-bold text-red-400 font-mono">Call 911</div>
-                    <div class="text-[10px] text-slate-500 mt-0.5">Overdose or immediate danger</div>
-                </a>
-            </div>
-        </section>
+        let sum = 0;
+        if (dataArray) {
+            for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+            }
+        }
+        let audioIntensity = dataArray ? (sum / dataArray.length) / 255 : 0.05;
 
-    </main>
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    <script>
-        // --- Session verification -----------------------------------------
-        // The blocking <head> script already redirected if there's no token
-        // at all. Now confirm the token is actually still valid server-side
-        // (it may have expired or the account may have been removed).
-        async function verifySession() {
-            const token = localStorage.getItem('beacon_token');
+        rotationAngle += 0.015;
+        const numRings = 12;
+
+        ctx.lineWidth = 1.8;
+
+        for (let i = 0; i < numRings; i++) {
+            ctx.beginPath();
+
+            const ringGradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+            ringGradient.addColorStop(0, `rgba(0, 119, 182, ${0.7 + audioIntensity * 0.3})`);
+            ringGradient.addColorStop(0.5, `rgba(0, 180, 216, ${0.8 + audioIntensity * 0.2})`);
+            ringGradient.addColorStop(1, `rgba(114, 9, 183, ${0.5 + audioIntensity * 0.5})`);
+            ctx.strokeStyle = ringGradient;
+
+            const ringAngle = rotationAngle + (i * Math.PI / numRings);
+            const dynamicRadiusX = baseRadius + (audioIntensity * 30 * Math.sin(ringAngle * 2));
+            const dynamicRadiusY = baseRadius * Math.abs(Math.cos(ringAngle)) + (audioIntensity * 15);
+
+            ctx.ellipse(
+                centerX, 
+                centerY, 
+                Math.max(10, dynamicRadiusX), 
+                Math.max(5, dynamicRadiusY), 
+                ringAngle, 
+                0, 
+                2 * Math.PI
+            );
+            ctx.stroke();
+        }
+    }
+
+    // Start Idle Animation
+    drawVoiceOrb();
+
+    function playAudioWithAnimation(base64AudioData) {
+        const audio = new Audio(base64AudioData);
+
+        if (!audioContext) {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+
+        const source = audioContext.createMediaElementSource(audio);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 128;
+
+        source.connect(analyser);
+        analyser.connect(audioContext.destination);
+
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+        audio.play();
+
+        audio.onended = () => {
+            dataArray = null; // Return to idle state
+        };
+    }
+
+    // Recording Logic
+    let mediaRecorder;
+    let audioChunks = [];
+    const recordBtn = document.getElementById('recordBtn');
+    const userSpeechText = document.getElementById('userSpeechText');
+    const aiScriptText = document.getElementById('aiScriptText');
+
+    recordBtn.addEventListener('click', async () => {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+            mediaRecorder.stop();
+            recordBtn.innerText = "Processing...";
+            recordBtn.classList.remove('recording');
+        } else {
+            audioChunks = [];
             try {
-                const res = await fetch('/api/auth/me', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (!res.ok) throw new Error('invalid session');
-                const user = await res.json();
-                localStorage.setItem('beacon_user', JSON.stringify(user));
-                document.body.classList.add('beacon-authed');
-                renderAccountWidget();
-            } catch (err) {
-                localStorage.removeItem('beacon_token');
-                localStorage.removeItem('beacon_user');
-                window.location.replace('/login.html');
-            }
-        }
-        verifySession();
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                mediaRecorder.start();
 
-        // Re-check whenever the page is restored from the browser's
-        // back/forward cache (e.g. hitting "back" right after logout).
-        window.addEventListener('pageshow', (event) => {
-            if (event.persisted) verifySession();
-        });
+                recordBtn.innerText = "Stop Recording";
+                recordBtn.classList.add('recording');
 
-        // Helper: attach the bearer token to every protected API call and
-        // force a re-login if the server ever rejects it (expired, revoked).
-        async function authFetch(url, options = {}) {
-            const token = localStorage.getItem('beacon_token');
-            const headers = Object.assign({}, options.headers, {
-                'Authorization': `Bearer ${token}`
-            });
-            const response = await fetch(url, { ...options, headers });
-            if (response.status === 401) {
-                localStorage.removeItem('beacon_token');
-                localStorage.removeItem('beacon_user');
-                window.location.replace('/login.html');
-                throw new Error('Session expired. Redirecting to login...');
-            }
-            return response;
-        }
-
-        function renderAccountWidget() {
-            const widget = document.getElementById('account-widget');
-            const userRaw = localStorage.getItem('beacon_user');
-            if (!userRaw) return;
-            const user = JSON.parse(userRaw);
-            widget.innerHTML = `
-                <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-200 text-xs">
-                    <i class="fa-solid fa-circle-user text-teal-400"></i>
-                    <span>${user.username}</span>
-                </div>
-                <button onclick="logout()" class="px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700 text-slate-400 hover:text-rose-400 hover:border-rose-500/40 transition">
-                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
-                </button>
-            `;
-        }
-
-        function logout() {
-            localStorage.removeItem('beacon_token');
-            localStorage.removeItem('beacon_user');
-            // Hard redirect (not a soft re-render) so nothing protected stays mounted.
-            window.location.replace('/login.html');
-        }
-
-        // --- Voice recording -------------------------------------------
-        let mediaRecorder;
-        let audioChunks = [];
-        let isRecording = false;
-        let recordedMimeType = 'audio/webm';
-        let activeStream = null;
-
-        async function toggleRecording() {
-            const btn = document.getElementById('record-btn');
-            const icon = document.getElementById('record-icon');
-            const status = document.getElementById('record-status');
-
-            if (!isRecording) {
-                let stream;
-                try {
-                    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                } catch (err) {
-                    status.innerText = "Microphone access denied or unavailable.";
-                    return;
-                }
-                activeStream = stream;
-
-                // Pick a format the browser can actually record, and remember
-                // it so we label the upload correctly later (no lying to the
-                // backend about the audio format).
-                const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
-                recordedMimeType = candidates.find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
-
-                mediaRecorder = recordedMimeType
-                    ? new MediaRecorder(stream, { mimeType: recordedMimeType })
-                    : new MediaRecorder(stream);
-                recordedMimeType = mediaRecorder.mimeType || recordedMimeType || 'audio/webm';
-                audioChunks = [];
-
-                mediaRecorder.ondataavailable = event => { if (event.data.size > 0) audioChunks.push(event.data); };
-                mediaRecorder.onstop = async () => {
-                    // Release the mic hardware and turn off the browser's
-                    // recording indicator now that we're done capturing.
-                    activeStream.getTracks().forEach(track => track.stop());
-                    const audioBlob = new Blob(audioChunks, { type: recordedMimeType });
-                    await sendAudioToGemini(audioBlob);
+                mediaRecorder.ondataavailable = event => {
+                    audioChunks.push(event.data);
                 };
 
-                mediaRecorder.start();
-                isRecording = true;
-                btn.classList.replace('bg-red-600', 'bg-amber-500');
-                icon.classList.replace('fa-microphone', 'fa-stop');
-                status.innerText = "Recording... tap again to stop and send";
-            } else {
-                mediaRecorder.stop();
-                isRecording = false;
-                btn.disabled = true;
-                btn.classList.replace('bg-amber-500', 'bg-red-600');
-                icon.classList.replace('fa-stop', 'fa-microphone');
-                status.innerText = "Processing...";
-            }
-        }
-
-        async function sendAudioToGemini(blob) {
-            const pane = document.getElementById('output-pane');
-            const spinner = document.getElementById('loading-spinner');
-            const results = document.getElementById('script-results');
-            const audioReplyBox = document.getElementById('audio-reply');
-            const btn = document.getElementById('record-btn');
-            const status = document.getElementById('record-status');
-
-            pane.classList.remove('hidden');
-            spinner.classList.remove('hidden');
-            results.innerHTML = '';
-            audioReplyBox.innerHTML = '';
-            audioReplyBox.classList.add('hidden');
-
-            // Use a filename extension that matches the real encoding so
-            // nothing downstream (server, logs, Gemini) gets misled.
-            const ext = recordedMimeType.includes('mp4') ? 'mp4' : recordedMimeType.includes('ogg') ? 'ogg' : 'webm';
-            const formData = new FormData();
-            formData.append('file', blob, `panic_audio.${ext}`);
-            formData.append('user_type', 'individual');
-
-            try {
-                const response = await authFetch('/api/voice-intervention', { method: 'POST', body: formData });
-                const res = await response.json();
-                if (!response.ok) {
-                    throw new Error(res.detail || 'Server error processing audio.');
-                }
-                const parsed = JSON.parse(res.data);
-
-                spinner.classList.add('hidden');
-                results.innerHTML = `
-          <div class="p-3 bg-teal-950/40 border border-teal-500/40 rounded-xl">
-            <span class="text-xs font-mono text-teal-400 font-bold block mb-1">WHAT WE HEARD</span>
-            <p class="text-xs text-slate-200">${parsed.vocal_risk_analysis}</p>
-          </div>
-          <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl">
-            <span class="text-xs font-mono text-emerald-400 font-bold block mb-1">SPOKEN RESPONSE</span>
-            <p class="text-xs font-mono text-slate-300">"${parsed.deescalation_script}"</p>
-          </div>
-          <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl">
-            <span class="text-xs font-mono text-amber-400 font-bold block mb-1">RIGHT NOW</span>
-            <p class="text-xs text-slate-300">${parsed.immediate_safety_steps}</p>
-          </div>
-        `;
-
-                // Play the spoken reply automatically. If TTS failed on the
-                // backend for any reason, audio_base64 will be null -- fall
-                // back to text-only rather than breaking the response.
-                if (res.audio_base64) {
-                    const src = `data:${res.audio_mime || 'audio/wav'};base64,${res.audio_base64}`;
-                    audioReplyBox.classList.remove('hidden');
-                    audioReplyBox.innerHTML = `<audio controls autoplay class="w-full" src="${src}"></audio>`;
-                } else {
-                    audioReplyBox.classList.remove('hidden');
-                    audioReplyBox.innerHTML = `<p class="text-[11px] text-slate-500">Voice reply unavailable right now — showing text response above.</p>`;
-                }
-
-                btn.disabled = false;
-                status.innerText = "Tap to speak";
+                mediaRecorder.onstop = async () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                    await sendAudioToBackend(audioBlob);
+                    recordBtn.innerText = "Start Recording";
+                };
             } catch (err) {
-                spinner.classList.add('hidden');
-                results.innerHTML = `<p class="text-red-400 text-xs">Audio Processing Error: ${err.message}</p>`;
-                btn.disabled = false;
-                status.innerText = "Tap to speak";
+                alert("Microphone access is required to use this feature.");
+                recordBtn.innerText = "Start Recording";
             }
         }
-    </script>
-</body>
+    });
 
+    async function sendAudioToBackend(audioBlob) {
+        const formData = new FormData();
+        formData.append("file", audioBlob, "recording.webm");
+
+        try {
+            // Note: Include Bearer auth token header if authentication is enabled
+            const response = await fetch('/api/voice-intervention', {
+                method: 'POST',
+                body: formData
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                userSpeechText.innerText = result.transcription || "No transcription available.";
+                aiScriptText.innerText = result.deescalation_script;
+
+                if (result.audio_base64) {
+                    const audioSrc = `data:${result.audio_mime};base64,${result.audio_base64}`;
+                    playAudioWithAnimation(audioSrc);
+                }
+            } else {
+                aiScriptText.innerText = "Error: " + (result.detail || "Unable to process audio.");
+            }
+        } catch (error) {
+            aiScriptText.innerText = "Connection error. Please try again.";
+        }
+    }
+</script>
+</body>
 </html>
