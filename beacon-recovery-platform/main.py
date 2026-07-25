@@ -1,11 +1,17 @@
 import os
-import requests
+
+from dotenv import load_dotenv
+load_dotenv()  # local dev convenience — no-op if no .env file is present (e.g. on Render)
+
+import base64
+import io
+import wave
+
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
 from typing import Optional
 from google import genai
 from google.genai import types
@@ -15,7 +21,7 @@ from auth import router as auth_router, get_current_user, User
 app = FastAPI(
     title="Beacon - GenAI Recovery & Prevention Platform",
     version="1.0.0",
-    description="Enterprise Multi-Modal Harm Reduction & Emergency Script Engine"
+    description="Zero-Typing Voice Emergency Intervention Engine"
 )
 
 # Enable CORS for public access
@@ -44,31 +50,10 @@ async def root():
 GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-class ZeroTypingRequest(BaseModel):
-    user_type: str = Field(..., description="'individual' or 'caregiver'")
-    crisis_level: str = Field(..., description="'acute_craving', 'caregiver_deescalation', 'exit_strategy', 'overdose_risk'")
-    substance_category: str = Field(default="General", description="Substance type")
-    latitude: Optional[float] = Field(default=37.7749)
-    longitude: Optional[float] = Field(default=-122.4194)
+ANALYSIS_MODEL = "gemini-2.5-flash"
+TTS_MODEL = "gemini-2.5-flash-preview-tts"
+TTS_VOICE = "Kore"
 
-class EducationQuery(BaseModel):
-    query_topic: str
-    audience: str = Field(default="family_and_patient")
-
-def fetch_live_environmental_context(lat: float, lon: float) -> dict:
-    try:
-        url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current_weather=true"
-        resp = requests.get(url, timeout=3)
-        if resp.status_code == 200:
-            data = resp.json().get("current_weather", {})
-            return {
-                "temperature": f"{data.get('temperature')}°C",
-                "condition_code": data.get("weathercode"),
-                "is_day": "Daytime" if data.get("is_day") == 1 else "Nighttime"
-            }
-    except Exception:
-        pass
-    return {"temperature": "Unknown", "is_day": "Unknown"}
 
 def gemini_auth_error_detail(e: Exception, context: str) -> str:
     """
@@ -85,6 +70,51 @@ def gemini_auth_error_detail(e: Exception, context: str) -> str:
             "in your host's environment variables (no quotes, no extra spaces/newlines), then redeploy."
         )
     return f"{context}: {msg}"
+
+
+def synthesize_speech(text: str, retries: int = 1) -> Optional[str]:
+    """
+    Turns a line of text into spoken audio using Gemini TTS and returns it as
+    base64-encoded WAV, ready to hand straight to an <audio> tag on the
+    frontend. Returns None (never raises) if synthesis fails or the model
+    momentarily returns text instead of audio -- a known rare TTS quirk --
+    so a voice hiccup never breaks the rest of the response.
+    """
+    if not client or not text:
+        return None
+    for _ in range(retries + 1):
+        try:
+            response = client.models.generate_content(
+                model=TTS_MODEL,
+                contents=text,
+                config=types.GenerateContentConfig(
+                    response_modalities=["AUDIO"],
+                    speech_config=types.SpeechConfig(
+                        voice_config=types.VoiceConfig(
+                            prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=TTS_VOICE)
+                        )
+                    ),
+                ),
+            )
+            candidates = getattr(response, "candidates", None)
+            if not candidates:
+                continue
+            parts = candidates[0].content.parts
+            if not parts or not getattr(parts[0], "inline_data", None):
+                continue
+            pcm_data = parts[0].inline_data.data
+
+            buf = io.BytesIO()
+            with wave.open(buf, "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(24000)
+                wf.writeframes(pcm_data)
+            return base64.b64encode(buf.getvalue()).decode("utf-8")
+        except Exception:
+            continue
+    return None
+
 
 @app.get("/api/health")
 async def health_check():
@@ -103,46 +133,6 @@ async def health_check():
             "gemini_error": gemini_auth_error_detail(e, "Key check failed")
         }
 
-@app.post("/api/emergency-script")
-async def generate_emergency_script(payload: ZeroTypingRequest, current_user: User = Depends(get_current_user)):
-    if not client:
-        raise HTTPException(status_code=500, detail="Gemini Engine missing. Set GEMINI_API_KEY env variable.")
-
-    env_context = fetch_live_environmental_context(payload.latitude, payload.longitude)
-
-    system_instruction = """
-    You are an AI Clinical Decision Support Engine specializing in Substance Use Disorder (SUD) emergency interventions.
-    Your objective is to provide ZERO-TYPING, ultra-high clarity actions when the user's cognitive load is at maximum capacity.
-    Outputs MUST be empathetic, clinically sound, actionable, and structured cleanly in JSON.
-    """
-
-    prompt = f"""
-    Target User Role: {payload.user_type.upper()}
-    Emergency Level: {payload.crisis_level}
-    Substance Context: {payload.substance_category}
-    Real Environmental Context: Time of day is {env_context['is_day']}, Temp: {env_context['temperature']}.
-
-    Generate an immediate intervention returning EXACT JSON with keys:
-    1. "immediate_action": One bold sentence (max 15 words) of what to do RIGHT NOW.
-    2. "verbatim_script": Exact words to say out loud or text directly to a trusted contact or caregiver.
-    3. "somatic_grounding": A 30-second somatic physiological grounding exercise.
-    4. "safety_protocol": Critical harm reduction or emergency helpline protocol.
-    5. "samhsa_hotline": "1-800-662-4357 (24/7 Real National Helpline)"
-    """
-
-    try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                response_mime_type="application/json",
-                temperature=0.2
-            )
-        )
-        return {"status": "success", "data": response.text, "context": env_context}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=gemini_auth_error_detail(e, "Gemini Inference Error"))
 
 @app.post("/api/voice-intervention")
 async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Form("individual"),
@@ -152,56 +142,54 @@ async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Fo
 
     try:
         audio_bytes = await file.read()
-        mime_type = file.content_type or "audio/wav"
+        if not audio_bytes:
+            raise HTTPException(status_code=400, detail="No audio received. Please try recording again.")
+
+        # Use the real mime type the browser sent -- not a hardcoded guess --
+        # so Gemini decodes the actual codec that was recorded.
+        mime_type = file.content_type or "audio/webm"
         audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
 
         prompt = f"""
         Analyze this emergency audio clip from a {user_type} navigating a high-cognitive-load recovery crisis.
         1. Identify emotional state and risk level from tone and vocal markers.
-        2. Provide an immediate calming response script.
+        2. Provide an immediate calming response script written as warm, spoken words directly to the
+           person (2-4 short sentences, natural to read out loud -- this will be converted to speech).
         3. Give 2 immediate de-escalation actions.
 
         Return JSON with keys: "vocal_risk_analysis", "deescalation_script", "immediate_safety_steps"
         """
 
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model=ANALYSIS_MODEL,
             contents=[prompt, audio_part],
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 temperature=0.3
             )
         )
-        return {"status": "success", "data": response.text}
+        result_text = response.text
+
+        # Speak the calming script back -- this is the actual voice reply.
+        spoken_text = ""
+        try:
+            import json as _json
+            spoken_text = _json.loads(result_text).get("deescalation_script", "")
+        except Exception:
+            pass
+        audio_b64 = synthesize_speech(spoken_text)
+
+        return {
+            "status": "success",
+            "data": result_text,
+            "audio_base64": audio_b64,
+            "audio_mime": "audio/wav"
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=gemini_auth_error_detail(e, "Audio Processing Error"))
 
-@app.post("/api/educational-resources")
-async def generate_educational_module(payload: EducationQuery, current_user: User = Depends(get_current_user)):
-    if not client:
-        raise HTTPException(status_code=500, detail="Gemini Engine missing.")
-
-    prompt = f"""
-    Provide evidence-based clinical recovery knowledge for: '{payload.query_topic}'.
-    Target Audience: {payload.audience}.
-    Return JSON with keys:
-    1. "clinical_summary": 2-sentence explanation of neurobiology/intervention.
-    2. "actionable_coping_mechanisms": Array of 3 concrete prevention techniques.
-    3. "caregiver_guidance": How family members can support this specific challenge.
-    """
-
-    try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.3
-            )
-        )
-        return {"status": "success", "data": response.text}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=gemini_auth_error_detail(e, "Educational Resource Error"))
 
 app.mount("/", StaticFiles(directory="templates", html=True), name="templates")
 
