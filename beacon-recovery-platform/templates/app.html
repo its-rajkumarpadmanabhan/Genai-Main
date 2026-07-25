@@ -50,7 +50,7 @@
   nav{
     display:flex;
     align-items:center;
-    justify-content:space-between;
+    justify-style:space-between;
     padding:26px 32px;
     max-width:1100px;
     margin:0 auto;
@@ -389,7 +389,6 @@
   const cx = W/2, cy = H/2;
   const baseRadius = W * 0.34;
 
-  // Build a sphere of points using a Fibonacci sphere distribution
   const POINT_COUNT = 900;
   const points = [];
   const golden = Math.PI * (3 - Math.sqrt(5));
@@ -415,7 +414,6 @@
   let audioChunks = [];
   let audioContext, analyser, dataArray;
 
-  // Orbit Rendering Loop
   function project(p, r){
     let x = p.x, y = p.y, z = p.z;
 
@@ -476,7 +474,6 @@
 
   draw();
 
-  // Voice Recording and Handling
   async function toggleRecording() {
     if (isRecording) {
       mediaRecorder.stop();
@@ -551,6 +548,10 @@
 
     if (!audioContext) {
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    if (audioContext.state === 'suspended') {
+      audioContext.resume();
     }
 
     const source = audioContext.createMediaElementSource(audio);
