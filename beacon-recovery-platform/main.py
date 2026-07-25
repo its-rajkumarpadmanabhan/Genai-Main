@@ -75,9 +75,6 @@ async def get_app_page():
 GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-ANALYSIS_MODEL = "gemini-2.5-flash"
-TTS_MODEL = "gemini-2.5-flash"
-TTS_VOICE = "Kore"
 
 
 def gemini_auth_error_detail(e: Exception, context: str) -> str:
@@ -91,9 +88,14 @@ def gemini_auth_error_detail(e: Exception, context: str) -> str:
     return f"{context}: {msg}"
 
 
+ANALYSIS_MODEL = "gemini-2.0-flash"
+TTS_MODEL = "gemini-2.0-flash"
+TTS_VOICE = "Kore"
+
 def synthesize_speech(text: str, retries: int = 2) -> Optional[str]:
     """
-    Turns text into spoken audio using Gemini TTS and returns base64-encoded WAV data.
+    Synthesizes spoken audio from text using Gemini 2.0 Flash audio output modality.
+    Returns base64-encoded WAV string.
     """
     if not client or not text:
         print("[TTS Error]: Client or text missing")
@@ -101,44 +103,47 @@ def synthesize_speech(text: str, retries: int = 2) -> Optional[str]:
 
     for attempt in range(retries + 1):
         try:
+            # Request audio output explicitly
             response = client.models.generate_content(
                 model=TTS_MODEL,
-                contents=f"Please read this aloud clearly and naturally: {text}",
+                contents=f"Say the following phrase out loud in a calm tone: {text}",
                 config=types.GenerateContentConfig(
                     response_modalities=["AUDIO"],
                     speech_config=types.SpeechConfig(
                         voice_config=types.VoiceConfig(
                             prebuilt_voice_config=types.PrebuiltVoiceConfig(voice_name=TTS_VOICE)
                         )
-                    ),
-                ),
+                    )
+                )
             )
-            
-            candidates = getattr(response, "candidates", None)
-            if not candidates:
-                continue
-            
-            parts = candidates[0].content.parts
-            if not parts or not getattr(parts[0], "inline_data", None):
-                continue
-                
-            pcm_data = parts[0].inline_data.data
 
-            buf = io.BytesIO()
-            with wave.open(buf, "wb") as wf:
-                wf.setnchannels(1)
-                wf.setsampwidth(2)
-                wf.setframerate(24000)
-                wf.writeframes(pcm_data)
-                
-            print(f"[TTS Success]: Generated audio bytes on attempt {attempt + 1}")
-            return base64.b64encode(buf.getvalue()).decode("utf-8")
+            # Inspect candidate parts for audio bytes
+            candidates = getattr(response, "candidates", None)
+            if not candidates or not candidates[0].content or not candidates[0].content.parts:
+                continue
+
+            for part in candidates[0].content.parts:
+                inline_data = getattr(part, "inline_data", None)
+                if inline_data and getattr(inline_data, "data", None):
+                    pcm_data = inline_data.data
+
+                    # Encode raw PCM into standard WAV format (1 channel, 16-bit, 24kHz)
+                    buf = io.BytesIO()
+                    with wave.open(buf, "wb") as wf:
+                        wf.setnchannels(1)
+                        wf.setsampwidth(2)
+                        wf.setframerate(24000)
+                        wf.writeframes(pcm_data)
+
+                    print(f"[TTS Success]: Speech generated on attempt {attempt + 1}")
+                    return base64.b64encode(buf.getvalue()).decode("utf-8")
+
         except Exception as tts_err:
             print(f"[TTS Exception Attempt {attempt + 1}]: {tts_err}")
             continue
 
+    print("[TTS Error]: All synthesis attempts failed")
     return None
-
 
 @app.get("/api/health")
 async def health_check():
