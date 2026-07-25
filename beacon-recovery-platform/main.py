@@ -72,7 +72,7 @@ GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
 ANALYSIS_MODEL = "gemini-3.5-flash"
-TTS_MODEL = "gemini-2.5-flash-preview-tts"  # gemini-3.5-flash is text-output only; TTS needs its own model
+TTS_MODEL = "gemini-2.5-flash-tts"  # gemini-3.5-flash is text-output only; TTS needs its own model
 TTS_VOICE = "Kore"
 
 
