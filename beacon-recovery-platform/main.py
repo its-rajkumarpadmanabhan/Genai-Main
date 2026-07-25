@@ -38,18 +38,13 @@ app.add_middleware(
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc: RequestValidationError):
     """
-    FastAPI's default 422 response puts `detail` as a LIST of error objects,
-    e.g. {"detail": [{"msg": "Value error, Password needs 8+ characters...", ...}]}.
-    Every frontend page here does `throw new Error(data.detail)` expecting a
-    plain string -- with a list of objects, JS stringifies it as
-    "[object Object]" and the real message (from our @field_validators in
-    auth.py) never reaches the user. Flatten it into one readable string so
-    signup/login/forgot/reset all show the actual validation message.
+    FastAPI's default 422 response puts `detail` as a LIST of error objects.
+    Flatten it into one readable string so signup/login/forgot/reset all 
+    show the actual validation message.
     """
     messages = []
     for err in exc.errors():
         msg = err.get("msg", "Invalid input")
-        # Pydantic v2 prefixes custom @field_validator ValueErrors with this.
         msg = msg.replace("Value error, ", "")
         messages.append(msg)
     return JSONResponse(status_code=422, content={"detail": "; ".join(messages) or "Invalid input."})
@@ -62,10 +57,33 @@ app.include_router(auth_router)
 async def root():
     """
     Landing page. No account -> straight to sign in (link to sign up from there).
-    The protected main tool lives at /app.html and is guarded client-side +
-    by the '/api/...' endpoints requiring a valid session below.
     """
-    return FileResponse("templates/login.html")
+    if os.path.exists("templates/login.html"):
+        return FileResponse("templates/login.html")
+    elif os.path.exists("login.html"):
+        return FileResponse("login.html")
+    raise HTTPException(status_code=404, detail="login.html not found")
+
+
+@app.get("/app.html", include_in_schema=False)
+async def get_app_page():
+    """
+    Serves the main application page /app.html.
+    Checks common locations (root, templates/, static/) automatically.
+    """
+    possible_paths = [
+        "app.html",
+        "templates/app.html",
+        "static/app.html",
+        "beacon-recovery-platform/app.html",
+        "beacon-recovery-platform/templates/app.html"
+    ]
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            return FileResponse(path)
+            
+    raise HTTPException(status_code=404, detail="app.html file not found on server.")
 
 
 GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
@@ -79,9 +97,7 @@ TTS_VOICE = "Kore"
 def gemini_auth_error_detail(e: Exception, context: str) -> str:
     """
     Turn Google's raw 401/403 errors into a message that actually tells you
-    what to do, instead of a wall of JSON. UNAUTHENTICATED / PERMISSION_DENIED
-    from Gemini almost always means the key itself is wrong -- not expired
-    credentials, not a code bug -- so point straight at fixing the key.
+    what to do, instead of a wall of JSON.
     """
     msg = str(e)
     if "UNAUTHENTICATED" in msg or "401" in msg or "PERMISSION_DENIED" in msg or "403" in msg:
@@ -96,10 +112,7 @@ def gemini_auth_error_detail(e: Exception, context: str) -> str:
 def synthesize_speech(text: str, retries: int = 1) -> Optional[str]:
     """
     Turns a line of text into spoken audio using Gemini TTS and returns it as
-    base64-encoded WAV, ready to hand straight to an <audio> tag on the
-    frontend. Returns None (never raises) if synthesis fails or the model
-    momentarily returns text instead of audio -- a known rare TTS quirk --
-    so a voice hiccup never breaks the rest of the response.
+    base64-encoded WAV.
     """
     if not client or not text:
         return None
@@ -142,8 +155,6 @@ async def health_check():
     if not client:
         return {"status": "online", "gemini_configured": False, "gemini_key_valid": False}
     try:
-        # A minimal real call -- this is the only way to know the key is
-        # actually accepted by Google, not just present in the environment.
         next(iter(client.models.list()))
         return {"status": "online", "gemini_configured": True, "gemini_key_valid": True}
     except Exception as e:
@@ -192,20 +203,16 @@ async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Fo
         spoken_text = ""
         try:
             import json as _json
-            # Strips any markdown block backticks if Gemini includes them
             clean_json_str = result_text.strip().replace("```json", "").replace("```", "").strip()
             parsed_data = _json.loads(clean_json_str)
             spoken_text = parsed_data.get("deescalation_script", "")
         except Exception as json_err:
             print(f"JSON Parsing Error: {json_err}. Raw text was: {result_text}")
-            # Fallback: Use the whole response text instead of leaving it empty!
             spoken_text = result_text
 
-        # If spoken_text is still empty, raise an error instead of using static speech
         if not spoken_text.strip():
             spoken_text = "I received your message and I am here to support you. Let's take a deep breath together."
 
-        # Pass non-empty dynamic text to speech synthesizer
         audio_b64 = synthesize_speech(spoken_text)
 
         return {
@@ -218,3 +225,14 @@ async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Fo
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=gemini_auth_error_detail(e, "Audio Processing Error"))
+
+
+# Mount static files folder if present
+if os.path.exists("templates"):
+    app.mount("/templates", StaticFiles(directory="templates"), name="templates")
+if os.path.exists("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
