@@ -6,7 +6,7 @@ load_dotenv()  # local dev convenience — no-op if no .env file is present (e.g
 import base64
 import io
 import wave
-
+from pydantic import BaseModel, Field
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends
 from fastapi.staticfiles import StaticFiles
@@ -153,7 +153,10 @@ async def health_check():
             "gemini_key_valid": False,
             "gemini_error": gemini_auth_error_detail(e, "Key check failed")
         }
-
+class VoiceInterventionResponse(BaseModel):
+    vocal_risk_analysis: str = Field(description="Summary of vocal tone and panic level")
+    immediate_safety_steps: str = Field(description="Text summary of physical action steps")
+    deescalation_script: str = Field(description="FULL spoken response combining empathy AND immediate safety steps")
 
 @app.post("/api/voice-intervention")
 async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Form("individual"),
@@ -166,37 +169,37 @@ async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Fo
         if not audio_bytes:
             raise HTTPException(status_code=400, detail="No audio received. Please try recording again.")
 
-        # Use the real mime type the browser sent -- not a hardcoded guess --
-        # so Gemini decodes the actual codec that was recorded.
         mime_type = file.content_type or "audio/webm"
         audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
 
         prompt = f"""
         Analyze this emergency audio clip from a {user_type} navigating a high-cognitive-load recovery crisis.
-        1. Identify emotional state and risk level from tone and vocal markers.
-        2. Provide an immediate calming response script written as warm, spoken words directly to the
-           person (2-4 short sentences, natural to read out loud -- this will be converted to speech).
-        3. Give 2 immediate de-escalation actions.
-
-        Return JSON with keys: "vocal_risk_analysis", "deescalation_script", "immediate_safety_steps"
+        1. Identify emotional state and risk level from tone and vocal markers for vocal_risk_analysis.
+        2. Provide 2 immediate de-escalation actions for immediate_safety_steps.
+        3. Provide a single unified spoken script for deescalation_script written directly to the person.
+           CRITICAL REQUIREMENT: The "deescalation_script" MUST combine both warm empathetic reassurance AND the immediate physical safety/first-aid steps into one single spoken response (3-5 clear sentences).
         """
 
+        # Enforce response_schema so Gemini returns valid JSON every time
         response = client.models.generate_content(
             model=ANALYSIS_MODEL,
             contents=[prompt, audio_part],
             config=types.GenerateContentConfig(
-                response_mime_type="application/json"
+                response_mime_type="application/json",
+                response_schema=VoiceInterventionResponse
             )
         )
         result_text = response.text
 
-        # Speak the calming script back -- this is the actual voice reply.
+        # Extract spoken text safely
         spoken_text = ""
         try:
             import json as _json
-            spoken_text = _json.loads(result_text).get("deescalation_script", "")
-        except Exception:
-            pass
+            parsed_data = _json.loads(result_text)
+            spoken_text = parsed_data.get("deescalation_script", "")
+        except Exception as err:
+            print(f"[JSON Parse Error on Backend]: {err}")
+
         audio_b64 = synthesize_speech(spoken_text)
 
         return {
