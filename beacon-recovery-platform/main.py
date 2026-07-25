@@ -6,7 +6,7 @@ load_dotenv()  # local dev convenience — no-op if no .env file is present (e.g
 import base64
 import io
 import wave
-from pydantic import BaseModel, Field
+
 import uvicorn
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends
 from fastapi.staticfiles import StaticFiles
@@ -93,17 +93,27 @@ def gemini_auth_error_detail(e: Exception, context: str) -> str:
     return f"{context}: {msg}"
 
 
-def synthesize_speech(text: str, retries: int = 1) -> Optional[str]:
+def synthesize_speech(text: str, retries: int = 3):
     """
-    Turns a line of text into spoken audio using Gemini TTS and returns it as
-    base64-encoded WAV, ready to hand straight to an <audio> tag on the
-    frontend. Returns None (never raises) if synthesis fails or the model
-    momentarily returns text instead of audio -- a known rare TTS quirk --
-    so a voice hiccup never breaks the rest of the response.
+    Turns a line of text into spoken audio using Gemini TTS and returns
+    (audio_base64, error_message). Never raises -- a voice hiccup should
+    never break the rest of the response -- but unlike before, it no longer
+    swallows the reason silently. Every failed attempt is printed to stderr
+    (visible in your Render/host logs) and the *last* failure reason is
+    returned to the caller so it can be surfaced in the API response too.
+
+    Google's own TTS docs note the model occasionally returns text tokens
+    instead of audio on a request, causing a 500 -- expected to happen on a
+    small percentage of calls, and their recommended fix is exactly what this
+    does: retry automatically (bumped from 1 retry to 3).
     """
-    if not client or not text:
-        return None
-    for _ in range(retries + 1):
+    if not client:
+        return None, "Gemini client not configured (missing GEMINI_API_KEY)."
+    if not text:
+        return None, "No text was provided to synthesize."
+
+    last_error = "Unknown TTS failure."
+    for attempt in range(retries + 1):
         try:
             response = client.models.generate_content(
                 model=TTS_MODEL,
@@ -119,22 +129,37 @@ def synthesize_speech(text: str, retries: int = 1) -> Optional[str]:
             )
             candidates = getattr(response, "candidates", None)
             if not candidates:
+                last_error = f"Gemini TTS returned no candidates (attempt {attempt + 1})."
+                print(f"[TTS ERROR] {last_error}")
                 continue
-            parts = candidates[0].content.parts
-            if not parts or not getattr(parts[0], "inline_data", None):
-                continue
-            pcm_data = parts[0].inline_data.data
 
+            finish_reason = getattr(candidates[0], "finish_reason", None)
+            parts = candidates[0].content.parts if candidates[0].content else None
+            if not parts or not getattr(parts[0], "inline_data", None):
+                # This is the documented "returned text instead of audio" quirk.
+                # Log what it actually said/why, instead of just retrying blind.
+                stray_text = getattr(parts[0], "text", None) if parts else None
+                last_error = (
+                    f"Gemini TTS returned text instead of audio on attempt {attempt + 1} "
+                    f"(finish_reason={finish_reason}, text={stray_text!r})."
+                )
+                print(f"[TTS ERROR] {last_error}")
+                continue
+
+            pcm_data = parts[0].inline_data.data
             buf = io.BytesIO()
             with wave.open(buf, "wb") as wf:
                 wf.setnchannels(1)
                 wf.setsampwidth(2)
                 wf.setframerate(24000)
                 wf.writeframes(pcm_data)
-            return base64.b64encode(buf.getvalue()).decode("utf-8")
-        except Exception:
+            return base64.b64encode(buf.getvalue()).decode("utf-8"), None
+        except Exception as e:
+            last_error = gemini_auth_error_detail(e, f"TTS call failed (attempt {attempt + 1})")
+            print(f"[TTS ERROR] {last_error}")
             continue
-    return None
+
+    return None, last_error
 
 
 @app.get("/api/health")
@@ -153,10 +178,7 @@ async def health_check():
             "gemini_key_valid": False,
             "gemini_error": gemini_auth_error_detail(e, "Key check failed")
         }
-class VoiceInterventionResponse(BaseModel):
-    vocal_risk_analysis: str = Field(description="Summary of vocal tone and panic level")
-    immediate_safety_steps: str = Field(description="Text summary of physical action steps")
-    deescalation_script: str = Field(description="FULL spoken response combining empathy AND immediate safety steps")
+
 
 @app.post("/api/voice-intervention")
 async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Form("individual"),
@@ -169,44 +191,52 @@ async def process_voice_crisis(file: UploadFile = File(...), user_type: str = Fo
         if not audio_bytes:
             raise HTTPException(status_code=400, detail="No audio received. Please try recording again.")
 
+        # Use the real mime type the browser sent -- not a hardcoded guess --
+        # so Gemini decodes the actual codec that was recorded.
         mime_type = file.content_type or "audio/webm"
         audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
 
         prompt = f"""
         Analyze this emergency audio clip from a {user_type} navigating a high-cognitive-load recovery crisis.
-        1. Identify emotional state and risk level from tone and vocal markers for vocal_risk_analysis.
-        2. Provide 2 immediate de-escalation actions for immediate_safety_steps.
-        3. Provide a single unified spoken script for deescalation_script written directly to the person.
-           CRITICAL REQUIREMENT: The "deescalation_script" MUST combine both warm empathetic reassurance AND the immediate physical safety/first-aid steps into one single spoken response (3-5 clear sentences).
+        1. Identify emotional state and risk level from tone and vocal markers.
+        2. Provide an immediate calming response script written as warm, spoken words directly to the
+           person (2-4 short sentences, natural to read out loud -- this will be converted to speech).
+        3. Give 2 immediate de-escalation actions.
+
+        Return JSON with keys: "vocal_risk_analysis", "deescalation_script", "immediate_safety_steps"
         """
 
-        # Enforce response_schema so Gemini returns valid JSON every time
         response = client.models.generate_content(
             model=ANALYSIS_MODEL,
             contents=[prompt, audio_part],
             config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=VoiceInterventionResponse
+                response_mime_type="application/json"
             )
         )
         result_text = response.text
 
-        # Extract spoken text safely
+        # Speak the calming script back -- this is the actual voice reply.
         spoken_text = ""
         try:
             import json as _json
-            parsed_data = _json.loads(result_text)
-            spoken_text = parsed_data.get("deescalation_script", "")
-        except Exception as err:
-            print(f"[JSON Parse Error on Backend]: {err}")
-
-        audio_b64 = synthesize_speech(spoken_text)
+            spoken_text = _json.loads(result_text).get("deescalation_script", "")
+        except Exception:
+            pass
+        audio_b64, audio_error = synthesize_speech(spoken_text)
+        if audio_error:
+            # Visible in server logs already (synthesize_speech prints each
+            # attempt), but also surfaced here so the frontend/browser
+            # console shows exactly why voice failed instead of a silent
+            # "unavailable" -- open browser devtools Network tab and look at
+            # this response, or check your host's logs for [TTS ERROR] lines.
+            print(f"[VOICE INTERVENTION] TTS failed, returning text-only. Reason: {audio_error}")
 
         return {
             "status": "success",
             "data": result_text,
             "audio_base64": audio_b64,
-            "audio_mime": "audio/wav"
+            "audio_mime": "audio/wav",
+            "audio_error": audio_error,
         }
     except HTTPException:
         raise
