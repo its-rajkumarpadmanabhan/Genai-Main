@@ -68,7 +68,7 @@ class VoiceInterventionResponse(BaseModel):
         description="Immediate physical safety or first-aid steps in target language."
     )
     deescalation_script: str = Field(
-        description="The COMPLETE spoken script written strictly in the native script of the requested response language. MUST state the specific nearest hospital name, ownership (Govt/Private), exact distance in kilometers, estimated drive reach time in minutes, and if the closest is closed, explicitly announce it and redirect to the next nearest open facility."
+        description="The COMPLETE spoken script written strictly in the native script of the requested response language. MUST follow conversational flow: 1. Safety Advice, 2. Nearest Hospital info."
     )
 
 
@@ -353,27 +353,24 @@ async def process_voice_crisis(
         DETECTED REAL-TIME NEARBY MEDICAL FACILITIES (SCANNED AT EXACT USER GPS LATITUDE/LONGITUDE: {lat}, {lon}):
         {hospital_context_str}
 
-        CRITICAL INTENT, GPS ROUTING & MULTILINGUAL MANDATES:
+        CRITICAL INTENT, CONVERSATIONAL FLOW & GPS ROUTING:
 
-        1. AUTOMATIC SPOKEN LANGUAGE TRANSLATION:
-           - Analyze the medical issue (e.g., headache, chest pain, leg pain, stomach pain).
-           - Generate ALL JSON fields (vocal_risk_analysis, detected_specialty, immediate_safety_steps, deescalation_script) EXCLUSIVELY in target language: {language}.
-           - Write strictly in the NATIVE SCRIPT of {language} (e.g., Malayalam script മലയാളം).
+        1. CONVERSATIONAL LOGIC (STRICT ORDER):
+           - FIRST: Analyze the user's condition (e.g., headache, chest pain, stomach pain). PROVIDE immediate first-aid, safety advice, or 'what to do' BEFORE mentioning any hospital.
+           - SECOND: ONLY AFTER safety advice, provide the nearest hospital referral.
+           - FOLLOW-UP: If the user is asking specifically for 'which hospitals are near me?', assume they have a condition and provide the list of nearby facilities using the referral rules below.
 
-        2. ACCURATE GPS HOSPITAL ANNOUNCEMENT MANDATE:
+        2. ACCURATE GPS HOSPITAL ANNOUNCEMENT:
            - You MUST explicitly tell the user the PARTICULAR HOSPITAL NAME, OWNERSHIP (Government/Private), EXACT DISTANCE IN KILOMETERS, and ESTIMATED REACH TIME IN MINUTES.
-           - Check the 'Status' of Facility #1.
            - IF FACILITY #1 IS CLOSED:
-             - Explicitly announce in native script that the closest option ({hospitals_list[0]['name'] if hospitals_list else 'facility'}) is currently closed.
-             - Immediately redirect them to the NEXT NEAREST OPEN facility ({hospitals_list[1]['name'] if len(hospitals_list)>1 else 'emergency center'}), stating its exact name, ownership, distance ({hospitals_list[1]['distance_km'] if len(hospitals_list)>1 else '2'} km), and estimated driving time (~{hospitals_list[1]['reach_time_mins'] if len(hospitals_list)>1 else '5'} mins drive).
+             - Announce it is closed, and redirect them to the NEXT NEAREST OPEN facility, citing exact name, ownership, distance, and driving time.
            - IF FACILITY #1 IS OPEN:
-             - Announce Facility #1 ({hospitals_list[0]['name'] if hospitals_list else 'medical facility'}), stating ownership, exact distance ({hospitals_list[0]['distance_km'] if hospitals_list else '1'} km) and estimated drive reach time (~{hospitals_list[0]['reach_time_mins'] if hospitals_list else '3'} mins drive).
+             - Announce Facility #1, its ownership, exact distance, and estimated drive reach time.
 
-        3. STRICT SCOPE SAFETY:
-           - NEVER recommend restaurants, food, or non-medical services.
-
-        4. CASUAL QUERIES:
-           - If query is non-medical (e.g. "Who are you?"), answer conversationally in native script of {language} without listing hospitals.
+        3. LANGUAGE & STYLE:
+           - Generate ALL JSON fields in the requested language: {language}.
+           - Write strictly in the NATIVE SCRIPT of {language} (e.g., Malayalam script മലയാളം).
+           - Do not recommend restaurants or non-medical services.
 
         OUTPUT MUST BE VALID JSON MATCHING THE SCHEMA EXACTLY.
         """
