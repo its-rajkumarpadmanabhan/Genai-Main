@@ -9,6 +9,7 @@ import wave
 from typing import List, Optional
 
 import uvicorn
+import edge_tts
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.exceptions import RequestValidationError
@@ -63,10 +64,8 @@ GEMINI_API_KEY = (
 )
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-# Active Flash models for fast inference & TTS synthesis
 PRIMARY_MODEL = "gemini-2.5-flash"
 FALLBACK_MODEL = "gemini-2.0-flash"
-TTS_VOICE = "Kore"
 
 
 class VoiceInterventionResponse(BaseModel):
@@ -208,54 +207,41 @@ def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
         hospitals.sort(key=lambda x: x["distance_km"])
         return hospitals[:6]
     except Exception as e:
-        print(f"[FAST MAP SCAN ERROR] {e}")
+        print(f"[MAP SCAN ERROR] {e}")
         return []
 
 
-def synthesize_speech_direct(text: str, target_language: str) -> Optional[str]:
-    """Generates clear, native-sounding voice audio via Gemini TTS with fallback."""
-    if not client or not text:
+async def generate_free_neural_speech(text: str, target_language: str) -> Optional[str]:
+    """
+    Synthesizes crystal-clear audio using Microsoft's free Neural Voice engine.
+    Zero rate limits, zero costs, and zero quota consumption on Gemini!
+    """
+    if not text:
         return None
 
-    tts_prompt = f"Speak the following text aloud clearly and naturally in {target_language}: {text}"
-    models_to_try = [PRIMARY_MODEL, FALLBACK_MODEL, "gemini-2.0-flash-exp"]
+    # Native voice mappings for 100% natural pronunciation
+    voice_map = {
+        "Malayalam": "ml-IN-SobhanaNeural",
+        "Tamil": "ta-IN-PallaviNeural",
+        "Hindi": "hi-IN-SwaraNeural",
+        "Spanish": "es-ES-ElviraNeural",
+        "Arabic": "ar-SA-ZariyahNeural",
+        "English": "en-US-AvaNeural",
+    }
+    voice = voice_map.get(target_language, "en-US-AvaNeural")
 
-    for model_name in models_to_try:
-        try:
-            response = client.models.generate_content(
-                model=model_name,
-                contents=tts_prompt,
-                config=types.GenerateContentConfig(
-                    response_modalities=["AUDIO"],
-                    speech_config=types.SpeechConfig(
-                        voice_config=types.VoiceConfig(
-                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                voice_name=TTS_VOICE
-                            )
-                        )
-                    ),
-                ),
-            )
+    try:
+        communicate = edge_tts.Communicate(text, voice)
+        buf = io.BytesIO()
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                buf.write(chunk["data"])
 
-            candidates = getattr(response, "candidates", None)
-            if not candidates or not candidates[0].content:
-                continue
-
-            parts = candidates[0].content.parts
-            for part in parts:
-                inline_data = getattr(part, "inline_data", None)
-                if inline_data and inline_data.data:
-                    pcm_data = inline_data.data
-                    buf = io.BytesIO()
-                    with wave.open(buf, "wb") as wf:
-                        wf.setnchannels(1)
-                        wf.setsampwidth(2)
-                        wf.setframerate(24000)
-                        wf.writeframes(pcm_data)
-                    return base64.b64encode(buf.getvalue()).decode("utf-8")
-        except Exception as e:
-            print(f"[TTS FAIL ON {model_name}] {e}")
-            continue
+        audio_bytes = buf.getvalue()
+        if audio_bytes:
+            return base64.b64encode(audio_bytes).decode("utf-8")
+    except Exception as e:
+        print(f"[EDGE-TTS ERROR] {e}")
 
     return None
 
@@ -372,6 +358,7 @@ async def process_voice_crisis(
         OUTPUT MUST BE VALID JSON MATCHING THE SCHEMA EXACTLY.
         """
 
+        # Single API call to Gemini (Saves 50% Quota!)
         try:
             response = client.models.generate_content(
                 model=PRIMARY_MODEL,
@@ -381,15 +368,18 @@ async def process_voice_crisis(
                     response_schema=VoiceInterventionResponse,
                 ),
             )
-        except Exception:
-            response = client.models.generate_content(
-                model=FALLBACK_MODEL,
-                contents=[prompt, audio_part],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=VoiceInterventionResponse,
-                ),
-            )
+        except Exception as e:
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                response = client.models.generate_content(
+                    model=FALLBACK_MODEL,
+                    contents=[prompt, audio_part],
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=VoiceInterventionResponse,
+                    ),
+                )
+            else:
+                raise e
 
         result_text = response.text
         spoken_text = ""
@@ -399,8 +389,8 @@ async def process_voice_crisis(
         except Exception as parse_err:
             print(f"[JSON PARSE ERROR] {parse_err}")
 
-        # Synthesize audio directly in target language
-        audio_b64 = synthesize_speech_direct(spoken_text, language)
+        # Instant Free Neural Speech Generation
+        audio_b64 = await generate_free_neural_speech(spoken_text, language)
 
         should_show_hospitals = bool(hospitals_list) and not any(
             k in result_text.lower()
@@ -411,11 +401,16 @@ async def process_voice_crisis(
             "status": "success",
             "data": result_text,
             "audio_base64": audio_b64,
-            "audio_mime": "audio/wav",
+            "audio_mime": "audio/mp3",
             "audio_error": None if audio_b64 else "Audio synthesis fallback",
             "hospitals": hospitals_list if should_show_hospitals else [],
         }
     except Exception as e:
+        if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+            raise HTTPException(
+                status_code=429,
+                detail="System busy. Please retry in 10 seconds."
+            )
         raise HTTPException(status_code=500, detail=str(e))
 
 
