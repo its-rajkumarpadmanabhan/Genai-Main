@@ -28,7 +28,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 # Configuration
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:ycbM7#Y4p+d3fmJ@db.wsoufcugaxhqdozuvsih.supabase.co:5432/postgres")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:ycbM7%Y4p+d3fmJ@db.wsoufcugaxhqdozuvsih.supabase.co:5432/postgres")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
@@ -76,7 +76,7 @@ class PasswordResetToken(Base):
     used = Column(Boolean, default=False)
 
 
-Base.metadata.create_all(bind=engine)
+#Base.metadata.create_all(bind=engine)
 
 
 def get_db():
