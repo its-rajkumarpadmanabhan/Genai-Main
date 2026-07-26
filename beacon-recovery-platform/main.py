@@ -37,10 +37,6 @@ app.add_middleware(
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc: RequestValidationError):
-    """
-    FastAPI's default 422 response puts `detail` as a LIST of error objects.
-    Flatten it into one readable string so frontend shows the actual validation message.
-    """
     messages = []
     for err in exc.errors():
         msg = err.get("msg", "Invalid input")
@@ -63,8 +59,8 @@ async def root():
 GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-ANALYSIS_MODEL = "gemini-3.5-flash"
-TTS_MODEL = "gemini-2.5-flash-preview-tts"  # gemini-3.5-flash is text-output only; TTS needs its own model
+ANALYSIS_MODEL = "gemini-2.5-flash"
+TTS_MODEL = "gemini-2.5-flash-preview-tts"
 TTS_VOICE = "Kore"
 
 
@@ -217,7 +213,6 @@ async def process_voice_crisis(
            CRITICAL REQUIREMENT: "deescalation_script" MUST combine BOTH warm empathetic reassurance AND the immediate physical safety/first-aid steps (e.g. keeping an injured leg still, breathing, applying pressure) into one clear, spoken response (3-5 sentences).
         """
 
-        # Try primary model first; fallback to gemini-2.5-flash-lite on 429 rate limit
         try:
             response = client.models.generate_content(
                 model=ANALYSIS_MODEL,
@@ -230,10 +225,10 @@ async def process_voice_crisis(
         except Exception as model_err:
             if "429" in str(model_err) or "RESOURCE_EXHAUSTED" in str(model_err):
                 print(
-                    "[API WARNING] Primary model hit rate limit (429). Falling back to gemini-2.5-flash-lite."
+                    "[API WARNING] Primary model hit rate limit (429). Retrying with gemini-2.5-flash."
                 )
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash-lite",
+                    model="gemini-2.5-flash",
                     contents=[prompt, audio_part],
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
@@ -245,7 +240,7 @@ async def process_voice_crisis(
 
         result_text = response.text
 
-        # Extract the complete script (empathy + right now steps) for voice playback
+        # Extract complete script for TTS audio synthesis
         spoken_text = ""
         try:
             import json as _json
