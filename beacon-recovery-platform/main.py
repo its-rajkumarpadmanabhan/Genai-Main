@@ -64,7 +64,7 @@ GEMINI_API_KEY = (
 )
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-PRIMARY_MODEL = "gemini-2.5-flash"
+PRIMARY_MODEL = "gemini-1.5-flash"
 FALLBACK_MODEL = "gemini-2.0-flash"
 
 
