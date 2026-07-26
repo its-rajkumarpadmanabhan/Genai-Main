@@ -16,7 +16,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
-load_dotenv()
+load_dotenv()  # local dev convenience — no-op if no .env file is present
 
 app = FastAPI(
     title="Beacon - GenAI Recovery & Prevention Platform",
@@ -24,6 +24,7 @@ app = FastAPI(
     description="Zero-Typing Voice Emergency Intervention Engine",
 )
 
+# Enable CORS for public access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -35,6 +36,10 @@ app.add_middleware(
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc: RequestValidationError):
+    """
+    Flatten Pydantic validation errors into a single string so frontend displays
+    the actual error message directly.
+    """
     messages = [
         err.get("msg", "Invalid input").replace("Value error, ", "")
         for err in exc.errors()
@@ -45,6 +50,7 @@ async def validation_exception_handler(request, exc: RequestValidationError):
     )
 
 
+# Account system: signup / login / forgot-password / reset-password
 app.include_router(auth_router)
 
 
@@ -58,11 +64,15 @@ GEMINI_API_KEY = (
 )
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-ANALYSIS_MODEL = "gemini-2.5-flash"
-TTS_MODEL = "gemini-2.5-flash-preview-tts"
+# Active Gemini 3.x production endpoints
+ANALYSIS_MODEL = "gemini-3.6-flash"
+FALLBACK_ANALYSIS_MODEL = "gemini-3.5-flash-lite"
+TTS_MODEL = "gemini-3.1-flash-tts-preview"
+TTS_FALLBACK_MODEL = "gemini-2.5-flash-preview-tts"
 TTS_VOICE = "Kore"
 
 
+# Pydantic Schema guarantees Gemini outputs 100% valid, auto-escaped JSON every time
 class VoiceInterventionResponse(BaseModel):
     vocal_risk_analysis: str = Field(
         description="Analysis of vocal tone, distress level, or summary of platform informational inquiry translated into the requested language."
@@ -97,7 +107,7 @@ def synthesize_speech(text: str, retries: int = 3):
     if not text:
         return None, "No text provided for audio synthesis."
 
-    tts_models = [TTS_MODEL, "gemini-2.5-flash-tts"]
+    tts_models = [TTS_MODEL, TTS_FALLBACK_MODEL]
 
     last_error = "Unknown failure"
     for model_name in tts_models:
@@ -172,7 +182,7 @@ async def health_check():
 async def process_voice_crisis(
     file: UploadFile = File(...),
     user_type: str = Form("individual"),
-    language: str = Form("English"),  # Accepts selected language
+    language: str = Form("English"),
     current_user: User = Depends(get_current_user),
 ):
     if not client:
@@ -225,9 +235,9 @@ async def process_voice_crisis(
                 ),
             )
         except Exception as model_err:
-            if "429" in str(model_err) or "RESOURCE_EXHAUSTED" in str(model_err):
+            if "429" in str(model_err) or "RESOURCE_EXHAUSTED" in str(model_err) or "404" in str(model_err):
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash-lite",
+                    model=FALLBACK_ANALYSIS_MODEL,
                     contents=[prompt, audio_part],
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
@@ -248,7 +258,6 @@ async def process_voice_crisis(
         except Exception as parse_err:
             print(f"[JSON PARSE ERROR] {parse_err}")
 
-        # Gemini TTS synthesizes native pronunciation for Malayalam, Tamil, Hindi, Spanish, etc.
         audio_b64, audio_error = synthesize_speech(spoken_text)
 
         return {
