@@ -51,11 +51,8 @@ GEMINI_API_KEY = (
 )
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-# Active Gemini 3.x production endpoints
 ANALYSIS_MODEL = "gemini-3.6-flash"
 FALLBACK_ANALYSIS_MODEL = "gemini-3.5-flash-lite"
-TTS_MODEL = "gemini-3.1-flash-tts-preview"
-TTS_FALLBACK_MODEL = "gemini-2.5-flash-preview-tts"
 TTS_VOICE = "Kore"
 
 
@@ -63,18 +60,21 @@ class VoiceInterventionResponse(BaseModel):
     vocal_risk_analysis: str = Field(
         description="Analysis of vocal tone, distress level, or summary of user inquiry in target language."
     )
+    detected_specialty: str = Field(
+        description="Identified medical specialty or condition (e.g. Ophthalmology, Dentistry, General Emergency, Cardiology)."
+    )
     immediate_safety_steps: str = Field(
         description="Immediate physical safety or first-aid steps in target language."
     )
     deescalation_script: str = Field(
-        description="The COMPLETE spoken script written strictly in the native script of the requested response language."
+        description="The COMPLETE spoken script written strictly in the native script of the requested response language, addressing exact kilometers, open/closed status, and next nearest routing if closed."
     )
 
 
 def calculate_distance_and_time(
     lat1: float, lon1: float, lat2: float, lon2: float
 ):
-    """Calculates Haversine distance in kilometers and estimated driving reach time."""
+    """Calculates Haversine distance in exact kilometers and driving reach time in minutes."""
     R = 6371.0
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
@@ -93,7 +93,7 @@ def calculate_distance_and_time(
 
 
 def determine_open_status(tags: dict) -> str:
-    """Evaluates facility operating status."""
+    """Evaluates whether a hospital or clinic is currently open or 24/7."""
     opening_hours = tags.get("opening_hours", "").strip().lower()
     amenity = tags.get("amenity", "").strip().lower()
     emergency = tags.get("emergency", "").strip().lower()
@@ -109,23 +109,26 @@ def determine_open_status(tags: dict) -> str:
     return "Open / Active"
 
 
-def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
-    """Lightweight & high-speed OpenStreetMap query."""
+def fetch_hospitals_data(lat: float, lon: float, specialty_keyword: Optional[str] = None) -> List[dict]:
+    """Scans map centered at user's exact GPS coordinates for all medical centers, clinics, and specialists."""
     headers = {"User-Agent": "BeaconEngine/1.0"}
+    
+    # Fast OpenStreetMap Overpass Query
     overpass_query = f"""
-    [out:json][timeout:6];
+    [out:json][timeout:10];
     (
-      node["amenity"~"hospital|clinic|dentist|doctors"](around:25000, {lat}, {lon});
-      way["amenity"~"hospital|clinic"](around:25000, {lat}, {lon});
+      node["amenity"~"hospital|clinic|dentist|doctors"](around:30000, {lat}, {lon});
+      way["amenity"~"hospital|clinic"](around:30000, {lat}, {lon});
+      node["healthcare"~"hospital|clinic|doctor"](around:30000, {lat}, {lon});
     );
-    out center 12;
+    out center 25;
     """
     try:
         url = "https://overpass-api.de/api/interpreter"
         data = urllib.parse.urlencode({"data": overpass_query}).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers=headers)
 
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=7) as resp:
             result = json.loads(resp.read().decode())
 
         elements = result.get("elements", [])
@@ -160,7 +163,7 @@ def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
                 or (
                     "Dental Specialist"
                     if "Dentist" in amenity
-                    else "Emergency Medical Physician"
+                    else "General Medicine Physician"
                 )
             )
 
@@ -179,6 +182,13 @@ def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
                 )
                 maps_url = f"https://www.google.com/maps/dir/?api=1&destination={elem_lat},{elem_lon}"
 
+                # Specialty Relevance Checking
+                is_specialty_match = True
+                if specialty_keyword and len(specialty_keyword) > 2:
+                    sk = specialty_keyword.lower()
+                    combined_tags = f"{name} {facility_type} {doctor} {tags.get('healthcare:speciality', '')}".lower()
+                    is_specialty_match = any(term in combined_tags for term in [sk, "hospital", "emergency", "clinic"])
+
                 hospitals.append(
                     {
                         "name": name,
@@ -187,6 +197,8 @@ def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
                         "address": address,
                         "doctor": doctor,
                         "status": status,
+                        "is_open": not status.startswith("Closed"),
+                        "specialty_match": is_specialty_match,
                         "distance_km": dist_km,
                         "reach_time_mins": reach_time_mins,
                         "maps_url": maps_url,
@@ -195,18 +207,16 @@ def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
                     }
                 )
 
-        hospitals.sort(key=lambda x: x["distance_km"])
-        return hospitals[:6]
+        # Sort strictly: Open facilities matching specialty first, then by exact kilometer distance
+        hospitals.sort(key=lambda x: (not x["is_open"], not x["specialty_match"], x["distance_km"]))
+        return hospitals[:8]
     except Exception as e:
-        print(f"[FAST MAP SCAN ERROR] {e}")
+        print(f"[MAP SCAN ERROR] {e}")
         return []
 
 
 async def generate_free_neural_speech(text: str, target_language: str) -> Optional[str]:
-    """
-    Synthesizes audio using Microsoft's free Edge Neural Voice engine.
-    Zero rate limits and zero quota impact on Gemini!
-    """
+    """Synthesizes audio using Microsoft's free Edge Neural Voice engine."""
     if not text or not HAS_EDGE_TTS:
         return None
 
@@ -299,6 +309,7 @@ async def process_voice_crisis(
         mime_type = file.content_type or "audio/webm"
         audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
 
+        # Initial fetch of medical centers based on user GPS
         hospitals_list = []
         if lat is not None and lon is not None:
             hospitals_list = fetch_hospitals_data(lat, lon)
@@ -306,7 +317,7 @@ async def process_voice_crisis(
         hospital_summary_lines = []
         for idx, h in enumerate(hospitals_list):
             hospital_summary_lines.append(
-                f"Facility #{idx+1}: {h['name']} ({h['type']}) | Distance: {h['distance_km']} km | Reach: ~{h['reach_time_mins']} mins | Status: {h['status']} | Specialist: {h['doctor']}"
+                f"Facility #{idx+1}: {h['name']} ({h['type']}) | Distance: {h['distance_km']} km | Drive Reach Time: ~{h['reach_time_mins']} mins | Status: {h['status']} (Open: {h['is_open']}) | Doctor/Specialist: {h['doctor']}"
             )
 
         hospital_context_str = (
@@ -319,31 +330,35 @@ async def process_voice_crisis(
         You are Beacon, an intelligent voice emergency health assistant.
         Analyze the audio input from user '{current_user.username}'.
 
-        DETECTED REAL-TIME NEARBY MEDICAL FACILITIES (SORTED BY DISTANCE):
+        DETECTED REAL-TIME NEARBY MEDICAL FACILITIES (MAP DATA FOR USER GPS LOCATION):
         {hospital_context_str}
 
-        CRITICAL INTENT, MULTILINGUAL & ROUTING MANDATES:
+        CRITICAL INTENT, SPECIALTY FILTERING & ROUTING RULES:
 
-        1. AUTOMATIC SPOKEN LANGUAGE TRANSLATION:
-           - The user may speak ANY language in the audio clip (e.g., Malayalam, Tamil, Hindi, English).
-           - Regardless of the input spoken language, you MUST generate ALL fields in the JSON response (vocal_risk_analysis, immediate_safety_steps, and deescalation_script) EXCLUSIVELY in the requested TARGET RESPONSE LANGUAGE: {language}.
-           - For non-English target languages (e.g. Malayalam, Tamil, Hindi, Arabic, Spanish), write strictly in the NATIVE SCRIPT of {language} (e.g., Malayalam script മലയാളം) so the TTS voice reads it with authentic pronunciation.
+        1. DISEASE / SPECIALTY IDENTIFICATION:
+           - Analyze what disease, symptom, or medical requirement the user mentioned (e.g., eye pain -> Ophthalmology, toothache -> Dental, chest pain -> Emergency/Cardiology, skin rash -> Dermatology, or general illness).
+           - Populate 'detected_specialty' with the relevant medical department.
 
-        2. ACCURATE HOSPITAL ROUTING & CLOSED STATUS HANDLING:
-           - Review the sorted facilities list above.
-           - Check the 'Status' of Facility #1.
-           - IF FACILITY #1 IS CLOSED:
-             - Explicitly announce in native {language} script that the closest option ({hospitals_list[0]['name'] if hospitals_list else 'facility'}) is currently closed.
-             - Immediately redirect them to Facility #2 ({hospitals_list[1]['name'] if len(hospitals_list)>1 else 'emergency center'}), stating exact distance ({hospitals_list[1]['distance_km'] if len(hospitals_list)>1 else '2'} km) and drive reach time (~{hospitals_list[1]['reach_time_mins'] if len(hospitals_list)>1 else '5'} mins drive).
-           - IF FACILITY #1 IS OPEN:
-             - Direct them straight to Facility #1 ({hospitals_list[0]['name'] if hospitals_list else 'medical facility'}), stating exact distance ({hospitals_list[0]['distance_km'] if hospitals_list else '1'} km) and drive reach time (~{hospitals_list[0]['reach_time_mins'] if hospitals_list else '3'} mins drive).
+        2. AUTOMATIC SPOKEN LANGUAGE TRANSLATION:
+           - The user may speak ANY language in the audio clip.
+           - Generate ALL JSON fields (vocal_risk_analysis, detected_specialty, immediate_safety_steps, deescalation_script) EXCLUSIVELY in target language: {language}.
+           - For non-English languages, write strictly in native script of {language} (e.g. Malayalam script മലയാളം).
 
-        3. STRICT SCOPE SAFETY:
+        3. OPEN VS CLOSED ROUTING & FAILOVER:
+           - Look at the provided list of facilities.
+           - Identify the closest facility that handles their condition.
+           - IF THE NEAREST FACILITY IS CLOSED:
+             - You MUST explicitly inform the user in native {language} script that the nearest option ({hospitals_list[0]['name'] if hospitals_list else 'facility'}) is currently closed.
+             - IMMEDIATELY redirect them to the NEXT NEAREST OPEN facility ({hospitals_list[1]['name'] if len(hospitals_list)>1 else 'emergency medical center'}).
+             - State the exact distance in kilometers ({hospitals_list[1]['distance_km'] if len(hospitals_list)>1 else '2'} km) and drive time (~{hospitals_list[1]['reach_time_mins'] if len(hospitals_list)>1 else '5'} mins).
+           - IF THE NEAREST FACILITY IS OPEN:
+             - Direct them straight to Facility #1 ({hospitals_list[0]['name'] if hospitals_list else 'medical center'}), stating exact distance in kilometers ({hospitals_list[0]['distance_km'] if hospitals_list else '1'} km) and drive time (~{hospitals_list[0]['reach_time_mins'] if hospitals_list else '3'} mins).
+
+        4. STRICT SCOPE SAFETY:
            - NEVER recommend restaurants, food, or non-medical services.
-           - If user mentions medical pain mixed with casual tasks (e.g., "hungry and headache"), address the health symptom immediately and advise them not to delay medical evaluation.
 
-        4. CASUAL / META QUERIES:
-           - If query is non-medical (e.g., "Who are you?"), respond conversationally in native script of {language} without listing hospitals.
+        5. CASUAL QUERIES:
+           - If query is 100% non-medical (e.g., "Who are you?"), answer politely in native script of {language} without listing hospitals.
 
         OUTPUT MUST BE VALID JSON MATCHING THE SCHEMA EXACTLY.
         """
