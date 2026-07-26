@@ -127,7 +127,7 @@ def determine_open_status(tags: dict) -> str:
     return "Open / Active"
 
 
-def fetch_hospitals_data(lat: float, lon: float, specialty_keyword: Optional[str] = None) -> List[dict]:
+def fetch_hospitals_data(lat: float, lon: float, specialty_keyword: Optional[str] = None, accuracy_m: Optional[float] = None) -> List[dict]:
     """Scans map with expanding radius. Returns [] if no genuine facilities are verified."""
     headers = {"User-Agent": "BeaconEngine/1.0"}
     endpoints = [
@@ -137,6 +137,23 @@ def fetch_hospitals_data(lat: float, lon: float, specialty_keyword: Optional[str
     
     # Tiered search: Start small (5km) and expand to 50km only if needed
     radiuses = [5000, 20000, 50000]
+
+    # LOCATION ACCURACY HANDLING:
+    # `accuracy_m` is the GPS accuracy radius (in meters) reported by the client's
+    # navigator.geolocation fix. If that fix is uncertain (large accuracy_m — common
+    # on desktop/wifi-based positioning), the visitor's true position could already
+    # lie outside a tight 5km/20km ring, so searching those tiers first can miss
+    # real nearby facilities. In that case, skip straight to a tier that safely
+    # covers the uncertainty, and if even 50km isn't enough, add one wider tier on
+    # top of the existing list (nothing existing is removed, only extended).
+    if accuracy_m and accuracy_m > 0:
+        radiuses = [r for r in radiuses if r >= accuracy_m]
+        if not radiuses:
+            radiuses = [5000, 20000, 50000]
+        widened_radius = int(accuracy_m + 5000)
+        if widened_radius not in radiuses:
+            radiuses.append(widened_radius)
+            radiuses.sort()
     
     for radius in radiuses:
         overpass_query = f"""
@@ -246,6 +263,7 @@ async def get_nearest_hospitals(
     lat: Optional[float] = Query(None),
     lon: Optional[float] = Query(None),
     location_query: Optional[str] = Query(None),
+    accuracy: Optional[float] = Query(None, description="GPS accuracy radius in meters, from navigator.geolocation on the client"),
     current_user: User = Depends(get_current_user),
 ):
     headers = {"User-Agent": "BeaconEngine/1.0"}
@@ -268,10 +286,10 @@ async def get_nearest_hospitals(
             status_code=400, detail="GPS Coordinates or search query required."
         )
 
-    hospitals = fetch_hospitals_data(lat, lon)
+    hospitals = fetch_hospitals_data(lat, lon, accuracy_m=accuracy)
     return {
         "status": "success",
-        "search_center": {"lat": lat, "lon": lon},
+        "search_center": {"lat": lat, "lon": lon, "accuracy_m": accuracy},
         "count": len(hospitals),
         "hospitals": hospitals,
     }
@@ -284,6 +302,7 @@ async def process_voice_crisis(
     language: str = Form("English"),
     lat: Optional[float] = Form(None),
     lon: Optional[float] = Form(None),
+    accuracy: Optional[float] = Form(None, description="GPS accuracy radius in meters, from navigator.geolocation on the client"),
     current_user: User = Depends(get_current_user),
 ):
     if not client:
@@ -304,7 +323,7 @@ async def process_voice_crisis(
         # GPS Data Verification
         hospitals_list = []
         if lat is not None and lon is not None:
-            hospitals_list = fetch_hospitals_data(lat, lon)
+            hospitals_list = fetch_hospitals_data(lat, lon, accuracy_m=accuracy)
 
         hospital_summary_lines = []
         for idx, h in enumerate(hospitals_list):
