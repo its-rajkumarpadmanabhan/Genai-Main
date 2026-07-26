@@ -28,7 +28,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 # Configuration
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./beacon_users.db")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:ycbM7#Y4p+d3fmJ@db.wsoufcugaxhqdozuvsih.supabase.co:5432/postgres")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
