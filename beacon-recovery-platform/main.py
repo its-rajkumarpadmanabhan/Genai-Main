@@ -18,8 +18,16 @@ from fastapi.staticfiles import StaticFiles
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
-from auth import User, get_current_user, router as auth_router
+from auth import (
+    User,
+    get_current_user,
+    get_db,
+    get_user_medical_history,
+    router as auth_router,
+    save_user_medical_event,
+)
 
 load_dotenv()
 
@@ -77,7 +85,9 @@ class VoiceInterventionResponse(BaseModel):
     immediate_safety_steps: str = Field(
         description="Immediate physical safety or guidance steps."
     )
-    deescalation_script: str = Field(description="Spoken response script.")
+    deescalation_script: str = Field(
+        description="The COMPLETE spoken response script written strictly in the requested language."
+    )
 
 
 def calculate_distance_and_time(
@@ -103,23 +113,25 @@ def calculate_distance_and_time(
 def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
     headers = {"User-Agent": "BeaconEmergencyPlatform/1.0"}
     overpass_query = f"""
-    [out:json][timeout:10];
+    [out:json][timeout:12];
     (
-      node["amenity"="hospital"](around:15000, {lat}, {lon});
-      node["amenity"="clinic"](around:15000, {lat}, {lon});
-      node["amenity"="dentist"](around:15000, {lat}, {lon});
-      node["amenity"="doctors"](around:15000, {lat}, {lon});
-      way["amenity"="hospital"](around:15000, {lat}, {lon});
-      way["amenity"="clinic"](around:15000, {lat}, {lon});
+      node["amenity"="hospital"](around:25000, {lat}, {lon});
+      node["amenity"="clinic"](around:25000, {lat}, {lon});
+      node["amenity"="dentist"](around:25000, {lat}, {lon});
+      node["amenity"="doctors"](around:25000, {lat}, {lon});
+      way["amenity"="hospital"](around:25000, {lat}, {lon});
+      way["amenity"="clinic"](around:25000, {lat}, {lon});
+      node["healthcare"="hospital"](around:25000, {lat}, {lon});
+      node["healthcare"="clinic"](around:25000, {lat}, {lon});
     );
-    out center 15;
+    out center 20;
     """
     try:
         url = "https://overpass-api.de/api/interpreter"
         data = urllib.parse.urlencode({"data": overpass_query}).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers=headers)
 
-        with urllib.request.urlopen(req, timeout=8) as resp:
+        with urllib.request.urlopen(req, timeout=10) as resp:
             result = json.loads(resp.read().decode())
 
         elements = result.get("elements", [])
@@ -127,11 +139,14 @@ def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
 
         for elem in elements:
             tags = elem.get("tags", {})
-            name = tags.get("name") or tags.get("name:en") or "Medical Center"
-            amenity = tags.get("amenity", "hospital").capitalize()
-            facility_type = (
-                "Dental Clinic" if amenity == "Dentist" else amenity
+            name = (
+                tags.get("name")
+                or tags.get("name:en")
+                or "Medical Center / Health Clinic"
             )
+            amenity = tags.get("amenity") or tags.get("healthcare") or "hospital"
+            amenity = amenity.capitalize()
+            facility_type = "Dental Clinic" if "Dentist" in amenity else amenity
             phone = (
                 tags.get("phone")
                 or tags.get("contact:phone")
@@ -151,8 +166,8 @@ def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
                 or tags.get("speciality")
                 or (
                     "Dental Specialist"
-                    if amenity == "Dentist"
-                    else "Duty Medical Specialist"
+                    if "Dentist" in amenity
+                    else "Emergency Medical Physician"
                 )
             )
 
@@ -187,7 +202,7 @@ def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
         hospitals.sort(key=lambda x: x["reach_time_mins"])
         return hospitals[:6]
     except Exception as e:
-        print(f"[HOSPITAL FETCH ERROR] {e}")
+        print(f"[HOSPITAL SCAN ERROR] {e}")
         return []
 
 
@@ -267,7 +282,7 @@ async def get_nearest_hospitals(
 
     if lat is None or lon is None:
         raise HTTPException(
-            status_code=400, detail="GPS Coordinates or search query required."
+            status_code=400, detail="GPS Coordinates or location query required."
         )
 
     hospitals = fetch_hospitals_data(lat, lon)
@@ -286,6 +301,7 @@ async def process_voice_crisis(
     language: str = Form("English"),
     lat: Optional[float] = Form(None),
     lon: Optional[float] = Form(None),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     if not client:
@@ -301,54 +317,60 @@ async def process_voice_crisis(
             data=audio_bytes, mime_type=mime_type
         )
 
+        # Retrieve past user medical history from SQLite via SQLAlchemy
+        history_records = get_user_medical_history(db, current_user.id)
+        history_str = "No prior recorded medical visits."
+        if history_records:
+            history_str = "\n".join(
+                [
+                    f"- Date: {r['date']}, Reported Condition/Ailment: '{r['condition']}', Recommended Hospital: '{r['hospital']}'"
+                    for r in history_records
+                ]
+            )
+
+        # Query OpenStreetMap for nearest medical facilities
         hospitals_list = []
         if lat is not None and lon is not None:
             hospitals_list = fetch_hospitals_data(lat, lon)
 
-        top_hospital_info = ""
+        top_h_str = "No nearby hospital detected."
         if hospitals_list:
             top_h = hospitals_list[0]
-            top_hospital_info = f"Name: {top_h['name']}, Type: {top_h['type']}, Drive Time: ~{top_h['reach_time_mins']} mins away, Specialist: {top_h['doctor']}."
+            top_h_str = f"Name: {top_h['name']}, Distance: {top_h['distance_km']} km, Drive Reach Time: ~{top_h['reach_time_mins']} minutes away, Specialist: {top_h['doctor']}."
 
         prompt = f"""
-        You are Beacon, an intelligent AI crisis response and medical emergency assistant.
-        Analyze the audio clip from the user carefully.
+        You are Beacon, an intelligent emergency health and crisis AI assistant.
+        Analyze the audio input from user '{current_user.username}'.
 
-        REAL-TIME NEARBY MEDICAL FACILITY DATA:
-        {top_hospital_info if top_hospital_info else "No live GPS coordinates available."}
+        USER'S PREVIOUS MEDICAL HISTORY LOGS:
+        {history_str}
 
-        STRICT INTENT CLASSIFICATION RULES:
+        NEARBY DETECTED MEDICAL CENTER CONTEXT:
+        {top_h_str}
 
-        EVALUATE THE USER'S INPUT AND CLASSIFY IT INTO ONE OF THREE CATEGORIES:
+        CRITICAL INTENT AND MEDICAL MEMORY LOGIC:
 
-        --------------------------------------------------------------------------------
-        CATEGORY 1: CONVERSATIONAL, META, OR INFORMATIONAL QUESTIONS
-        Examples: "What is the first thing you do?", "Who are you?", "What can you do?", "How are you?"
-        - vocal_risk_analysis: "Informational inquiry regarding system capabilities and identity."
-        - immediate_safety_steps: "No physical emergency action required."
-        - deescalation_script: Answer the user's question directly, clearly, and naturally in {language}. 
-          (Example: "When you speak to me during an emergency, my first priority is to evaluate your vocal distress, guide you through immediate first-aid steps, and find the nearest hospital or doctor for you.")
-        - STRICT RULE: DO NOT mention any hospitals, drive times, or doctors for general questions!
-        --------------------------------------------------------------------------------
+        1. LANGUAGE MANDATE:
+           Generate ALL outputs (vocal_risk_analysis, immediate_safety_steps, and deescalation_script) strictly in: {language}.
 
-        CATEGORY 2: CASUAL NON-MEDICAL REQUESTS
-        Examples: "I am hungry", "Find me a restaurant", "What is the weather like?"
-        - vocal_risk_analysis: "Casual non-emergency query."
-        - immediate_safety_steps: "No medical intervention required."
-        - deescalation_script: Respond appropriately and conversationally to the user in {language}. Politely clarify that you are an emergency medical response platform designed for health crises and trauma guidance.
-        - STRICT RULE: DO NOT recommend orthopedic doctors, hospitals, or emergency steps for food or casual requests!
-        --------------------------------------------------------------------------------
+        2. PREVIOUS MEDICAL HISTORY INTEGRATION (CRITICAL):
+           - Review the user's past medical history above.
+           - IF THE USER IS REPORTING AN AILMENT/CONDITION THEY HAD BEFORE (e.g. headache, toothache, chest pain, eye pain):
+             - Acknowledge their history warmly in the spoken response! 
+               (Example: "I notice that previously you also reported a headache and visited [Previous Hospital Name]. Would you like to return to [Previous Hospital Name] for continuity of care, or should I guide you to the nearest available hospital right now, which is [Nearest Hospital Name]?")
+             - Provide immediate first-aid steps in {language}.
 
-        CATEGORY 3: GENUINE MEDICAL CRISIS, TRAUMA, INJURY, DENTAL PAIN, OR ILLNESS
-        Examples: "I have a toothache", "My leg is bleeding", "Chest pain", "I feel unconscious", "I broke my arm"
-        - vocal_risk_analysis: Assess distress level, vocal markers, and emergency severity in {language}.
-        - immediate_safety_steps: Provide 2 immediate physical first-aid/care steps in {language}.
-        - deescalation_script: Provide warm, spoken de-escalation instructions in {language} combining:
-          1. Empathetic reassurance and physical first-aid steps.
-          2. Explicitly announce out loud: The nearest medical facility ({hospitals_list[0]['name'] if hospitals_list else 'medical center'}), estimated reach time (~{hospitals_list[0]['reach_time_mins'] if hospitals_list else '5'} minutes away), and the attending doctor/specialist ({hospitals_list[0]['doctor'] if hospitals_list else 'emergency specialist'}).
-        --------------------------------------------------------------------------------
+        3. MIXED / COMPLEX / RISKY ACTIONS (e.g. "I have eye pain and I'm going to a theater", "I am hungry and I have a headache"):
+           - Warn them clearly against risky behavior first (e.g. "Do not go to the movie theater as bright lights will strain your eyes.").
+           - Guide them to the nearest hospital or their previously visited facility.
 
-        OUTPUT FORMAT MUST BE VALID JSON IN {language} MATCHING THE SCHEMA EXACTLY.
+        4. PURELY CASUAL / NON-MEDICAL (e.g. "I am hungry", "Who are you?"):
+           - Respond conversationally and politely in {language}. DO NOT invent hospitals or mention past medical records if there is no medical ailment.
+
+        5. PURE MEDICAL CRISIS / FIRST VISIT FOR THIS AILMENT:
+           - Assess distress, give 2 immediate safety steps, and state the nearest facility name ({hospitals_list[0]['name'] if hospitals_list else 'medical center'}), reach time (~{hospitals_list[0]['reach_time_mins'] if hospitals_list else '5'} mins), and attending doctor ({hospitals_list[0]['doctor'] if hospitals_list else 'Specialist'}).
+
+        OUTPUT MUST BE VALID JSON IN {language} MATCHING THE SCHEMA EXACTLY.
         """
 
         try:
@@ -375,27 +397,24 @@ async def process_voice_crisis(
         try:
             parsed_data = json.loads(result_text)
             spoken_text = parsed_data.get("deescalation_script", "")
+
+            # Automatically log medical events into SQLite history
+            condition_desc = parsed_data.get("vocal_risk_analysis", "")
+            if hospitals_list and not any(
+                k in result_text.lower()
+                for k in ["no medical intervention required", "non-emergency query"]
+            ):
+                rec_hospital = hospitals_list[0]["name"]
+                save_user_medical_event(db, current_user.id, condition_desc, rec_hospital)
+
         except Exception as parse_err:
             print(f"[JSON PARSE ERROR] {parse_err}")
 
         audio_b64, audio_error = synthesize_speech(spoken_text)
 
-        is_medical_event = any(
-            k in spoken_text.lower()
-            for k in [
-                "hospital",
-                "clinic",
-                "doctor",
-                "specialist",
-                "reach time",
-                "first-aid",
-                "tooth",
-                "pain",
-                "medical",
-            ]
-        ) and not any(
+        should_show_hospitals = bool(hospitals_list) and not any(
             k in result_text.lower()
-            for k in ["non-emergency", "informational query"]
+            for k in ["no medical intervention required", "non-emergency query"]
         )
 
         return {
@@ -404,7 +423,7 @@ async def process_voice_crisis(
             "audio_base64": audio_b64,
             "audio_mime": "audio/wav",
             "audio_error": audio_error,
-            "hospitals": hospitals_list if is_medical_event else [],
+            "hospitals": hospitals_list if should_show_hospitals else [],
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

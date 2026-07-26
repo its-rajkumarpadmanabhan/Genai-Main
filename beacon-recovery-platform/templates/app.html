@@ -384,7 +384,7 @@
       window.location.replace('/login.html');
   }
 
-  // Location & Hospital Scanner (GPS with IP Fallback)
+  // Location & Hospital Scanner
   function detectLocationAndScan() {
       const status = document.getElementById('location-status');
       status.classList.remove('hidden');
@@ -399,14 +399,14 @@
           async (position) => {
               currentLat = position.coords.latitude;
               currentLon = position.coords.longitude;
-              status.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> Live GPS acquired (${currentLat.toFixed(3)}, ${currentLon.toFixed(3)}). Searching nearby medical facilities...`;
+              status.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> Live GPS acquired (${currentLat.toFixed(3)}, ${currentLon.toFixed(3)}). Searching medical facilities...`;
               await fetchHospitals(`/api/nearest-hospitals?lat=${currentLat}&lon=${currentLon}`);
           },
           async () => {
-              console.warn("GPS failed/blocked. Falling back to IP-based location...");
+              console.warn("GPS failed/blocked. Falling back to IP location...");
               await fallbackToIpLocation();
           },
-          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+          { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
       );
   }
 
@@ -456,7 +456,7 @@
   function renderHospitalsList(hospitals) {
       const list = document.getElementById('hospitals-list');
       if (!hospitals || hospitals.length === 0) {
-          list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-slate-400">No medical emergency centers loaded for current view.</div>`;
+          list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-slate-400">No medical facilities found nearby for current view.</div>`;
           return;
       }
 
@@ -470,7 +470,7 @@
               ${(h.reach_time_mins !== undefined || h.doctor) ? `
               <div class="flex items-center justify-between text-[11px] font-mono text-emerald-400 font-semibold">
                   <span><i class="fa-solid fa-car-side mr-1"></i>~${h.reach_time_mins || 5} min drive (${h.distance_km || 2} km)</span>
-                  <span class="text-slate-300 text-[10px]"><i class="fa-solid fa-user-doctor text-blue-400 mr-1"></i>${h.doctor || 'Trauma Physician'}</span>
+                  <span class="text-slate-300 text-[10px]"><i class="fa-solid fa-user-doctor text-blue-400 mr-1"></i>${h.doctor || 'Trauma Specialist'}</span>
               </div>` : ''}
               <div class="flex items-center justify-between pt-1 text-[11px]">
                   <a href="tel:${h.phone}" class="text-slate-300 font-mono hover:text-emerald-400"><i class="fa-solid fa-phone text-emerald-400 mr-1"></i>${h.phone}</a>
@@ -478,6 +478,36 @@
               </div>
           </div>
       `).join('');
+  }
+
+  // Multi-Language Native Web Voice Player Fallback
+  function playNativeSpeech(text, language) {
+      if (!('speechSynthesis' in window) || !text) return;
+      speechSynthesis.cancel(); // Clear any playing voice
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 0.95;
+
+      const langCodeMap = {
+          'English': 'en-US',
+          'Malayalam': 'ml-IN',
+          'Tamil': 'ta-IN',
+          'Hindi': 'hi-IN',
+          'Spanish': 'es-ES',
+          'Arabic': 'ar-SA'
+      };
+
+      const targetLang = langCodeMap[language] || 'en-US';
+      utterance.lang = targetLang;
+
+      // Select matching regional voice if available in browser
+      const voices = speechSynthesis.getVoices();
+      const matchedVoice = voices.find(v => v.lang.startsWith(targetLang.split('-')[0]) || v.lang === targetLang);
+      if (matchedVoice) {
+          utterance.voice = matchedVoice;
+      }
+
+      speechSynthesis.speak(utterance);
   }
 
   // Audio Recording Engine
@@ -593,7 +623,7 @@
               <p class="text-xs text-slate-200">${parsed.vocal_risk_analysis}</p>
             </div>
             <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl">
-              <span class="text-xs font-mono text-emerald-400 font-bold block mb-1">BEACON SPOKEN RESPONSE</span>
+              <span class="text-xs font-mono text-emerald-400 font-bold block mb-1">BEACON SPOKEN RESPONSE (${selectedLanguage})</span>
               <p class="text-xs font-mono text-slate-300">"${parsed.deescalation_script}"</p>
             </div>
             <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl">
@@ -610,16 +640,11 @@
               audioReplyBox.classList.remove('hidden');
               audioReplyBox.innerHTML = `
                   <div class="p-2.5 bg-teal-950/60 border border-teal-500/40 rounded-xl flex items-center justify-between text-teal-300 text-xs">
-                      <span><i class="fa-solid fa-volume-high text-teal-400 mr-2"></i> Playing response via Web Voice</span>
+                      <span><i class="fa-solid fa-volume-high text-teal-400 mr-2"></i> Playing response in ${selectedLanguage}</span>
                       <button onclick="speechSynthesis.cancel()" class="text-[10px] bg-slate-800 px-2 py-1 rounded text-slate-300">Stop</button>
                   </div>
               `;
-              if ('speechSynthesis' in window && parsed.deescalation_script) {
-                  speechSynthesis.cancel();
-                  const utterance = new SpeechSynthesisUtterance(parsed.deescalation_script);
-                  utterance.rate = 0.95;
-                  speechSynthesis.speak(utterance);
-              }
+              playNativeSpeech(parsed.deescalation_script, selectedLanguage);
           }
 
           status.innerText = "Tap the orb or button to start recording";
@@ -630,7 +655,7 @@
       }
   }
 
-  // 3D Fibonacci Sphere Voice Orb Animation Engine
+  // 3D Fibonacci Sphere Voice Orb Engine
   let setOrbState = function(listening) {};
 
   (function(){
