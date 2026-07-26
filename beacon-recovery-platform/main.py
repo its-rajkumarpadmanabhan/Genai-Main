@@ -9,7 +9,6 @@ import wave
 from typing import List, Optional
 
 import uvicorn
-import edge_tts
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.exceptions import RequestValidationError
@@ -21,6 +20,13 @@ from google.genai import types
 from pydantic import BaseModel, Field
 
 from auth import User, get_current_user, router as auth_router
+
+try:
+    import edge_tts
+    HAS_EDGE_TTS = True
+except ImportError:
+    HAS_EDGE_TTS = False
+    print("[WARN] edge-tts package not installed. Speech synthesis will fall back to text.")
 
 load_dotenv()
 
@@ -38,34 +44,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request, exc: RequestValidationError):
-    messages = [
-        err.get("msg", "Invalid input").replace("Value error, ", "")
-        for err in exc.errors()
-    ]
-    return JSONResponse(
-        status_code=422,
-        content={"detail": "; ".join(messages) or "Invalid input."},
-    )
-
-
 app.include_router(auth_router)
-
-
-@app.get("/", include_in_schema=False)
-async def root():
-    return FileResponse("templates/login.html")
-
 
 GEMINI_API_KEY = (
     (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
 )
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-PRIMARY_MODEL = "gemini-2.5-flash"
-FALLBACK_MODEL = "gemini-2.0-flash"
+# Active Gemini 3.x production endpoints
+ANALYSIS_MODEL = "gemini-3.6-flash"
+FALLBACK_ANALYSIS_MODEL = "gemini-3.5-flash-lite"
+TTS_MODEL = "gemini-3.1-flash-tts-preview"
+TTS_FALLBACK_MODEL = "gemini-2.5-flash-preview-tts"
+TTS_VOICE = "Kore"
+
 
 class VoiceInterventionResponse(BaseModel):
     vocal_risk_analysis: str = Field(
@@ -206,19 +198,18 @@ def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
         hospitals.sort(key=lambda x: x["distance_km"])
         return hospitals[:6]
     except Exception as e:
-        print(f"[MAP SCAN ERROR] {e}")
+        print(f"[FAST MAP SCAN ERROR] {e}")
         return []
 
 
 async def generate_free_neural_speech(text: str, target_language: str) -> Optional[str]:
     """
-    Synthesizes crystal-clear audio using Microsoft's free Neural Voice engine.
-    Zero rate limits, zero costs, and zero quota consumption on Gemini!
+    Synthesizes audio using Microsoft's free Edge Neural Voice engine.
+    Zero rate limits and zero quota impact on Gemini!
     """
-    if not text:
+    if not text or not HAS_EDGE_TTS:
         return None
 
-    # Native voice mappings for 100% natural pronunciation
     voice_map = {
         "Malayalam": "ml-IN-SobhanaNeural",
         "Tamil": "ta-IN-PallaviNeural",
@@ -357,10 +348,9 @@ async def process_voice_crisis(
         OUTPUT MUST BE VALID JSON MATCHING THE SCHEMA EXACTLY.
         """
 
-        # Single API call to Gemini (Saves 50% Quota!)
         try:
             response = client.models.generate_content(
-                model=PRIMARY_MODEL,
+                model=ANALYSIS_MODEL,
                 contents=[prompt, audio_part],
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
@@ -368,9 +358,9 @@ async def process_voice_crisis(
                 ),
             )
         except Exception as e:
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e) or "NOT_FOUND" in str(e):
                 response = client.models.generate_content(
-                    model=FALLBACK_MODEL,
+                    model=FALLBACK_ANALYSIS_MODEL,
                     contents=[prompt, audio_part],
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
@@ -388,7 +378,7 @@ async def process_voice_crisis(
         except Exception as parse_err:
             print(f"[JSON PARSE ERROR] {parse_err}")
 
-        # Instant Free Neural Speech Generation
+        # Free Neural Speech Synthesis
         audio_b64 = await generate_free_neural_speech(spoken_text, language)
 
         should_show_hospitals = bool(hospitals_list) and not any(
