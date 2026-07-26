@@ -5,6 +5,7 @@ import wave
 from typing import Optional
 
 import uvicorn
+from auth import User, get_current_user, router as auth_router
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.exceptions import RequestValidationError
@@ -15,9 +16,7 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
-from auth import User, get_current_user, router as auth_router
-
-load_dotenv()  # local dev convenience — no-op if no .env file is present (e.g. on Render)
+load_dotenv()
 
 app = FastAPI(
     title="Beacon - GenAI Recovery & Prevention Platform",
@@ -25,7 +24,6 @@ app = FastAPI(
     description="Zero-Typing Voice Emergency Intervention Engine",
 )
 
-# Enable CORS for public access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -37,17 +35,16 @@ app.add_middleware(
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc: RequestValidationError):
-    messages = []
-    for err in exc.errors():
-        msg = err.get("msg", "Invalid input")
-        msg = msg.replace("Value error, ", "")
-        messages.append(msg)
+    messages = [
+        err.get("msg", "Invalid input").replace("Value error, ", "")
+        for err in exc.errors()
+    ]
     return JSONResponse(
-        status_code=422, content={"detail": "; ".join(messages) or "Invalid input."}
+        status_code=422,
+        content={"detail": "; ".join(messages) or "Invalid input."},
     )
 
 
-# Account system: signup / login / forgot-password / reset-password
 app.include_router(auth_router)
 
 
@@ -56,25 +53,25 @@ async def root():
     return FileResponse("templates/login.html")
 
 
-GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
+GEMINI_API_KEY = (
+    (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
+)
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-# Active model endpoints
-ANALYSIS_MODEL = "gemini-3.6-flash"
+ANALYSIS_MODEL = "gemini-2.5-flash"
 TTS_MODEL = "gemini-2.5-flash-preview-tts"
 TTS_VOICE = "Kore"
 
 
-# Pydantic Schema ensures Gemini outputs 100% valid, auto-escaped JSON every time
 class VoiceInterventionResponse(BaseModel):
     vocal_risk_analysis: str = Field(
-        description="Analysis of vocal tone, distress level, and risk assessment."
+        description="Analysis of vocal tone, distress level, or summary of platform informational inquiry translated into the requested language."
     )
     immediate_safety_steps: str = Field(
-        description="Text bullet points or summary of immediate physical safety steps."
+        description="Text bullet points or summary of immediate physical safety steps translated into the requested language."
     )
     deescalation_script: str = Field(
-        description="The COMPLETE spoken response script combining empathetic validation AND immediate physical safety instructions into one single spoken response."
+        description="The COMPLETE spoken response script combining empathetic validation AND immediate physical safety instructions into one single spoken response strictly written in the requested language."
     )
 
 
@@ -89,70 +86,62 @@ def gemini_auth_error_detail(e: Exception, context: str) -> str:
         return (
             f"{context}: Gemini rejected the API key (invalid or malformed GEMINI_API_KEY). "
             "Generate a fresh key at https://aistudio.google.com/apikey, set it as GEMINI_API_KEY "
-            "in your host's environment variables (no quotes, no extra spaces/newlines), then redeploy."
+            "in your host's environment variables, then redeploy."
         )
     return f"{context}: {msg}"
 
 
 def synthesize_speech(text: str, retries: int = 3):
     if not client:
-        return None, "Gemini client not configured (missing GEMINI_API_KEY)."
+        return None, "Gemini client not configured."
     if not text:
-        return None, "No text was provided to synthesize."
+        return None, "No text provided for audio synthesis."
 
-    last_error = "Unknown TTS failure."
-    for attempt in range(retries + 1):
-        try:
-            response = client.models.generate_content(
-                model=TTS_MODEL,
-                contents=text,
-                config=types.GenerateContentConfig(
-                    response_modalities=["AUDIO"],
-                    speech_config=types.SpeechConfig(
-                        voice_config=types.VoiceConfig(
-                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                voice_name=TTS_VOICE
+    tts_models = [TTS_MODEL, "gemini-2.5-flash-tts"]
+
+    last_error = "Unknown failure"
+    for model_name in tts_models:
+        for attempt in range(retries):
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=text,
+                    config=types.GenerateContentConfig(
+                        response_modalities=["AUDIO"],
+                        speech_config=types.SpeechConfig(
+                            voice_config=types.VoiceConfig(
+                                prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                                    voice_name=TTS_VOICE
+                                )
                             )
-                        )
+                        ),
                     ),
-                ),
-            )
-            candidates = getattr(response, "candidates", None)
-            if not candidates:
-                last_error = (
-                    f"Gemini TTS returned no candidates (attempt {attempt + 1})."
                 )
-                print(f"[TTS ERROR] {last_error}")
+                candidates = getattr(response, "candidates", None)
+                if not candidates:
+                    continue
+
+                parts = (
+                    candidates[0].content.parts
+                    if candidates[0].content
+                    else None
+                )
+                if not parts or not getattr(parts[0], "inline_data", None):
+                    continue
+
+                pcm_data = parts[0].inline_data.data
+                buf = io.BytesIO()
+                with wave.open(buf, "wb") as wf:
+                    wf.setnchannels(1)
+                    wf.setsampwidth(2)
+                    wf.setframerate(24000)
+                    wf.writeframes(pcm_data)
+                return base64.b64encode(buf.getvalue()).decode("utf-8"), None
+            except Exception as e:
+                last_error = str(e)
                 continue
 
-            parts = (
-                candidates[0].content.parts if candidates[0].content else None
-            )
-            if not parts or not getattr(parts[0], "inline_data", None):
-                stray_text = getattr(parts[0], "text", None) if parts else None
-                last_error = (
-                    f"Gemini TTS returned text instead of audio on attempt {attempt + 1} "
-                    f"(finish_reason={getattr(candidates[0], 'finish_reason', None)}, text={stray_text!r})."
-                )
-                print(f"[TTS ERROR] {last_error}")
-                continue
-
-            pcm_data = parts[0].inline_data.data
-            buf = io.BytesIO()
-            with wave.open(buf, "wb") as wf:
-                wf.setnchannels(1)
-                wf.setsampwidth(2)
-                wf.setframerate(24000)
-                wf.writeframes(pcm_data)
-            return base64.b64encode(buf.getvalue()).decode("utf-8"), None
-        except Exception as e:
-            last_error = gemini_auth_error_detail(
-                e, f"TTS call failed (attempt {attempt + 1})"
-            )
-            print(f"[TTS ERROR] {last_error}")
-            continue
-
-    return None, last_error
+    return None, f"TTS synthesis failed: {last_error}"
 
 
 @app.get("/api/health")
@@ -183,6 +172,7 @@ async def health_check():
 async def process_voice_crisis(
     file: UploadFile = File(...),
     user_type: str = Form("individual"),
+    language: str = Form("English"),  # Accepts selected language
     current_user: User = Depends(get_current_user),
 ):
     if not client:
@@ -205,19 +195,24 @@ async def process_voice_crisis(
         )
 
         prompt = f"""
-        Analyze this audio clip from a {user_type} interacting with Beacon.
+        You are Beacon, an emergency response and crisis AI assistant.
+        Analyze this audio clip from a {user_type}.
 
-        First, assess the user's intent:
+        CRITICAL LANGUAGE INSTRUCTION:
+        You MUST provide ALL outputs in the JSON schema (vocal_risk_analysis, immediate_safety_steps, and deescalation_script) exclusively in the following language: {language}.
+        Even if the input user audio is spoken in a different dialect or language, understand the intent and respond completely in {language}.
 
-        1. IF THE USER IS ASKING PLATFORM/GENERAL QUESTIONS (e.g., "Who are you?", "What do you do?", "How many people have you helped?", "What can you do?"):
-           - vocal_risk_analysis: State "Informational inquiry regarding system identity or capabilities."
-           - immediate_safety_steps: State "No emergency physical action required."
-           - deescalation_script: Provide a concise, friendly response explaining that you are Beacon, an AI-powered crisis and emergency response assistant built to offer immediate voice guidance, de-escalation, and safety steps during high-stress recovery situations.
+        Evaluate user intent:
 
-        2. IF THE USER IS EXPERIENCING AN ACTUAL EMERGENCY OR CRISIS (e.g., panic, distress, physical injury, pain):
-           - vocal_risk_analysis: Identify emotional state, distress level, and risk assessment from vocal markers.
-           - immediate_safety_steps: Provide 2 immediate physical action/first-aid steps for screen reference.
-           - deescalation_script: CRITICAL REQUIREMENT — "deescalation_script" MUST combine BOTH warm empathetic reassurance AND the immediate physical safety/first-aid steps (e.g., keeping an injured leg still, applying pressure, slow deep breathing) into one single spoken response (3-5 sentences).
+        1. IF THE USER IS ASKING GENERAL/META QUESTIONS ABOUT THE SYSTEM (e.g., "Who are you?", "What do you do?", "How many people do you help?", "What can you do?"):
+           - vocal_risk_analysis: State "Informational inquiry regarding Beacon system identity and capabilities." in {language}.
+           - immediate_safety_steps: State "No emergency physical action required." in {language}.
+           - deescalation_script: Provide a concise, friendly response in {language} explaining that you are Beacon, an AI-powered crisis response assistant built to offer real-time voice guidance, de-escalation, and physical safety instructions during emergency situations.
+
+        2. IF THE USER IS EXPERIENCING AN ACTUAL EMERGENCY OR CRISIS (e.g., panic, physical injury, distress, pain):
+           - vocal_risk_analysis: Identify emotional state, distress level, and risk assessment from vocal markers in {language}.
+           - immediate_safety_steps: Provide 2 immediate physical action/first-aid steps for screen reference in {language}.
+           - deescalation_script: CRITICAL REQUIREMENT — "deescalation_script" MUST combine BOTH warm empathetic reassurance AND the immediate physical safety/first-aid steps (e.g., keeping an injured leg still, applying pressure, slow deep breathing) into one single spoken response (3-5 sentences) written entirely in {language}.
         """
 
         try:
@@ -231,11 +226,8 @@ async def process_voice_crisis(
             )
         except Exception as model_err:
             if "429" in str(model_err) or "RESOURCE_EXHAUSTED" in str(model_err):
-                print(
-                    "[API WARNING] Primary model hit rate limit (429). Retrying with gemini-3.5-flash-lite."
-                )
                 response = client.models.generate_content(
-                    model="gemini-3.5-flash-lite",
+                    model="gemini-2.5-flash-lite",
                     contents=[prompt, audio_part],
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
@@ -247,7 +239,6 @@ async def process_voice_crisis(
 
         result_text = response.text
 
-        # Extract complete script for TTS audio synthesis
         spoken_text = ""
         try:
             import json as _json
@@ -257,11 +248,8 @@ async def process_voice_crisis(
         except Exception as parse_err:
             print(f"[JSON PARSE ERROR] {parse_err}")
 
+        # Gemini TTS synthesizes native pronunciation for Malayalam, Tamil, Hindi, Spanish, etc.
         audio_b64, audio_error = synthesize_speech(spoken_text)
-        if audio_error:
-            print(
-                f"[VOICE INTERVENTION] TTS failed, returning text-only. Reason: {audio_error}"
-            )
 
         return {
             "status": "success",
