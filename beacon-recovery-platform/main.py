@@ -51,6 +51,7 @@ GEMINI_API_KEY = (
 )
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
+# Active Gemini 3.x production endpoints
 ANALYSIS_MODEL = "gemini-3.6-flash"
 FALLBACK_ANALYSIS_MODEL = "gemini-3.5-flash-lite"
 TTS_VOICE = "Kore"
@@ -61,20 +62,20 @@ class VoiceInterventionResponse(BaseModel):
         description="Analysis of vocal tone, distress level, or summary of user inquiry in target language."
     )
     detected_specialty: str = Field(
-        description="Identified medical specialty or condition (e.g. Ophthalmology, Dentistry, General Emergency, Cardiology)."
+        description="Identified medical requirement or condition (e.g. Emergency Medicine, Neurology, General Medicine)."
     )
     immediate_safety_steps: str = Field(
         description="Immediate physical safety or first-aid steps in target language."
     )
     deescalation_script: str = Field(
-        description="The COMPLETE spoken script written strictly in the native script of the requested response language, addressing exact kilometers, open/closed status, and next nearest routing if closed."
+        description="The COMPLETE spoken script written strictly in the native script of the requested response language. MUST follow conversational flow: 1. Safety Advice for the condition, 2. Hospital Referral (Name, Ownership, Distance, Time)."
     )
 
 
 def calculate_distance_and_time(
     lat1: float, lon1: float, lat2: float, lon2: float
 ):
-    """Calculates Haversine distance in exact kilometers and driving reach time in minutes."""
+    """Calculates realistic driving distance (1.6x winding) and time (20 km/h average)."""
     R = 6371.0
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
@@ -85,11 +86,13 @@ def calculate_distance_and_time(
         * math.sin(dlon / 2) ** 2
     )
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    dist_km = round(R * c, 1)
+    straight_dist_km = R * c
 
-    driving_dist_km = dist_km * 1.3
-    reach_time_mins = max(1, round((driving_dist_km / 30.0) * 60))
-    return dist_km, reach_time_mins
+    # Realistic road distance (straight line * 1.6 factor for urban roads)
+    driving_dist_km = round(straight_dist_km * 1.6, 1)
+    # 20 km/h is a realistic average speed including traffic/signals in urban areas
+    reach_time_mins = max(2, round((driving_dist_km / 20.0) * 60))
+    return driving_dist_km, reach_time_mins
 
 
 def determine_open_status(tags: dict) -> str:
@@ -110,10 +113,9 @@ def determine_open_status(tags: dict) -> str:
 
 
 def fetch_hospitals_data(lat: float, lon: float, specialty_keyword: Optional[str] = None) -> List[dict]:
-    """Scans map centered at user's exact GPS coordinates for all medical centers, clinics, and specialists."""
+    """Scans map centered at user's exact GPS coordinates using reliable Overpass API mirrors."""
     headers = {"User-Agent": "BeaconEngine/1.0"}
     
-    # Fast OpenStreetMap Overpass Query
     overpass_query = f"""
     [out:json][timeout:10];
     (
@@ -123,96 +125,114 @@ def fetch_hospitals_data(lat: float, lon: float, specialty_keyword: Optional[str
     );
     out center 25;
     """
-    try:
-        url = "https://overpass-api.de/api/interpreter"
-        data = urllib.parse.urlencode({"data": overpass_query}).encode("utf-8")
-        req = urllib.request.Request(url, data=data, headers=headers)
+    
+    endpoints = [
+        "https://overpass-api.de/api/interpreter",
+        "https://overpass.kumi.systems/api/interpreter",
+        "https://maps.mail.ru/osm/tools/overpass/api/interpreter"
+    ]
 
-        with urllib.request.urlopen(req, timeout=7) as resp:
-            result = json.loads(resp.read().decode())
+    result = None
+    data_bytes = urllib.parse.urlencode({"data": overpass_query}).encode("utf-8")
 
-        elements = result.get("elements", [])
-        hospitals = []
+    for endpoint in endpoints:
+        try:
+            req = urllib.request.Request(endpoint, data=data_bytes, headers=headers)
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                result = json.loads(resp.read().decode())
+                if result and "elements" in result:
+                    break
+        except Exception as e:
+            print(f"[OVERPASS MIRROR FAIL - {endpoint}]: {e}")
+            continue
 
-        for elem in elements:
-            tags = elem.get("tags", {})
-            name = (
-                tags.get("name")
-                or tags.get("name:en")
-                or "Medical Center / Health Clinic"
-            )
-            amenity = tags.get("amenity", "hospital").capitalize()
-            facility_type = "Dental Clinic" if "Dentist" in amenity else amenity
-            phone = (
-                tags.get("phone")
-                or tags.get("contact:phone")
-                or tags.get("emergency:phone")
-                or "108 / 911"
-            )
-            address = (
-                tags.get("addr:street")
-                or tags.get("addr:full")
-                or tags.get("addr:suburb")
-                or "Nearby"
-            )
-            doctor = (
-                tags.get("operator")
-                or tags.get("doctor")
-                or tags.get("healthcare:speciality")
-                or tags.get("speciality")
-                or (
-                    "Dental Specialist"
-                    if "Dentist" in amenity
-                    else "General Medicine Physician"
-                )
-            )
-
-            status = determine_open_status(tags)
-
-            elem_lat = elem.get("lat") or (
-                elem.get("center", {}).get("lat") if "center" in elem else None
-            )
-            elem_lon = elem.get("lon") or (
-                elem.get("center", {}).get("lon") if "center" in elem else None
-            )
-
-            if elem_lat and elem_lon:
-                dist_km, reach_time_mins = calculate_distance_and_time(
-                    lat, lon, elem_lat, elem_lon
-                )
-                maps_url = f"https://www.google.com/maps/dir/?api=1&destination={elem_lat},{elem_lon}"
-
-                # Specialty Relevance Checking
-                is_specialty_match = True
-                if specialty_keyword and len(specialty_keyword) > 2:
-                    sk = specialty_keyword.lower()
-                    combined_tags = f"{name} {facility_type} {doctor} {tags.get('healthcare:speciality', '')}".lower()
-                    is_specialty_match = any(term in combined_tags for term in [sk, "hospital", "emergency", "clinic"])
-
-                hospitals.append(
-                    {
-                        "name": name,
-                        "type": facility_type,
-                        "phone": phone,
-                        "address": address,
-                        "doctor": doctor,
-                        "status": status,
-                        "is_open": not status.startswith("Closed"),
-                        "specialty_match": is_specialty_match,
-                        "distance_km": dist_km,
-                        "reach_time_mins": reach_time_mins,
-                        "maps_url": maps_url,
-                        "lat": elem_lat,
-                        "lon": elem_lon,
-                    }
-                )
-
-        # Sort strictly: Open facilities matching specialty first, then by exact kilometer distance
-        hospitals.sort(key=lambda x: (not x["is_open"], not x["specialty_match"], x["distance_km"]))
-        return hospitals[:8]
-    except Exception as e:
-        print(f"[MAP SCAN ERROR] {e}")
+    if not result:
         return []
+
+    elements = result.get("elements", [])
+    hospitals = []
+
+    for elem in elements:
+        tags = elem.get("tags", {})
+        name = (
+            tags.get("name")
+            or tags.get("name:en")
+            or "Medical Center / Health Clinic"
+        )
+        
+        # Ownership Classification Logic
+        operator = (tags.get("operator") or tags.get("official_name") or "").lower()
+        name_lower = name.lower()
+        if any(term in operator or term in name_lower for term in ["government", "govt", "medical college", "district hospital", "general hospital"]):
+            ownership = "Government Hospital"
+        else:
+            ownership = "Private Hospital"
+
+        amenity = tags.get("amenity", "hospital").capitalize()
+        facility_type = "Dental Clinic" if "Dentist" in amenity else amenity
+        phone = (
+            tags.get("phone")
+            or tags.get("contact:phone")
+            or tags.get("emergency:phone")
+            or "108 / 911"
+        )
+        address = (
+            tags.get("addr:street")
+            or tags.get("addr:full")
+            or tags.get("addr:suburb")
+            or "Nearby"
+        )
+        doctor = (
+            tags.get("operator")
+            or tags.get("doctor")
+            or tags.get("healthcare:speciality")
+            or tags.get("speciality")
+            or ("Dental Specialist" if "Dentist" in amenity else "General Emergency Physician")
+        )
+
+        status = determine_open_status(tags)
+
+        elem_lat = elem.get("lat") or (
+            elem.get("center", {}).get("lat") if "center" in elem else None
+        )
+        elem_lon = elem.get("lon") or (
+            elem.get("center", {}).get("lon") if "center" in elem else None
+        )
+
+        if elem_lat and elem_lon:
+            dist_km, reach_time_mins = calculate_distance_and_time(
+                lat, lon, elem_lat, elem_lon
+            )
+            maps_url = f"https://www.google.com/maps/dir/?api=1&destination={elem_lat},{elem_lon}"
+
+            is_specialty_match = True
+            if specialty_keyword and len(specialty_keyword) > 2:
+                sk = specialty_keyword.lower()
+                combined_tags = f"{name} {facility_type} {doctor} {tags.get('healthcare:speciality', '')}".lower()
+                is_specialty_match = any(term in combined_tags for term in [sk, "hospital", "emergency", "clinic"])
+
+            hospitals.append(
+                {
+                    "name": name,
+                    "ownership": ownership,
+                    "type": facility_type,
+                    "phone": phone,
+                    "address": address,
+                    "doctor": doctor,
+                    "status": status,
+                    "is_open": not status.startswith("Closed"),
+                    "specialty_match": is_specialty_match,
+                    "distance_km": dist_km,
+                    "reach_time_mins": reach_time_mins,
+                    "maps_url": maps_url,
+                    "lat": elem_lat,
+                    "lon": elem_lon,
+                }
+            )
+
+    # Sort strictly: Open facilities first, matching specialty, then by exact distance in kilometers
+    hospitals.sort(key=lambda x: (not x["is_open"], not x["specialty_match"], x["distance_km"]))
+    return hospitals[:8]
 
 
 async def generate_free_neural_speech(text: str, target_language: str) -> Optional[str]:
@@ -309,7 +329,7 @@ async def process_voice_crisis(
         mime_type = file.content_type or "audio/webm"
         audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
 
-        # Initial fetch of medical centers based on user GPS
+        # GPS Data Verification
         hospitals_list = []
         if lat is not None and lon is not None:
             hospitals_list = fetch_hospitals_data(lat, lon)
@@ -317,7 +337,7 @@ async def process_voice_crisis(
         hospital_summary_lines = []
         for idx, h in enumerate(hospitals_list):
             hospital_summary_lines.append(
-                f"Facility #{idx+1}: {h['name']} ({h['type']}) | Distance: {h['distance_km']} km | Drive Reach Time: ~{h['reach_time_mins']} mins | Status: {h['status']} (Open: {h['is_open']}) | Doctor/Specialist: {h['doctor']}"
+                f"Facility #{idx+1}: Name='{h['name']}' ({h['ownership']} | {h['type']}) | Distance={h['distance_km']} km | Drive Reach Time=~{h['reach_time_mins']} mins | Status={h['status']} (Open={h['is_open']}) | Doctor={h['doctor']}"
             )
 
         hospital_context_str = (
@@ -330,36 +350,17 @@ async def process_voice_crisis(
         You are Beacon, an intelligent voice emergency health assistant.
         Analyze the audio input from user '{current_user.username}'.
 
-        DETECTED REAL-TIME NEARBY MEDICAL FACILITIES (MAP DATA FOR USER GPS LOCATION):
+        DETECTED REAL-TIME NEARBY MEDICAL FACILITIES (SCANNED AT EXACT USER GPS LATITUDE/LONGITUDE: {lat}, {lon}):
         {hospital_context_str}
 
-        CRITICAL INTENT, SPECIALTY FILTERING & ROUTING RULES:
+        CRITICAL CONVERSATIONAL FLOW RULES:
+        1. FIRST: If the user describes a condition (headache, chest pain, body pain, etc.), ALWAYS provide the immediate first-aid, safety advice, or 'what to do' FIRST. 
+        2. SECOND: ONLY AFTER providing safety advice, provide the nearest hospital referral.
+        3. IF USER ASKS 'WHICH ARE THE HOSPITALS NEAR ME?': Analyze the disease/condition they previously mentioned (if any) and list the most appropriate hospitals near them using the GPS data provided.
+        4. HOSPITAL REFERRAL: You MUST explicitly tell the user the PARTICULAR HOSPITAL NAME, OWNERSHIP (Government/Private), EXACT DISTANCE IN KILOMETERS, and ESTIMATED REACH TIME IN MINUTES. Do not list all hospitals in the audio; focus on the most relevant one(s).
+        5. IF CLOSED: If the nearest is closed, announce it and redirect to the next nearest OPEN facility.
 
-        1. DISEASE / SPECIALTY IDENTIFICATION:
-           - Analyze what disease, symptom, or medical requirement the user mentioned (e.g., eye pain -> Ophthalmology, toothache -> Dental, chest pain -> Emergency/Cardiology, skin rash -> Dermatology, or general illness).
-           - Populate 'detected_specialty' with the relevant medical department.
-
-        2. AUTOMATIC SPOKEN LANGUAGE TRANSLATION:
-           - The user may speak ANY language in the audio clip.
-           - Generate ALL JSON fields (vocal_risk_analysis, detected_specialty, immediate_safety_steps, deescalation_script) EXCLUSIVELY in target language: {language}.
-           - For non-English languages, write strictly in native script of {language} (e.g. Malayalam script മലയാളം).
-
-        3. OPEN VS CLOSED ROUTING & FAILOVER:
-           - Look at the provided list of facilities.
-           - Identify the closest facility that handles their condition.
-           - IF THE NEAREST FACILITY IS CLOSED:
-             - You MUST explicitly inform the user in native {language} script that the nearest option ({hospitals_list[0]['name'] if hospitals_list else 'facility'}) is currently closed.
-             - IMMEDIATELY redirect them to the NEXT NEAREST OPEN facility ({hospitals_list[1]['name'] if len(hospitals_list)>1 else 'emergency medical center'}).
-             - State the exact distance in kilometers ({hospitals_list[1]['distance_km'] if len(hospitals_list)>1 else '2'} km) and drive time (~{hospitals_list[1]['reach_time_mins'] if len(hospitals_list)>1 else '5'} mins).
-           - IF THE NEAREST FACILITY IS OPEN:
-             - Direct them straight to Facility #1 ({hospitals_list[0]['name'] if hospitals_list else 'medical center'}), stating exact distance in kilometers ({hospitals_list[0]['distance_km'] if hospitals_list else '1'} km) and drive time (~{hospitals_list[0]['reach_time_mins'] if hospitals_list else '3'} mins).
-
-        4. STRICT SCOPE SAFETY:
-           - NEVER recommend restaurants, food, or non-medical services.
-
-        5. CASUAL QUERIES:
-           - If query is 100% non-medical (e.g., "Who are you?"), answer politely in native script of {language} without listing hospitals.
-
+        LANGUAGE: Generate response in {language} (use native script for non-English).
         OUTPUT MUST BE VALID JSON MATCHING THE SCHEMA EXACTLY.
         """
 
