@@ -205,6 +205,51 @@
     .hero h1{ font-size:26px; }
     nav{ padding:20px; }
   }
+
+  /* Nearby-care facility cards */
+  .facility-card{
+    background: rgba(7,11,24,0.9);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+  }
+  .facility-card .name{ font-weight:700; font-size:14px; color:var(--ink-hi); }
+  .facility-card .addr{ font-size:12px; color:var(--ink-mid); margin-top:2px; }
+  .facility-card .meta{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+  .badge{
+    display:inline-flex; align-items:center; gap:5px;
+    font-size:11px; font-weight:700; letter-spacing:0.3px;
+    padding:4px 9px; border-radius:999px;
+  }
+  .badge-open{ background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.35); }
+  .badge-closed{ background:rgba(244,63,94,0.15); color:#fb7185; border:1px solid rgba(244,63,94,0.35); }
+  .badge-unknown{ background:rgba(255,255,255,0.08); color:var(--ink-mid); border:1px solid var(--line); }
+  .badge-eta{ background:rgba(47,107,255,0.15); color:#8fb0ff; border:1px solid rgba(47,107,255,0.35); }
+
+  /* Manual location fallback prompt */
+  .location-prompt{
+    display:flex; gap:8px; margin-top:10px;
+  }
+  .location-prompt input{
+    flex:1;
+    background: rgba(7,11,24,0.9);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:10px 12px;
+    color:var(--ink-hi);
+    font-size:13px;
+  }
+  .location-prompt button{
+    background: linear-gradient(180deg, rgba(60,100,240,0.6), rgba(30,50,140,0.6));
+    border:1px solid rgba(120,150,255,0.4);
+    color:#fff;
+    border-radius:10px;
+    padding:10px 16px;
+    font-size:13px;
+    font-weight:600;
+    cursor:pointer;
+  }
 </style>
 </head>
 <body>
@@ -269,6 +314,29 @@
 
       <div id="audio-reply" class="hidden"></div>
       <div id="script-results" class="space-y-4 text-sm"></div>
+  </section>
+
+  <!-- Nearby Hospital/Clinic Results -->
+  <section id="care-pane" class="hidden bg-slate-900/80 backdrop-blur-md border border-blue-500/30 rounded-2xl p-6 shadow-2xl space-y-3">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <span class="text-xs font-mono text-blue-400 flex items-center gap-2">
+              <i class="fa-solid fa-hospital"></i> <span id="care-pane-title">Nearby Care</span>
+          </span>
+      </div>
+
+      <div id="care-status" class="text-xs text-slate-400"></div>
+
+      <!-- Shown only if GPS is denied/unavailable -->
+      <div id="location-fallback" class="hidden">
+          <p class="text-xs text-slate-400 mb-2">Couldn't access your GPS location. Type your city or address instead:</p>
+          <div class="location-prompt">
+              <input id="location-input" type="text" placeholder="e.g. Kochi, Kerala" />
+              <button onclick="submitManualLocation()">Search</button>
+          </div>
+      </div>
+
+      <div id="care-audio" class="hidden"></div>
+      <div id="care-results" class="space-y-2"></div>
   </section>
 
   <!-- Emergency Contacts -->
@@ -486,11 +554,148 @@
           }
 
           status.innerText = "Tap the orb or button to start recording";
+
+          // If Beacon detected a "find nearest hospital/clinic" request, kick off
+          // the location -> nearby-care lookup flow.
+          if (parsed.intent_type === 'facility_search' && parsed.facility_query) {
+              startFacilitySearch(parsed.facility_query, selectedLanguage);
+          }
       } catch (err) {
           spinner.classList.add('hidden');
           results.innerHTML = `<p class="text-red-400 text-xs">Audio Processing Error: ${err.message}</p>`;
           status.innerText = "Tap the orb or button to start recording";
       }
+  }
+
+  // ---------------------------------------------------------------------
+  // Nearest hospital/clinic search: GPS location -> /api/nearby-care
+  // ---------------------------------------------------------------------
+
+  let pendingCareCondition = null;
+  let pendingCareLanguage = 'English';
+
+  function startFacilitySearch(condition, language) {
+      pendingCareCondition = condition;
+      pendingCareLanguage = language;
+
+      const carePane = document.getElementById('care-pane');
+      const careStatus = document.getElementById('care-status');
+      const careResults = document.getElementById('care-results');
+      const fallback = document.getElementById('location-fallback');
+      const careAudio = document.getElementById('care-audio');
+      const title = document.getElementById('care-pane-title');
+
+      title.innerText = `Nearby Care for "${condition}"`;
+      carePane.classList.remove('hidden');
+      fallback.classList.add('hidden');
+      careResults.innerHTML = '';
+      careAudio.innerHTML = '';
+      careAudio.classList.add('hidden');
+      careStatus.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Getting your location...`;
+
+      if (!('geolocation' in navigator)) {
+          careStatus.innerText = 'Geolocation is not available in this browser.';
+          fallback.classList.remove('hidden');
+          return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+          (position) => {
+              fetchNearbyCare({
+                  lat: position.coords.latitude,
+                  lng: position.coords.longitude,
+                  condition,
+                  language,
+              });
+          },
+          (err) => {
+              // Permission denied, timeout, or position unavailable -> ask the user to type it.
+              careStatus.innerText = 'Location access was denied or unavailable — please enter your location below.';
+              fallback.classList.remove('hidden');
+          },
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+      );
+  }
+
+  function submitManualLocation() {
+      const input = document.getElementById('location-input');
+      const address = input.value.trim();
+      if (!address) return;
+      fetchNearbyCare({
+          address,
+          condition: pendingCareCondition,
+          language: pendingCareLanguage,
+      });
+  }
+
+  async function fetchNearbyCare(opts) {
+      const lat = opts.lat, lng = opts.lng, address = opts.address;
+      const condition = opts.condition, language = opts.language;
+      const careStatus = document.getElementById('care-status');
+      const careResults = document.getElementById('care-results');
+      const fallback = document.getElementById('location-fallback');
+      const careAudio = document.getElementById('care-audio');
+
+      careStatus.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Scanning nearby hospitals & clinics for "${condition}"...`;
+      careResults.innerHTML = '';
+
+      try {
+          const response = await authFetch('/api/nearby-care', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ lat, lng, address, condition, language }),
+          });
+          const res = await response.json();
+          if (!response.ok) {
+              throw new Error(res.detail || 'Could not search nearby care.');
+          }
+
+          fallback.classList.add('hidden');
+
+          if (!res.facilities || res.facilities.length === 0) {
+              careStatus.innerText = res.message || `No hospitals or clinics found nearby for "${condition}".`;
+              return;
+          }
+
+          careStatus.innerText = `Found ${res.facilities.length} option(s) near you — showing both open and closed:`;
+          careResults.innerHTML = res.facilities.map(renderFacilityCard).join('');
+
+          if (!res.audio_error && res.audio_base64) {
+              careAudio.classList.remove('hidden');
+              careAudio.innerHTML = `<audio controls autoplay class="w-full mb-2" src="data:${res.audio_mime || 'audio/wav'};base64,${res.audio_base64}"></audio>`;
+          }
+      } catch (err) {
+          careStatus.innerText = `Error: ${err.message}`;
+      }
+  }
+
+  function renderFacilityCard(f) {
+      let badge;
+      if (f.open_now === true) {
+          badge = `<span class="badge badge-open"><i class="fa-solid fa-circle-check"></i> Open now</span>`;
+      } else if (f.open_now === false) {
+          badge = `<span class="badge badge-closed"><i class="fa-solid fa-circle-xmark"></i> Closed now</span>`;
+      } else {
+          badge = `<span class="badge badge-unknown"><i class="fa-solid fa-question"></i> Hours unknown</span>`;
+      }
+
+      const mapsLink = `https://www.google.com/maps/search/?api=1&query=${f.lat},${f.lng}&query_place_id=${f.place_id}`;
+
+      return `
+        <div class="facility-card">
+            <div class="name">${f.name}</div>
+            <div class="addr">${f.address || ''}</div>
+            <div class="meta">
+                ${badge}
+                <span class="badge badge-eta"><i class="fa-solid fa-car"></i> ${f.duration_text} to reach</span>
+                <span class="badge badge-unknown"><i class="fa-solid fa-route"></i> ${f.distance_text}</span>
+                ${f.rating ? `<span class="badge badge-unknown"><i class="fa-solid fa-star"></i> ${f.rating}</span>` : ''}
+            </div>
+            <a href="${mapsLink}" target="_blank" class="text-[11px] text-blue-400 hover:underline mt-2 inline-block">
+                <i class="fa-solid fa-diamond-turn-right"></i> Open in Google Maps
+            </a>
+        </div>
+      `;
   }
 
   // 3D Fibonacci Sphere Voice Orb Animation Engine
