@@ -59,7 +59,8 @@ async def root():
 GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-ANALYSIS_MODEL = "gemini-2.5-flash"
+# Active model endpoints
+ANALYSIS_MODEL = "gemini-3.6-flash"
 TTS_MODEL = "gemini-2.5-flash-preview-tts"
 TTS_VOICE = "Kore"
 
@@ -124,7 +125,6 @@ def synthesize_speech(text: str, retries: int = 3):
                 print(f"[TTS ERROR] {last_error}")
                 continue
 
-            finish_reason = getattr(candidates[0], "finish_reason", None)
             parts = (
                 candidates[0].content.parts if candidates[0].content else None
             )
@@ -132,7 +132,7 @@ def synthesize_speech(text: str, retries: int = 3):
                 stray_text = getattr(parts[0], "text", None) if parts else None
                 last_error = (
                     f"Gemini TTS returned text instead of audio on attempt {attempt + 1} "
-                    f"(finish_reason={finish_reason}, text={stray_text!r})."
+                    f"(finish_reason={getattr(candidates[0], 'finish_reason', None)}, text={stray_text!r})."
                 )
                 print(f"[TTS ERROR] {last_error}")
                 continue
@@ -225,10 +225,10 @@ async def process_voice_crisis(
         except Exception as model_err:
             if "429" in str(model_err) or "RESOURCE_EXHAUSTED" in str(model_err):
                 print(
-                    "[API WARNING] Primary model hit rate limit (429). Retrying with gemini-2.5-flash."
+                    "[API WARNING] Primary model hit rate limit (429). Retrying with gemini-3.5-flash-lite."
                 )
                 response = client.models.generate_content(
-                    model="gemini-2.5-flash",
+                    model="gemini-3.5-flash-lite",
                     contents=[prompt, audio_part],
                     config=types.GenerateContentConfig(
                         response_mime_type="application/json",
