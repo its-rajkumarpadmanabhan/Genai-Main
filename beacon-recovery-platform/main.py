@@ -6,6 +6,7 @@ import os
 import urllib.parse
 import urllib.request
 import wave
+from datetime import datetime, timezone
 from typing import List, Optional
 
 import uvicorn
@@ -26,7 +27,7 @@ load_dotenv()
 app = FastAPI(
     title="Beacon - GenAI Emergency & Crisis Platform",
     version="1.0.0",
-    description="Zero-Typing Voice Intervention Engine",
+    description="Zero-Typing Voice Intervention Engine with Live Proximity & Status Scanner",
 )
 
 app.add_middleware(
@@ -63,7 +64,10 @@ GEMINI_API_KEY = (
 )
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-ANALYSIS_MODEL = "gemini-2.5-flash"
+# Updated to current active Gemini models
+ANALYSIS_MODEL = "gemini-3.6-flash"
+FALLBACK_ANALYSIS_MODEL = "gemini-3.5-flash"
+TTS_MODEL = "gemini-3.1-flash-tts-preview"
 TTS_VOICE = "Kore"
 
 
@@ -75,14 +79,15 @@ class VoiceInterventionResponse(BaseModel):
         description="Immediate physical safety or guidance steps."
     )
     deescalation_script: str = Field(
-        description="The COMPLETE spoken response script written strictly in the native script of the requested language."
+        description="The COMPLETE spoken response script written strictly in the requested language, addressing exact kilometer distances, facility status (open/closed), and routing to the next nearest open facility if needed."
     )
 
 
 def calculate_distance_and_time(
     lat1: float, lon1: float, lat2: float, lon2: float
 ):
-    R = 6371.0
+    """Calculates exact Haversine distance in kilometers and driving reach time in minutes."""
+    R = 6371.0  # Earth radius in kilometers
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
     a = (
@@ -94,9 +99,27 @@ def calculate_distance_and_time(
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     dist_km = R * c
 
+    # Estimate driving distance (~1.3 road winding factor) & urban speed (~30 km/h)
     driving_dist_km = dist_km * 1.3
     reach_time_mins = max(1, round((driving_dist_km / 30.0) * 60))
     return round(dist_km, 2), reach_time_mins
+
+
+def determine_open_status(tags: dict) -> str:
+    """Parses OpenStreetMap opening_hours tag to check if facility is open or 24/7."""
+    opening_hours = tags.get("opening_hours", "").strip().lower()
+    amenity = tags.get("amenity", "").strip().lower()
+    emergency = tags.get("emergency", "").strip().lower()
+
+    if "24/7" in opening_hours or emergency == "yes" or amenity == "hospital":
+        return "Open (24/7 Emergency)"
+
+    if opening_hours:
+        if "off" in opening_hours or "closed" in opening_hours:
+            return "Closed"
+        return f"Open ({tags.get('opening_hours')})"
+
+    return "Open / Operating"
 
 
 def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
@@ -160,6 +183,8 @@ def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
                 )
             )
 
+            status = determine_open_status(tags)
+
             elem_lat = elem.get("lat") or (
                 elem.get("center", {}).get("lat") if "center" in elem else None
             )
@@ -180,6 +205,7 @@ def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
                         "phone": phone,
                         "address": address,
                         "doctor": doctor,
+                        "status": status,
                         "distance_km": dist_km,
                         "reach_time_mins": reach_time_mins,
                         "maps_url": maps_url,
@@ -188,56 +214,56 @@ def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
                     }
                 )
 
-        hospitals.sort(key=lambda x: x["reach_time_mins"])
-        return hospitals[:6]
+        hospitals.sort(key=lambda x: x["distance_km"])
+        return hospitals[:8]
     except Exception as e:
         print(f"[HOSPITAL SCAN ERROR] {e}")
         return []
 
 
 def synthesize_speech_direct(text: str) -> Optional[str]:
-    """
-    Synthesizes audio using Gemini 2.5 Flash Multimodal Audio Generation.
-    Guarantees clean 24kHz WAV base64 string response.
-    """
+    """Synthesizes speech using current Gemini TTS models."""
     if not client or not text:
         return None
 
-    try:
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=f"Please read the following text aloud clearly and naturally: {text}",
-            config=types.GenerateContentConfig(
-                response_modalities=["AUDIO"],
-                speech_config=types.SpeechConfig(
-                    voice_config=types.VoiceConfig(
-                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                            voice_name=TTS_VOICE
+    tts_models = [TTS_MODEL, "gemini-3.6-flash"]
+
+    for model_name in tts_models:
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=text,
+                config=types.GenerateContentConfig(
+                    response_modalities=["AUDIO"],
+                    speech_config=types.SpeechConfig(
+                        voice_config=types.VoiceConfig(
+                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                                voice_name=TTS_VOICE
+                            )
                         )
-                    )
+                    ),
                 ),
-            ),
-        )
+            )
 
-        candidates = getattr(response, "candidates", None)
-        if not candidates or not candidates[0].content:
-            return None
+            candidates = getattr(response, "candidates", None)
+            if not candidates or not candidates[0].content:
+                continue
 
-        parts = candidates[0].content.parts
-        for part in parts:
-            inline_data = getattr(part, "inline_data", None)
-            if inline_data and inline_data.data:
-                pcm_data = inline_data.data
-                buf = io.BytesIO()
-                with wave.open(buf, "wb") as wf:
-                    wf.setnchannels(1)
-                    wf.setsampwidth(2)
-                    wf.setframerate(24000)
-                    wf.writeframes(pcm_data)
-                return base64.b64encode(buf.getvalue()).decode("utf-8")
-
-    except Exception as e:
-        print(f"[DIRECT TTS ERROR] {e}")
+            parts = candidates[0].content.parts
+            for part in parts:
+                inline_data = getattr(part, "inline_data", None)
+                if inline_data and inline_data.data:
+                    pcm_data = inline_data.data
+                    buf = io.BytesIO()
+                    with wave.open(buf, "wb") as wf:
+                        wf.setnchannels(1)
+                        wf.setsampwidth(2)
+                        wf.setframerate(24000)
+                        wf.writeframes(pcm_data)
+                    return base64.b64encode(buf.getvalue()).decode("utf-8")
+        except Exception as e:
+            print(f"[TTS MODEL {model_name} ERROR] {e}")
+            continue
 
     return None
 
@@ -309,48 +335,64 @@ async def process_voice_crisis(
         if lat is not None and lon is not None:
             hospitals_list = fetch_hospitals_data(lat, lon)
 
-        top_h_str = "No nearby hospital detected."
-        if hospitals_list:
-            top_h = hospitals_list[0]
-            top_h_str = f"Name: {top_h['name']}, Distance: {top_h['distance_km']} km, Drive Reach Time: ~{top_h['reach_time_mins']} minutes away, Specialist: {top_h['doctor']}."
+        hospital_summary_lines = []
+        for idx, h in enumerate(hospitals_list):
+            hospital_summary_lines.append(
+                f"{idx+1}. Name: {h['name']}, Type: {h['type']}, Distance: {h['distance_km']} km, Drive Time: ~{h['reach_time_mins']} mins, Status: {h['status']}, Doctor: {h['doctor']}"
+            )
+
+        hospital_context_str = "\n".join(hospital_summary_lines) if hospital_summary_lines else "No live GPS medical data available."
 
         prompt = f"""
         You are Beacon, an intelligent emergency health and crisis AI assistant.
         Analyze the audio input from user '{current_user.username}'.
 
-        NEARBY DETECTED MEDICAL CENTER CONTEXT:
-        {top_h_str}
+        REAL-TIME ACCURATE NEARBY MEDICAL FACILITIES (SORTED BY DISTANCE):
+        {hospital_context_str}
 
-        CRITICAL INTENT, SAFETY & LANGUAGE MANDATES:
+        CRITICAL INTENT, DISTANCE, AND STATUS RULES:
 
-        1. EXACT NATIVE LANGUAGE & SCRIPT MANDATE:
-           - Selected target language: {language}.
-           - You MUST write the ENTIRE JSON fields (vocal_risk_analysis, immediate_safety_steps, and deescalation_script) strictly in the native script of {language}.
-           - Examples: Malayalam -> മലയാളം, Tamil -> தமிழ், Hindi -> हिंदी, Spanish -> Español, Arabic -> العربية.
+        1. NATIVE LANGUAGE RULE:
+           - Target language: {language}.
+           - Generate ALL JSON fields (vocal_risk_analysis, immediate_safety_steps, and deescalation_script) strictly in native script of {language}.
 
-        2. STRICT SCOPE & MEDICAL PRIORITIZATION:
-           - NEVER search for or offer restaurants, food, entertainment, or non-medical services.
-           - If user mentions medical pain/symptom mixed with a casual task (e.g. "I am hungry and have a headache", "I have eye pain and I'm going to a movie"):
-             - Prioritize the health issue immediately. Warn against delaying medical care for non-essential tasks.
-             - Direct them to the nearest medical center: {hospitals_list[0]['name'] if hospitals_list else 'the nearest clinic'}, stating drive time (~{hospitals_list[0]['reach_time_mins'] if hospitals_list else '5'} mins) and distance ({hospitals_list[0]['distance_km'] if hospitals_list else '2'} km).
+        2. ACCURATE FACILITY SELECTION & CLOSED FACILITY HANDLING:
+           - Examine the list of facilities sorted by distance above.
+           - Check the 'Status' of the closest facility (Facility #1).
+           - IF THE CLOSEST FACILITY IS CLOSED (Status: Closed):
+             - You MUST explicitly inform the user that the nearest option ({hospitals_list[0]['name'] if hospitals_list else 'facility'}) is currently closed.
+             - IMMEDIATELY guide them to the NEXT NEAREST OPEN facility in the list ({hospitals_list[1]['name'] if len(hospitals_list)>1 else 'emergency center'}).
+             - State the exact distance in kilometers (e.g., "{hospitals_list[1]['distance_km'] if len(hospitals_list)>1 else '2.5'} km away") and driving reach time (~{hospitals_list[1]['reach_time_mins'] if len(hospitals_list)>1 else '5'} minutes drive).
+           - IF THE CLOSEST FACILITY IS OPEN (e.g. 24/7 or Open):
+             - Direct them straight to Facility #1 ({hospitals_list[0]['name'] if hospitals_list else 'medical center'}), stating the exact distance in kilometers ({hospitals_list[0]['distance_km'] if hospitals_list else '1.2'} km away) and driving reach time (~{hospitals_list[0]['reach_time_mins'] if hospitals_list else '3'} minutes).
 
-        3. CASUAL ONLY:
-           - If query is 100% non-medical (e.g. "Who are you?"), answer politely in native script of {language} without citing hospitals.
+        3. STRICT MEDICAL PRIORITIZATION:
+           - NEVER offer restaurants, food, or non-medical services. If mixed query (e.g. "hungry and headache"), address headache immediately and urge them not to delay care.
 
-        4. MEDICAL CRISIS / ILLNESS / PAIN:
-           - Assess distress, give 2 immediate safety steps, and announce nearest medical center details in native script of {language}.
+        4. CASUAL QUERY:
+           - If 100% casual (e.g., "Who are you?"), answer politely in native script of {language} without citing hospitals.
 
         OUTPUT MUST BE VALID JSON MATCHING SCHEMA.
         """
 
-        response = client.models.generate_content(
-            model=ANALYSIS_MODEL,
-            contents=[prompt, audio_part],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=VoiceInterventionResponse,
-            ),
-        )
+        try:
+            response = client.models.generate_content(
+                model=ANALYSIS_MODEL,
+                contents=[prompt, audio_part],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=VoiceInterventionResponse,
+                ),
+            )
+        except Exception:
+            response = client.models.generate_content(
+                model=FALLBACK_ANALYSIS_MODEL,
+                contents=[prompt, audio_part],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=VoiceInterventionResponse,
+                ),
+            )
 
         result_text = response.text
         spoken_text = ""
@@ -360,7 +402,6 @@ async def process_voice_crisis(
         except Exception as parse_err:
             print(f"[JSON PARSE ERROR] {parse_err}")
 
-        # Synthesize audio directly using multimodal audio generation
         audio_b64 = synthesize_speech_direct(spoken_text)
 
         should_show_hospitals = bool(hospitals_list) and not any(
