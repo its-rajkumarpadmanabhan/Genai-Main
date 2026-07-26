@@ -205,12 +205,19 @@ async def process_voice_crisis(
         )
 
         prompt = f"""
-        Analyze this emergency audio clip from a {user_type} navigating a high-cognitive-load recovery crisis.
+        Analyze this audio clip from a {user_type} interacting with Beacon.
 
-        1. Identify emotional state and risk level for vocal_risk_analysis.
-        2. Provide 2 immediate physical action/first-aid steps for immediate_safety_steps.
-        3. Provide a single unified spoken script for deescalation_script written directly to the person.
-           CRITICAL REQUIREMENT: "deescalation_script" MUST combine BOTH warm empathetic reassurance AND the immediate physical safety/first-aid steps (e.g. keeping an injured leg still, breathing, applying pressure) into one clear, spoken response (3-5 sentences).
+        First, assess the user's intent:
+
+        1. IF THE USER IS ASKING PLATFORM/GENERAL QUESTIONS (e.g., "Who are you?", "What do you do?", "How many people have you helped?", "What can you do?"):
+           - vocal_risk_analysis: State "Informational inquiry regarding system identity or capabilities."
+           - immediate_safety_steps: State "No emergency physical action required."
+           - deescalation_script: Provide a concise, friendly response explaining that you are Beacon, an AI-powered crisis and emergency response assistant built to offer immediate voice guidance, de-escalation, and safety steps during high-stress recovery situations.
+
+        2. IF THE USER IS EXPERIENCING AN ACTUAL EMERGENCY OR CRISIS (e.g., panic, distress, physical injury, pain):
+           - vocal_risk_analysis: Identify emotional state, distress level, and risk assessment from vocal markers.
+           - immediate_safety_steps: Provide 2 immediate physical action/first-aid steps for screen reference.
+           - deescalation_script: CRITICAL REQUIREMENT — "deescalation_script" MUST combine BOTH warm empathetic reassurance AND the immediate physical safety/first-aid steps (e.g., keeping an injured leg still, applying pressure, slow deep breathing) into one single spoken response (3-5 sentences).
         """
 
         try:
