@@ -25,6 +25,7 @@ from sqlalchemy import (
     create_engine,
     or_,
 )
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 # Configuration
@@ -76,7 +77,7 @@ class PasswordResetToken(Base):
     used = Column(Boolean, default=False)
 
 
-#Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine)
 
 
 def get_db():
@@ -281,23 +282,30 @@ def signup(payload: SignupRequest, background_tasks: BackgroundTasks, db: Sessio
 
 @router.post("/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    identifier = payload.identifier.strip().lower()
-    user = db.query(User).filter(
-        or_(User.username.ilike(identifier), User.email.ilike(identifier))
-    ).first()
+    try:
+        identifier = payload.identifier.strip().lower()
+        user = db.query(User).filter(
+            or_(User.username.ilike(identifier), User.email.ilike(identifier))
+        ).first()
 
-    if not user or not verify_password(payload.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid username/email or password.")
+        if not user or not verify_password(payload.password, user.password_hash):
+            raise HTTPException(status_code=401, detail="Invalid username/email or password.")
 
-    if not user.is_active:
-        raise HTTPException(status_code=403, detail="This account has been deactivated.")
+        if not user.is_active:
+            raise HTTPException(status_code=403, detail="This account has been deactivated.")
 
-    token = create_access_token(user)
-    return {
-        "status": "success",
-        "access_token": token,
-        "user": {"id": user.id, "username": user.username, "email": user.email},
-    }
+        token = create_access_token(user)
+        return {
+            "status": "success",
+            "access_token": token,
+            "user": {"id": user.id, "username": user.username, "email": user.email},
+        }
+    except Exception as e:
+        # This catches the crash and returns JSON instead of HTML!
+        return JSONResponse(
+            status_code=500,
+            content={"message": "Login failed due to server error", "detail": str(e)}
+        )
 
 
 @router.post("/forgot-password")
