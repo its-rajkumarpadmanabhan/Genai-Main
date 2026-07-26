@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
 <title>BEACON — Emergency Voice Intervention Engine</title>
 
 <script>
@@ -34,14 +34,18 @@
     --line:rgba(255,255,255,0.08);
   }
 
-  *{margin:0;padding:0;box-sizing:border-box;}
+  *{
+    margin:0;padding:0;box-sizing:border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
 
   html,body{
     background:var(--bg-0);
     color:var(--ink-hi);
-    font-family:'Segoe UI', ui-sans-serif, system-ui, -apple-system, sans-serif;
+    font-family:'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
     overflow-x:hidden;
     min-height: 100vh;
+    touch-action: manipulation;
   }
 
   .bg-glow{
@@ -60,14 +64,14 @@
     z-index:1;
     max-width:1100px;
     margin:0 auto;
-    padding:0 32px;
+    padding:0 20px;
   }
 
   nav{
     display:flex;
     align-items:center;
     justify-content:space-between;
-    padding:26px 32px;
+    padding:20px 20px;
     max-width:1100px;
     margin:0 auto;
     position:relative;
@@ -97,17 +101,20 @@
 
   .hero{
     text-align:center;
-    padding:20px 20px 10px;
+    padding:10px 10px 10px;
     position:relative;
     z-index:2;
   }
 
   .hero h1{
-    font-size:36px;
+    font-size:28px;
     line-height:1.25;
     font-weight:600;
     color:var(--ink-mid);
     letter-spacing:-0.3px;
+  }
+  @media(min-width:640px){
+    .hero h1{ font-size:36px; }
   }
   .hero h1 b{
     color:var(--ink-hi);
@@ -117,9 +124,9 @@
   .orb-stage{
     position:relative;
     width:100%;
-    max-width:320px;
+    max-width:280px;
     aspect-ratio:1/1;
-    margin:30px auto 20px;
+    margin:20px auto 15px;
     display:flex;
     align-items:center;
     justify-content:center;
@@ -134,7 +141,7 @@
 
   .orb-halo{
     position:absolute;
-    inset:-40px;
+    inset:-30px;
     border-radius:50%;
     background:radial-gradient(circle, rgba(60,110,255,0.35), transparent 70%);
     filter:blur(18px);
@@ -167,18 +174,19 @@
     align-items:center;
     gap:9px;
     margin:0 auto;
-    padding:12px 28px;
+    padding:14px 32px;
+    min-height: 48px;
     border-radius:999px;
     border:1px solid rgba(120,150,255,0.4);
     background:linear-gradient(180deg, rgba(60,100,240,0.35), rgba(30,50,140,0.35));
     color:#dbe4ff;
-    font-size:14px;
+    font-size:15px;
     font-weight:600;
     cursor:pointer;
     box-shadow:0 0 24px rgba(60,100,240,0.35), inset 0 1px 0 rgba(255,255,255,0.15);
     transition:transform .15s ease, box-shadow .15s ease;
   }
-  .speak-btn:hover{ transform:translateY(-1px); box-shadow:0 0 34px rgba(60,100,240,0.55); }
+  .speak-btn:active{ transform:scale(0.97); }
   .speak-btn .dot{
     width:8px;height:8px;border-radius:50%;
     background:#7ee0ff;
@@ -188,17 +196,12 @@
 
   @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
-  .speak-wrap{ text-align:center; margin-bottom:30px; }
+  .speak-wrap{ text-align:center; margin-bottom:20px; }
   .status-label{
     display:block;
-    margin-top:14px;
+    margin-top:12px;
     font-size:13px;
     color:var(--ink-mid);
-  }
-
-  @media (max-width:640px){
-    .hero h1{ font-size:26px; }
-    nav{ padding:20px; }
   }
 </style>
 </head>
@@ -213,12 +216,12 @@
   <div id="account-widget" class="flex items-center gap-2"></div>
 </nav>
 
-<main class="wrap relative z-10 max-w-2xl mx-auto space-y-8 pb-12">
+<main class="wrap relative z-10 max-w-2xl mx-auto space-y-6 pb-12">
 
   <section class="hero">
     <h1>Speak to <b>Beacon AI</b> — Instant<br>Emergency Guidance</h1>
 
-    <div class="max-w-xs mx-auto my-6">
+    <div class="max-w-xs mx-auto my-4">
         <label for="language-select" class="block text-xs font-semibold text-slate-300 mb-1 tracking-wider uppercase">Response Language</label>
         <select id="language-select" class="w-full bg-slate-900/90 border border-slate-700 text-teal-300 text-xs rounded-xl p-3 focus:ring-teal-500 focus:border-teal-500 font-medium shadow-inner">
             <option value="English" selected>English</option>
@@ -247,27 +250,27 @@
   </section>
 
   <!-- Output Pane -->
-  <section id="output-pane" class="hidden bg-slate-900/80 backdrop-blur-md border border-teal-500/30 rounded-2xl p-6 shadow-2xl space-y-4">
+  <section id="output-pane" class="hidden bg-slate-900/80 backdrop-blur-md border border-teal-500/30 rounded-2xl p-5 shadow-2xl space-y-4">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
           <span class="text-xs font-mono text-teal-400 flex items-center gap-2">
               <i class="fa-solid fa-microchip"></i> Beacon Analysis Output
           </span>
       </div>
 
-      <div id="loading-spinner" class="hidden text-center py-8">
+      <div id="loading-spinner" class="hidden text-center py-6">
           <i class="fa-solid fa-spinner fa-spin text-teal-400 text-3xl mb-3"></i>
           <p class="text-xs font-mono text-slate-400">Listening and synthesizing audio response...</p>
       </div>
 
       <div id="audio-reply" class="hidden"></div>
-      <div id="script-results" class="space-y-4 text-sm"></div>
+      <div id="script-results" class="space-y-3 text-sm"></div>
   </section>
 
   <!-- Hospital Scanner Section -->
   <section class="bg-gradient-to-br from-slate-900/90 to-slate-950/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
       <div class="flex items-center justify-between">
           <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-              <i class="fa-solid fa-hospital-user text-red-400"></i> Nearest Hospitals & Clinics
+              <i class="fa-solid fa-hospital-user text-red-400"></i> Nearest Medical Centers
           </h3>
           <button onclick="detectLocationAndScan()" class="text-xs bg-slate-800 hover:bg-slate-700 text-teal-300 px-3 py-1.5 rounded-lg border border-slate-700 transition">
               <i class="fa-solid fa-location-crosshairs"></i> Refresh GPS
@@ -275,7 +278,7 @@
       </div>
 
       <p class="text-xs text-slate-400">
-          Scans for emergency medical facilities based on your live position. If location access is blocked, type your current city or landmark below.
+          Real-time hospital proximity & operating status scanner.
       </p>
 
       <div class="flex gap-2">
@@ -288,9 +291,9 @@
 
       <div id="location-status" class="text-xs text-amber-300 hidden"></div>
 
-      <div id="hospitals-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+      <div id="hospitals-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           <div class="col-span-full text-center py-4 text-xs text-slate-500">
-              Detecting current location...
+              Detecting current position...
           </div>
       </div>
   </section>
@@ -298,7 +301,7 @@
   <!-- Emergency Contacts -->
   <section class="bg-gradient-to-br from-slate-900/90 to-slate-950/90 border border-slate-800 rounded-2xl p-5 shadow-xl">
       <h3 class="text-sm font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
-          <i class="fa-solid fa-phone-volume text-emerald-400"></i> Emergency Contacts
+          <i class="fa-solid fa-phone-volume text-emerald-400"></i> Emergency Hotlines
       </h3>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <a href="tel:1-800-662-4357" class="block p-3 bg-slate-900/90 border border-slate-800 rounded-xl hover:border-emerald-500/60 transition">
@@ -310,8 +313,8 @@
               <div class="text-sm font-bold text-teal-400 font-mono">Call/Text 988</div>
           </a>
           <a href="tel:911" class="block p-3 bg-slate-900/90 border border-red-900/60 rounded-xl hover:border-red-500/60 transition">
-              <div class="text-[11px] text-slate-400">Immediate Danger</div>
-              <div class="text-sm font-bold text-red-400 font-mono">Call 911</div>
+              <div class="text-[11px] text-slate-400">Immediate Emergency</div>
+              <div class="text-sm font-bold text-red-400 font-mono">Call 911 / 108</div>
           </a>
       </div>
   </section>
@@ -321,6 +324,19 @@
 <script>
   let currentLat = null;
   let currentLon = null;
+  let audioContext = null;
+
+  // iOS Safari / Mobile Touch Audio Context Unlocker
+  function unlockAudioContext() {
+      if (!audioContext) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioContext.state === 'suspended') {
+          audioContext.resume();
+      }
+  }
+  document.addEventListener('touchstart', unlockAudioContext, { once: true });
+  document.addEventListener('click', unlockAudioContext, { once: true });
 
   async function verifySession() {
       const token = localStorage.getItem('beacon_token');
@@ -383,11 +399,11 @@
       window.location.replace('/login.html');
   }
 
-  // Location & Hospital Scanner
+  // Location Scanner
   function detectLocationAndScan() {
       const status = document.getElementById('location-status');
       status.classList.remove('hidden');
-      status.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Detecting current GPS position...`;
+      status.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Detecting position...`;
 
       if (!navigator.geolocation) {
           fallbackToIpLocation();
@@ -398,13 +414,13 @@
           async (position) => {
               currentLat = position.coords.latitude;
               currentLon = position.coords.longitude;
-              status.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> Live GPS acquired (${currentLat.toFixed(3)}, ${currentLon.toFixed(3)}). Searching medical facilities...`;
+              status.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> Live GPS acquired (${currentLat.toFixed(3)}, ${currentLon.toFixed(3)})`;
               await fetchHospitals(`/api/nearest-hospitals?lat=${currentLat}&lon=${currentLon}`);
           },
           async () => {
               await fallbackToIpLocation();
           },
-          { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
+          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
       );
   }
 
@@ -416,16 +432,16 @@
           if (data.latitude && data.longitude) {
               currentLat = data.latitude;
               currentLon = data.longitude;
-              status.innerHTML = `<i class="fa-solid fa-network-wired text-teal-400"></i> Network position detected (${data.city || 'Approximate'}). Fetching hospitals...`;
+              status.innerHTML = `<i class="fa-solid fa-network-wired text-teal-400"></i> Network position detected (${data.city || 'Approximate'})`;
               await fetchHospitals(`/api/nearest-hospitals?lat=${currentLat}&lon=${currentLon}`);
           } else if (data.city) {
-              status.innerHTML = `<i class="fa-solid fa-city text-teal-400"></i> Searching hospitals in ${data.city}...`;
+              status.innerHTML = `<i class="fa-solid fa-city text-teal-400"></i> Location: ${data.city}`;
               await fetchHospitals(`/api/nearest-hospitals?location_query=${encodeURIComponent(data.city)}`);
           } else {
               throw new Error("No network coordinates");
           }
       } catch (e) {
-          status.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-400"></i> Location access unavailable. Please type your city above.`;
+          status.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-400"></i> Location access unavailable. Type city above.`;
       }
   }
 
@@ -447,45 +463,68 @@
           if (!resp.ok) throw new Error(data.detail || "Failed to find medical facilities.");
           renderHospitalsList(data.hospitals || []);
       } catch (err) {
-          list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-red-400">Could not fetch hospitals. Please check your location input.</div>`;
+          list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-red-400">Could not fetch hospitals. Check network connection.</div>`;
       }
   }
 
   function renderHospitalsList(hospitals) {
       const list = document.getElementById('hospitals-list');
       if (!hospitals || hospitals.length === 0) {
-          list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-slate-400">No medical facilities found nearby for current view.</div>`;
+          list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-slate-400">No medical facilities found in current view.</div>`;
           return;
       }
 
-      list.innerHTML = hospitals.map(h => `
-          <div class="p-3.5 bg-slate-900 border border-slate-800 rounded-xl hover:border-slate-700 transition space-y-1.5">
+      list.innerHTML = hospitals.map(h => {
+          const isClosed = h.status && h.status.toLowerCase().includes('closed');
+          const statusBadge = isClosed 
+              ? `<span class="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-rose-950 text-rose-400 border border-rose-800/60">Closed</span>`
+              : `<span class="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800/60">${h.status || 'Open'}</span>`;
+
+          return `
+          <div class="p-3.5 bg-slate-900 border ${isClosed ? 'border-rose-900/40 opacity-75' : 'border-slate-800'} rounded-xl hover:border-slate-700 transition space-y-1.5">
               <div class="flex items-start justify-between gap-2">
                   <h4 class="text-xs font-bold text-white line-clamp-1">${h.name}</h4>
-                  <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-teal-950 text-teal-400 border border-teal-800/60">${h.type}</span>
+                  ${statusBadge}
               </div>
               <p class="text-[11px] text-slate-400 line-clamp-1"><i class="fa-solid fa-location-dot text-slate-500 mr-1"></i>${h.address}</p>
-              ${(h.reach_time_mins !== undefined || h.doctor) ? `
               <div class="flex items-center justify-between text-[11px] font-mono text-emerald-400 font-semibold">
-                  <span><i class="fa-solid fa-car-side mr-1"></i>~${h.reach_time_mins || 5} min drive (${h.distance_km || 2} km)</span>
-                  <span class="text-slate-300 text-[10px]"><i class="fa-solid fa-user-doctor text-blue-400 mr-1"></i>${h.doctor || 'Emergency Physician'}</span>
-              </div>` : ''}
+                  <span><i class="fa-solid fa-car-side mr-1"></i>~${h.reach_time_mins || 5} min (${h.distance_km || 1} km)</span>
+                  <span class="text-slate-300 text-[10px]"><i class="fa-solid fa-user-doctor text-blue-400 mr-1"></i>${h.doctor || 'Physician'}</span>
+              </div>
               <div class="flex items-center justify-between pt-1 text-[11px]">
                   <a href="tel:${h.phone}" class="text-slate-300 font-mono hover:text-emerald-400"><i class="fa-solid fa-phone text-emerald-400 mr-1"></i>${h.phone}</a>
                   ${h.maps_url ? `<a href="${h.maps_url}" target="_blank" class="bg-teal-600/30 hover:bg-teal-600/50 text-teal-300 px-2.5 py-1 rounded-lg border border-teal-500/40 text-[10px] font-semibold transition">Route <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i></a>` : ''}
               </div>
           </div>
-      `).join('');
+          `;
+      }).join('');
   }
 
-  // Audio Recording Engine
+  // Cross-Platform MediaRecorder Engine (iOS, Android, Windows, Mac, Linux)
   let mediaRecorder;
   let audioChunks = [];
   let isRecording = false;
   let recordedMimeType = 'audio/webm';
   let activeStream = null;
 
+  function getSupportedMimeType() {
+      const candidates = [
+          'audio/webm;codecs=opus',
+          'audio/webm',
+          'audio/mp4',
+          'audio/aac',
+          'audio/ogg'
+      ];
+      for (const t of candidates) {
+          if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) {
+              return t;
+          }
+      }
+      return 'audio/webm';
+  }
+
   async function toggleRecording() {
+      unlockAudioContext();
       const btnText = document.getElementById('record-btn-text');
       const micIcon = document.getElementById('micIcon');
       const status = document.getElementById('record-status');
@@ -506,14 +545,13 @@
               return;
           }
           activeStream = stream;
+          recordedMimeType = getSupportedMimeType();
 
-          const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4', 'audio/ogg'];
-          recordedMimeType = candidates.find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || 'audio/webm';
-
-          mediaRecorder = new MediaRecorder(stream, {
-              mimeType: recordedMimeType,
-              audioBitsPerSecond: 128000
-          });
+          try {
+              mediaRecorder = new MediaRecorder(stream, { mimeType: recordedMimeType });
+          } catch (e) {
+              mediaRecorder = new MediaRecorder(stream);
+          }
 
           audioChunks = [];
           mediaRecorder.ondataavailable = event => { if (event.data.size > 0) audioChunks.push(event.data); };
@@ -528,7 +566,7 @@
           setOrbState(true);
           micIcon.className = "fa-solid fa-stop text-red-600 text-sm";
           btnText.innerText = "Stop Recording";
-          status.innerText = "Recording... tap again to stop and process";
+          status.innerText = "Recording... tap again to stop";
       } else {
           mediaRecorder.stop();
           isRecording = false;
@@ -554,7 +592,7 @@
       audioReplyBox.innerHTML = '';
       audioReplyBox.classList.add('hidden');
 
-      const ext = recordedMimeType.includes('mp4') ? 'mp4' : recordedMimeType.includes('ogg') ? 'ogg' : 'webm';
+      const ext = recordedMimeType.includes('mp4') || recordedMimeType.includes('aac') ? 'mp4' : 'webm';
       const formData = new FormData();
       formData.append('file', blob, `panic_audio.${ext}`);
       formData.append('user_type', 'individual');
@@ -591,7 +629,7 @@
               <p class="text-xs text-slate-200">${parsed.vocal_risk_analysis}</p>
             </div>
             <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl">
-              <span class="text-xs font-mono text-emerald-400 font-bold block mb-1">BEACON SPOKEN RESPONSE (${selectedLanguage})</span>
+              <span class="text-xs font-mono text-emerald-400 font-bold block mb-1">BEACON RESPONSE (${selectedLanguage})</span>
               <p class="text-xs font-mono text-slate-300">"${parsed.deescalation_script}"</p>
             </div>
             <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl">
@@ -603,7 +641,7 @@
           if (res.audio_base64) {
               const src = `data:${res.audio_mime || 'audio/wav'};base64,${res.audio_base64}`;
               audioReplyBox.classList.remove('hidden');
-              audioReplyBox.innerHTML = `<audio controls autoplay class="w-full" src="${src}"></audio>`;
+              audioReplyBox.innerHTML = `<audio controls autoplay playsinline class="w-full" src="${src}"></audio>`;
           }
 
           status.innerText = "Tap the orb or button to start recording";

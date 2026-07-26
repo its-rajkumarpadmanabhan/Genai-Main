@@ -6,7 +6,6 @@ import os
 import urllib.parse
 import urllib.request
 import wave
-from datetime import datetime, timezone
 from typing import List, Optional
 
 import uvicorn
@@ -25,9 +24,9 @@ from auth import User, get_current_user, router as auth_router
 load_dotenv()
 
 app = FastAPI(
-    title="Beacon - GenAI Emergency & Crisis Platform",
+    title="Beacon Engine",
     version="1.0.0",
-    description="Zero-Typing Voice Intervention Engine with Live Proximity & Status Scanner",
+    description="Cross-Platform Universal Emergency Voice Engine",
 )
 
 app.add_middleware(
@@ -64,30 +63,29 @@ GEMINI_API_KEY = (
 )
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-# Updated to current active Gemini models
-ANALYSIS_MODEL = "gemini-3.6-flash"
-FALLBACK_ANALYSIS_MODEL = "gemini-3.5-flash"
-TTS_MODEL = "gemini-3.1-flash-tts-preview"
+# Active Flash models for fast inference & TTS synthesis
+PRIMARY_MODEL = "gemini-2.5-flash"
+FALLBACK_MODEL = "gemini-2.0-flash"
 TTS_VOICE = "Kore"
 
 
 class VoiceInterventionResponse(BaseModel):
     vocal_risk_analysis: str = Field(
-        description="Analysis of distress level, vocal markers, or summary of user inquiry."
+        description="Analysis of vocal tone, distress level, or summary of user inquiry in target language."
     )
     immediate_safety_steps: str = Field(
-        description="Immediate physical safety or guidance steps."
+        description="Immediate physical safety or first-aid steps in target language."
     )
     deescalation_script: str = Field(
-        description="The COMPLETE spoken response script written strictly in the requested language, addressing exact kilometer distances, facility status (open/closed), and routing to the next nearest open facility if needed."
+        description="The COMPLETE spoken script written strictly in the native script of the requested response language."
     )
 
 
 def calculate_distance_and_time(
     lat1: float, lon1: float, lat2: float, lon2: float
 ):
-    """Calculates exact Haversine distance in kilometers and driving reach time in minutes."""
-    R = 6371.0  # Earth radius in kilometers
+    """Calculates Haversine distance in kilometers and estimated driving reach time."""
+    R = 6371.0
     dlat = math.radians(lat2 - lat1)
     dlon = math.radians(lon2 - lon1)
     a = (
@@ -97,16 +95,15 @@ def calculate_distance_and_time(
         * math.sin(dlon / 2) ** 2
     )
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    dist_km = R * c
+    dist_km = round(R * c, 1)
 
-    # Estimate driving distance (~1.3 road winding factor) & urban speed (~30 km/h)
     driving_dist_km = dist_km * 1.3
     reach_time_mins = max(1, round((driving_dist_km / 30.0) * 60))
-    return round(dist_km, 2), reach_time_mins
+    return dist_km, reach_time_mins
 
 
 def determine_open_status(tags: dict) -> str:
-    """Parses OpenStreetMap opening_hours tag to check if facility is open or 24/7."""
+    """Evaluates facility operating status."""
     opening_hours = tags.get("opening_hours", "").strip().lower()
     amenity = tags.get("amenity", "").strip().lower()
     emergency = tags.get("emergency", "").strip().lower()
@@ -119,31 +116,26 @@ def determine_open_status(tags: dict) -> str:
             return "Closed"
         return f"Open ({tags.get('opening_hours')})"
 
-    return "Open / Operating"
+    return "Open / Active"
 
 
 def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
-    headers = {"User-Agent": "BeaconEmergencyPlatform/1.0"}
+    """Lightweight & high-speed OpenStreetMap query."""
+    headers = {"User-Agent": "BeaconEngine/1.0"}
     overpass_query = f"""
-    [out:json][timeout:12];
+    [out:json][timeout:6];
     (
-      node["amenity"="hospital"](around:25000, {lat}, {lon});
-      node["amenity"="clinic"](around:25000, {lat}, {lon});
-      node["amenity"="dentist"](around:25000, {lat}, {lon});
-      node["amenity"="doctors"](around:25000, {lat}, {lon});
-      way["amenity"="hospital"](around:25000, {lat}, {lon});
-      way["amenity"="clinic"](around:25000, {lat}, {lon});
-      node["healthcare"="hospital"](around:25000, {lat}, {lon});
-      node["healthcare"="clinic"](around:25000, {lat}, {lon});
+      node["amenity"~"hospital|clinic|dentist|doctors"](around:25000, {lat}, {lon});
+      way["amenity"~"hospital|clinic"](around:25000, {lat}, {lon});
     );
-    out center 20;
+    out center 12;
     """
     try:
         url = "https://overpass-api.de/api/interpreter"
         data = urllib.parse.urlencode({"data": overpass_query}).encode("utf-8")
         req = urllib.request.Request(url, data=data, headers=headers)
 
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=5) as resp:
             result = json.loads(resp.read().decode())
 
         elements = result.get("elements", [])
@@ -156,8 +148,7 @@ def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
                 or tags.get("name:en")
                 or "Medical Center / Health Clinic"
             )
-            amenity = tags.get("amenity") or tags.get("healthcare") or "hospital"
-            amenity = amenity.capitalize()
+            amenity = tags.get("amenity", "hospital").capitalize()
             facility_type = "Dental Clinic" if "Dentist" in amenity else amenity
             phone = (
                 tags.get("phone")
@@ -179,7 +170,7 @@ def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
                 or (
                     "Dental Specialist"
                     if "Dentist" in amenity
-                    else "Emergency Physician"
+                    else "Emergency Medical Physician"
                 )
             )
 
@@ -215,24 +206,25 @@ def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
                 )
 
         hospitals.sort(key=lambda x: x["distance_km"])
-        return hospitals[:8]
+        return hospitals[:6]
     except Exception as e:
-        print(f"[HOSPITAL SCAN ERROR] {e}")
+        print(f"[FAST MAP SCAN ERROR] {e}")
         return []
 
 
-def synthesize_speech_direct(text: str) -> Optional[str]:
-    """Synthesizes speech using current Gemini TTS models."""
+def synthesize_speech_direct(text: str, target_language: str) -> Optional[str]:
+    """Generates clear, native-sounding voice audio via Gemini TTS with fallback."""
     if not client or not text:
         return None
 
-    tts_models = [TTS_MODEL, "gemini-3.6-flash"]
+    tts_prompt = f"Speak the following text aloud clearly and naturally in {target_language}: {text}"
+    models_to_try = [PRIMARY_MODEL, FALLBACK_MODEL, "gemini-2.0-flash-exp"]
 
-    for model_name in tts_models:
+    for model_name in models_to_try:
         try:
             response = client.models.generate_content(
                 model=model_name,
-                contents=text,
+                contents=tts_prompt,
                 config=types.GenerateContentConfig(
                     response_modalities=["AUDIO"],
                     speech_config=types.SpeechConfig(
@@ -262,7 +254,7 @@ def synthesize_speech_direct(text: str) -> Optional[str]:
                         wf.writeframes(pcm_data)
                     return base64.b64encode(buf.getvalue()).decode("utf-8")
         except Exception as e:
-            print(f"[TTS MODEL {model_name} ERROR] {e}")
+            print(f"[TTS FAIL ON {model_name}] {e}")
             continue
 
     return None
@@ -282,14 +274,14 @@ async def get_nearest_hospitals(
     location_query: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
 ):
-    headers = {"User-Agent": "BeaconEmergencyPlatform/1.0"}
+    headers = {"User-Agent": "BeaconEngine/1.0"}
 
     if (lat is None or lon is None) and location_query:
         try:
             encoded_q = urllib.parse.quote(location_query)
             geo_url = f"https://nominatim.openstreetmap.org/search?q={encoded_q}&format=json&limit=1"
             req = urllib.request.Request(geo_url, headers=headers)
-            with urllib.request.urlopen(req, timeout=5) as resp:
+            with urllib.request.urlopen(req, timeout=4) as resp:
                 geo_data = json.loads(resp.read().decode())
                 if geo_data:
                     lat = float(geo_data[0]["lat"])
@@ -299,7 +291,7 @@ async def get_nearest_hospitals(
 
     if lat is None or lon is None:
         raise HTTPException(
-            status_code=400, detail="GPS Coordinates or location query required."
+            status_code=400, detail="GPS Coordinates or search query required."
         )
 
     hospitals = fetch_hospitals_data(lat, lon)
@@ -338,46 +330,51 @@ async def process_voice_crisis(
         hospital_summary_lines = []
         for idx, h in enumerate(hospitals_list):
             hospital_summary_lines.append(
-                f"{idx+1}. Name: {h['name']}, Type: {h['type']}, Distance: {h['distance_km']} km, Drive Time: ~{h['reach_time_mins']} mins, Status: {h['status']}, Doctor: {h['doctor']}"
+                f"Facility #{idx+1}: {h['name']} ({h['type']}) | Distance: {h['distance_km']} km | Reach: ~{h['reach_time_mins']} mins | Status: {h['status']} | Specialist: {h['doctor']}"
             )
 
-        hospital_context_str = "\n".join(hospital_summary_lines) if hospital_summary_lines else "No live GPS medical data available."
+        hospital_context_str = (
+            "\n".join(hospital_summary_lines)
+            if hospital_summary_lines
+            else "No live GPS medical facilities found."
+        )
 
         prompt = f"""
-        You are Beacon, an intelligent emergency health and crisis AI assistant.
+        You are Beacon, an intelligent voice emergency health assistant.
         Analyze the audio input from user '{current_user.username}'.
 
-        REAL-TIME ACCURATE NEARBY MEDICAL FACILITIES (SORTED BY DISTANCE):
+        DETECTED REAL-TIME NEARBY MEDICAL FACILITIES (SORTED BY DISTANCE):
         {hospital_context_str}
 
-        CRITICAL INTENT, DISTANCE, AND STATUS RULES:
+        CRITICAL INTENT, MULTILINGUAL & ROUTING MANDATES:
 
-        1. NATIVE LANGUAGE RULE:
-           - Target language: {language}.
-           - Generate ALL JSON fields (vocal_risk_analysis, immediate_safety_steps, and deescalation_script) strictly in native script of {language}.
+        1. AUTOMATIC SPOKEN LANGUAGE TRANSLATION:
+           - The user may speak ANY language in the audio clip (e.g., Malayalam, Tamil, Hindi, English).
+           - Regardless of the input spoken language, you MUST generate ALL fields in the JSON response (vocal_risk_analysis, immediate_safety_steps, and deescalation_script) EXCLUSIVELY in the requested TARGET RESPONSE LANGUAGE: {language}.
+           - For non-English target languages (e.g. Malayalam, Tamil, Hindi, Arabic, Spanish), write strictly in the NATIVE SCRIPT of {language} (e.g., Malayalam script മലയാളം) so the TTS voice reads it with authentic pronunciation.
 
-        2. ACCURATE FACILITY SELECTION & CLOSED FACILITY HANDLING:
-           - Examine the list of facilities sorted by distance above.
-           - Check the 'Status' of the closest facility (Facility #1).
-           - IF THE CLOSEST FACILITY IS CLOSED (Status: Closed):
-             - You MUST explicitly inform the user that the nearest option ({hospitals_list[0]['name'] if hospitals_list else 'facility'}) is currently closed.
-             - IMMEDIATELY guide them to the NEXT NEAREST OPEN facility in the list ({hospitals_list[1]['name'] if len(hospitals_list)>1 else 'emergency center'}).
-             - State the exact distance in kilometers (e.g., "{hospitals_list[1]['distance_km'] if len(hospitals_list)>1 else '2.5'} km away") and driving reach time (~{hospitals_list[1]['reach_time_mins'] if len(hospitals_list)>1 else '5'} minutes drive).
-           - IF THE CLOSEST FACILITY IS OPEN (e.g. 24/7 or Open):
-             - Direct them straight to Facility #1 ({hospitals_list[0]['name'] if hospitals_list else 'medical center'}), stating the exact distance in kilometers ({hospitals_list[0]['distance_km'] if hospitals_list else '1.2'} km away) and driving reach time (~{hospitals_list[0]['reach_time_mins'] if hospitals_list else '3'} minutes).
+        2. ACCURATE HOSPITAL ROUTING & CLOSED STATUS HANDLING:
+           - Review the sorted facilities list above.
+           - Check the 'Status' of Facility #1.
+           - IF FACILITY #1 IS CLOSED:
+             - Explicitly announce in native {language} script that the closest option ({hospitals_list[0]['name'] if hospitals_list else 'facility'}) is currently closed.
+             - Immediately redirect them to Facility #2 ({hospitals_list[1]['name'] if len(hospitals_list)>1 else 'emergency center'}), stating exact distance ({hospitals_list[1]['distance_km'] if len(hospitals_list)>1 else '2'} km) and drive reach time (~{hospitals_list[1]['reach_time_mins'] if len(hospitals_list)>1 else '5'} mins drive).
+           - IF FACILITY #1 IS OPEN:
+             - Direct them straight to Facility #1 ({hospitals_list[0]['name'] if hospitals_list else 'medical facility'}), stating exact distance ({hospitals_list[0]['distance_km'] if hospitals_list else '1'} km) and drive reach time (~{hospitals_list[0]['reach_time_mins'] if hospitals_list else '3'} mins drive).
 
-        3. STRICT MEDICAL PRIORITIZATION:
-           - NEVER offer restaurants, food, or non-medical services. If mixed query (e.g. "hungry and headache"), address headache immediately and urge them not to delay care.
+        3. STRICT SCOPE SAFETY:
+           - NEVER recommend restaurants, food, or non-medical services.
+           - If user mentions medical pain mixed with casual tasks (e.g., "hungry and headache"), address the health symptom immediately and advise them not to delay medical evaluation.
 
-        4. CASUAL QUERY:
-           - If 100% casual (e.g., "Who are you?"), answer politely in native script of {language} without citing hospitals.
+        4. CASUAL / META QUERIES:
+           - If query is non-medical (e.g., "Who are you?"), respond conversationally in native script of {language} without listing hospitals.
 
-        OUTPUT MUST BE VALID JSON MATCHING SCHEMA.
+        OUTPUT MUST BE VALID JSON MATCHING THE SCHEMA EXACTLY.
         """
 
         try:
             response = client.models.generate_content(
-                model=ANALYSIS_MODEL,
+                model=PRIMARY_MODEL,
                 contents=[prompt, audio_part],
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
@@ -386,7 +383,7 @@ async def process_voice_crisis(
             )
         except Exception:
             response = client.models.generate_content(
-                model=FALLBACK_ANALYSIS_MODEL,
+                model=FALLBACK_MODEL,
                 contents=[prompt, audio_part],
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json",
@@ -402,7 +399,8 @@ async def process_voice_crisis(
         except Exception as parse_err:
             print(f"[JSON PARSE ERROR] {parse_err}")
 
-        audio_b64 = synthesize_speech_direct(spoken_text)
+        # Synthesize audio directly in target language
+        audio_b64 = synthesize_speech_direct(spoken_text, language)
 
         should_show_hospitals = bool(hospitals_list) and not any(
             k in result_text.lower()
@@ -414,7 +412,7 @@ async def process_voice_crisis(
             "data": result_text,
             "audio_base64": audio_b64,
             "audio_mime": "audio/wav",
-            "audio_error": None if audio_b64 else "Audio synthesis unavailable",
+            "audio_error": None if audio_b64 else "Audio synthesis fallback",
             "hospitals": hospitals_list if should_show_hospitals else [],
         }
     except Exception as e:
