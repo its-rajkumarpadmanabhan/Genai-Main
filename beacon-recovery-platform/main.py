@@ -18,23 +18,15 @@ from fastapi.staticfiles import StaticFiles
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
 
-from auth import (
-    User,
-    get_current_user,
-    get_db,
-    get_user_medical_history,
-    router as auth_router,
-    save_user_medical_event,
-)
+from auth import User, get_current_user, router as auth_router
 
 load_dotenv()
 
 app = FastAPI(
-    title="Beacon - GenAI Recovery & Prevention Platform",
+    title="Beacon - GenAI Emergency & Crisis Platform",
     version="1.0.0",
-    description="Zero-Typing Voice Emergency Intervention Engine",
+    description="Zero-Typing Voice Intervention Engine",
 )
 
 app.add_middleware(
@@ -71,16 +63,13 @@ GEMINI_API_KEY = (
 )
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-ANALYSIS_MODEL = "gemini-3.6-flash"
-FALLBACK_ANALYSIS_MODEL = "gemini-3.5-flash-lite"
-TTS_MODEL = "gemini-3.1-flash-tts-preview"
-TTS_FALLBACK_MODEL = "gemini-2.5-flash-preview-tts"
+ANALYSIS_MODEL = "gemini-2.5-flash"
 TTS_VOICE = "Kore"
 
 
 class VoiceInterventionResponse(BaseModel):
     vocal_risk_analysis: str = Field(
-        description="Analysis of vocal tone, distress level, or summary of user inquiry."
+        description="Analysis of distress level, vocal markers, or summary of user inquiry."
     )
     immediate_safety_steps: str = Field(
         description="Immediate physical safety or guidance steps."
@@ -167,7 +156,7 @@ def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
                 or (
                     "Dental Specialist"
                     if "Dentist" in amenity
-                    else "Emergency Medical Physician"
+                    else "Emergency Physician"
                 )
             )
 
@@ -206,50 +195,51 @@ def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
         return []
 
 
-def synthesize_speech(text: str, retries: int = 3):
+def synthesize_speech_direct(text: str) -> Optional[str]:
+    """
+    Synthesizes audio using Gemini 2.5 Flash Multimodal Audio Generation.
+    Guarantees clean 24kHz WAV base64 string response.
+    """
     if not client or not text:
-        return None, "TTS unavailable"
+        return None
 
-    tts_models = [TTS_MODEL, TTS_FALLBACK_MODEL]
+    try:
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=f"Please read the following text aloud clearly and naturally: {text}",
+            config=types.GenerateContentConfig(
+                response_modalities=["AUDIO"],
+                speech_config=types.SpeechConfig(
+                    voice_config=types.VoiceConfig(
+                        prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                            voice_name=TTS_VOICE
+                        )
+                    )
+                ),
+            ),
+        )
 
-    for model_name in tts_models:
-        for attempt in range(retries):
-            try:
-                response = client.models.generate_content(
-                    model=model_name,
-                    contents=text,
-                    config=types.GenerateContentConfig(
-                        response_modalities=["AUDIO"],
-                        speech_config=types.SpeechConfig(
-                            voice_config=types.VoiceConfig(
-                                prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                    voice_name=TTS_VOICE
-                                )
-                            )
-                        ),
-                    ),
-                )
-                candidates = getattr(response, "candidates", None)
-                if not candidates or not candidates[0].content:
-                    continue
+        candidates = getattr(response, "candidates", None)
+        if not candidates or not candidates[0].content:
+            return None
 
-                parts = candidates[0].content.parts
-                if not parts or not getattr(parts[0], "inline_data", None):
-                    continue
-
-                pcm_data = parts[0].inline_data.data
+        parts = candidates[0].content.parts
+        for part in parts:
+            inline_data = getattr(part, "inline_data", None)
+            if inline_data and inline_data.data:
+                pcm_data = inline_data.data
                 buf = io.BytesIO()
                 with wave.open(buf, "wb") as wf:
                     wf.setnchannels(1)
                     wf.setsampwidth(2)
                     wf.setframerate(24000)
                     wf.writeframes(pcm_data)
-                return base64.b64encode(buf.getvalue()).decode("utf-8"), None
-            except Exception as e:
-                print(f"[TTS ATTEMPT {attempt+1} ERROR] {e}")
-                continue
+                return base64.b64encode(buf.getvalue()).decode("utf-8")
 
-    return None, "TTS synthesis failed."
+    except Exception as e:
+        print(f"[DIRECT TTS ERROR] {e}")
+
+    return None
 
 
 @app.get("/api/health")
@@ -302,7 +292,6 @@ async def process_voice_crisis(
     language: str = Form("English"),
     lat: Optional[float] = Form(None),
     lon: Optional[float] = Form(None),
-    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     if not client:
@@ -316,16 +305,6 @@ async def process_voice_crisis(
         mime_type = file.content_type or "audio/webm"
         audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
 
-        history_records = get_user_medical_history(db, current_user.id)
-        history_str = "No prior recorded medical visits."
-        if history_records:
-            history_str = "\n".join(
-                [
-                    f"- Date: {r['date']}, Reported Condition: '{r['condition']}', Recommended Hospital: '{r['hospital']}'"
-                    for r in history_records
-                ]
-            )
-
         hospitals_list = []
         if lat is not None and lon is not None:
             hospitals_list = fetch_hospitals_data(lat, lon)
@@ -336,75 +315,53 @@ async def process_voice_crisis(
             top_h_str = f"Name: {top_h['name']}, Distance: {top_h['distance_km']} km, Drive Reach Time: ~{top_h['reach_time_mins']} minutes away, Specialist: {top_h['doctor']}."
 
         prompt = f"""
-        You are Beacon, an intelligent emergency health AI assistant.
+        You are Beacon, an intelligent emergency health and crisis AI assistant.
         Analyze the audio input from user '{current_user.username}'.
-
-        USER'S PREVIOUS MEDICAL HISTORY LOGS:
-        {history_str}
 
         NEARBY DETECTED MEDICAL CENTER CONTEXT:
         {top_h_str}
 
-        STRICT INTENT, SAFETY & LANGUAGE MANDATES:
+        CRITICAL INTENT, SAFETY & LANGUAGE MANDATES:
 
         1. EXACT NATIVE LANGUAGE & SCRIPT MANDATE:
            - Selected target language: {language}.
-           - You MUST write the ENTIRE JSON fields (vocal_risk_analysis, immediate_safety_steps, and deescalation_script) in native script of language {language}.
-           - For example, if {language} is Malayalam, write in Malayalam script (മലയാളം). If Tamil, write in Tamil script (தமிழ்). If Hindi, write in Devanagari (हिंदी).
+           - You MUST write the ENTIRE JSON fields (vocal_risk_analysis, immediate_safety_steps, and deescalation_script) strictly in the native script of {language}.
+           - Examples: Malayalam -> മലയാളം, Tamil -> தமிழ், Hindi -> हिंदी, Spanish -> Español, Arabic -> العربية.
 
         2. STRICT SCOPE & MEDICAL PRIORITIZATION:
            - NEVER search for or offer restaurants, food, entertainment, or non-medical services.
            - If user mentions medical pain/symptom mixed with a casual task (e.g. "I am hungry and have a headache", "I have eye pain and I'm going to a movie"):
              - Prioritize the health issue immediately. Warn against delaying medical care for non-essential tasks.
-             - Focus 100% on first-aid and reaching the hospital.
+             - Direct them to the nearest medical center: {hospitals_list[0]['name'] if hospitals_list else 'the nearest clinic'}, stating drive time (~{hospitals_list[0]['reach_time_mins'] if hospitals_list else '5'} mins) and distance ({hospitals_list[0]['distance_km'] if hospitals_list else '2'} km).
 
-        3. PREVIOUS HISTORY ACKNOWLEDGMENT:
-           - If user reports a recurring ailment (headache, toothache, etc.) found in history:
-             - Acknowledge prior visit in native script of {language} (e.g., mentioning previous hospital visit for continuity of care vs nearest current hospital).
-
-        4. CASUAL ONLY:
+        3. CASUAL ONLY:
            - If query is 100% non-medical (e.g. "Who are you?"), answer politely in native script of {language} without citing hospitals.
+
+        4. MEDICAL CRISIS / ILLNESS / PAIN:
+           - Assess distress, give 2 immediate safety steps, and announce nearest medical center details in native script of {language}.
 
         OUTPUT MUST BE VALID JSON MATCHING SCHEMA.
         """
 
-        try:
-            response = client.models.generate_content(
-                model=ANALYSIS_MODEL,
-                contents=[prompt, audio_part],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=VoiceInterventionResponse,
-                ),
-            )
-        except Exception:
-            response = client.models.generate_content(
-                model=FALLBACK_ANALYSIS_MODEL,
-                contents=[prompt, audio_part],
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=VoiceInterventionResponse,
-                ),
-            )
+        response = client.models.generate_content(
+            model=ANALYSIS_MODEL,
+            contents=[prompt, audio_part],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=VoiceInterventionResponse,
+            ),
+        )
 
         result_text = response.text
         spoken_text = ""
         try:
             parsed_data = json.loads(result_text)
             spoken_text = parsed_data.get("deescalation_script", "")
-
-            condition_desc = parsed_data.get("vocal_risk_analysis", "")
-            if hospitals_list and not any(
-                k in result_text.lower()
-                for k in ["no medical intervention required", "non-emergency query"]
-            ):
-                rec_hospital = hospitals_list[0]["name"]
-                save_user_medical_event(db, current_user.id, condition_desc, rec_hospital)
-
         except Exception as parse_err:
             print(f"[JSON PARSE ERROR] {parse_err}")
 
-        audio_b64, audio_error = synthesize_speech(spoken_text)
+        # Synthesize audio directly using multimodal audio generation
+        audio_b64 = synthesize_speech_direct(spoken_text)
 
         should_show_hospitals = bool(hospitals_list) and not any(
             k in result_text.lower()
@@ -416,7 +373,7 @@ async def process_voice_crisis(
             "data": result_text,
             "audio_base64": audio_b64,
             "audio_mime": "audio/wav",
-            "audio_error": audio_error,
+            "audio_error": None if audio_b64 else "Audio synthesis unavailable",
             "hospitals": hospitals_list if should_show_hospitals else [],
         }
     except Exception as e:

@@ -256,14 +256,14 @@
 
       <div id="loading-spinner" class="hidden text-center py-8">
           <i class="fa-solid fa-spinner fa-spin text-teal-400 text-3xl mb-3"></i>
-          <p class="text-xs font-mono text-slate-400">Listening and synthesizing response...</p>
+          <p class="text-xs font-mono text-slate-400">Listening and synthesizing audio response...</p>
       </div>
 
       <div id="audio-reply" class="hidden"></div>
       <div id="script-results" class="space-y-4 text-sm"></div>
   </section>
 
-  <!-- Hospital & Clinic Scanner Section -->
+  <!-- Hospital Scanner Section -->
   <section class="bg-gradient-to-br from-slate-900/90 to-slate-950/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
       <div class="flex items-center justify-between">
           <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
@@ -278,7 +278,6 @@
           Scans for emergency medical facilities based on your live position. If location access is blocked, type your current city or landmark below.
       </p>
 
-      <!-- Manual Search Fallback -->
       <div class="flex gap-2">
           <input type="text" id="hospital-search-input" placeholder="Type city, town, or landmark..." 
                  class="flex-1 bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-teal-500">
@@ -403,7 +402,6 @@
               await fetchHospitals(`/api/nearest-hospitals?lat=${currentLat}&lon=${currentLon}`);
           },
           async () => {
-              console.warn("GPS failed/blocked. Falling back to IP location...");
               await fallbackToIpLocation();
           },
           { enableHighAccuracy: true, timeout: 6000, maximumAge: 0 }
@@ -470,7 +468,7 @@
               ${(h.reach_time_mins !== undefined || h.doctor) ? `
               <div class="flex items-center justify-between text-[11px] font-mono text-emerald-400 font-semibold">
                   <span><i class="fa-solid fa-car-side mr-1"></i>~${h.reach_time_mins || 5} min drive (${h.distance_km || 2} km)</span>
-                  <span class="text-slate-300 text-[10px]"><i class="fa-solid fa-user-doctor text-blue-400 mr-1"></i>${h.doctor || 'Trauma Specialist'}</span>
+                  <span class="text-slate-300 text-[10px]"><i class="fa-solid fa-user-doctor text-blue-400 mr-1"></i>${h.doctor || 'Emergency Physician'}</span>
               </div>` : ''}
               <div class="flex items-center justify-between pt-1 text-[11px]">
                   <a href="tel:${h.phone}" class="text-slate-300 font-mono hover:text-emerald-400"><i class="fa-solid fa-phone text-emerald-400 mr-1"></i>${h.phone}</a>
@@ -602,21 +600,10 @@
             </div>
           `;
 
-          if (!res.audio_error && res.audio_base64) {
+          if (res.audio_base64) {
               const src = `data:${res.audio_mime || 'audio/wav'};base64,${res.audio_base64}`;
               audioReplyBox.classList.remove('hidden');
               audioReplyBox.innerHTML = `<audio controls autoplay class="w-full" src="${src}"></audio>`;
-          } else {
-              audioReplyBox.classList.remove('hidden');
-              audioReplyBox.innerHTML = `
-                  <div class="p-3 bg-amber-950/50 border border-amber-500/50 rounded-xl flex items-center gap-3 text-amber-300">
-                      <i class="fa-solid fa-triangle-exclamation text-amber-400 text-lg"></i>
-                      <div>
-                          <p class="text-xs font-bold">Audio Output Unavailable</p>
-                          <p class="text-[11px] text-amber-200/80">Voice generation paused. Refer to text response below.</p>
-                      </div>
-                  </div>
-              `;
           }
 
           status.innerText = "Tap the orb or button to start recording";
@@ -627,7 +614,7 @@
       }
   }
 
-  // 3D Fibonacci Sphere Voice Orb Engine
+  // 3D Voice Orb Engine
   let setOrbState = function(listening) {};
 
   (function(){

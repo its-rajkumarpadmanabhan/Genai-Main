@@ -1,5 +1,5 @@
 """
-BEACON — Authentication & Account System with Medical History
+BEACON — Authentication & Account System
 """
 
 import os
@@ -10,7 +10,7 @@ import ssl
 from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import List, Optional
+from typing import Optional
 
 import bcrypt
 import jwt
@@ -20,19 +20,14 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
-    ForeignKey,
     Integer,
     String,
-    Text,
     create_engine,
     or_,
 )
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
-# ----------------------------------------------------------------------------
 # Configuration
-# ----------------------------------------------------------------------------
-
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./beacon_users.db")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
@@ -52,10 +47,7 @@ FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:8000")
 
 EMAIL_ENABLED = bool(SMTP_HOST and SMTP_USER and SMTP_PASSWORD)
 
-# ----------------------------------------------------------------------------
-# Database setup
-# ----------------------------------------------------------------------------
-
+# Database Setup
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -84,16 +76,6 @@ class PasswordResetToken(Base):
     used = Column(Boolean, default=False)
 
 
-class UserMedicalHistory(Base):
-    __tablename__ = "user_medical_history"
-
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    condition = Column(Text, nullable=False)
-    hospital_recommended = Column(String(255), nullable=True)
-    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-
-
 Base.metadata.create_all(bind=engine)
 
 
@@ -105,49 +87,7 @@ def get_db():
         db.close()
 
 
-# ----------------------------------------------------------------------------
-# Medical History Helpers
-# ----------------------------------------------------------------------------
-
-def save_user_medical_event(db: Session, user_id: int, condition: str, hospital_recommended: str):
-    try:
-        entry = UserMedicalHistory(
-            user_id=user_id,
-            condition=condition,
-            hospital_recommended=hospital_recommended,
-        )
-        db.add(entry)
-        db.commit()
-    except Exception as e:
-        print(f"[DB LOG ERROR] {e}")
-
-
-def get_user_medical_history(db: Session, user_id: int, limit: int = 5) -> List[dict]:
-    try:
-        rows = (
-            db.query(UserMedicalHistory)
-            .filter(UserMedicalHistory.user_id == user_id)
-            .order_by(UserMedicalHistory.timestamp.desc())
-            .limit(limit)
-            .all()
-        )
-        return [
-            {
-                "condition": r.condition,
-                "hospital": r.hospital_recommended or "Medical Center",
-                "date": r.timestamp.strftime("%Y-%m-%d %H:%M") if r.timestamp else "Recently",
-            }
-            for r in rows
-        ]
-    except Exception as e:
-        print(f"[DB HISTORY FETCH ERROR] {e}")
-        return []
-
-
-# ----------------------------------------------------------------------------
-# Validation rules
-# ----------------------------------------------------------------------------
-
+# Validation
 USERNAME_RE = re.compile(r"^[a-zA-Z0-9_]{3,20}$")
 MOBILE_RE = re.compile(r"^\+?[0-9]{7,15}$")
 PASSWORD_RE = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$")
@@ -203,10 +143,7 @@ class ResetPasswordRequest(BaseModel):
         return v
 
 
-# ----------------------------------------------------------------------------
-# Password hashing & JWT
-# ----------------------------------------------------------------------------
-
+# Hashing & JWT
 def hash_password(plain_password: str) -> str:
     return bcrypt.hashpw(plain_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
 
@@ -249,10 +186,7 @@ def get_current_user(authorization: Optional[str] = Header(None), db: Session = 
     return user
 
 
-# ----------------------------------------------------------------------------
-# Email delivery
-# ----------------------------------------------------------------------------
-
+# Email Delivery
 def send_email(to_email: str, subject: str, html_body: str) -> bool:
     if not EMAIL_ENABLED:
         print("=" * 70)
@@ -280,7 +214,7 @@ def send_email(to_email: str, subject: str, html_body: str) -> bool:
 
 
 def send_welcome_email(user: User):
-    subject = "Welcome to Beacon — Your Recovery & Prevention Platform"
+    subject = "Welcome to Beacon — Your Emergency & Prevention Assistant"
     html = f"""
     <div style="font-family: Arial, sans-serif; max-width: 560px; margin: auto; background:#0f172a; color:#e2e8f0; padding: 32px; border-radius: 16px;">
       <h1 style="color:#2dd4bf; font-size: 22px;">Welcome, {user.username} 👋</h1>
@@ -302,10 +236,7 @@ def send_password_reset_email(user: User, reset_token: str):
     send_email(user.email, subject, html)
 
 
-# ----------------------------------------------------------------------------
-# Router
-# ----------------------------------------------------------------------------
-
+# Auth Endpoints
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
