@@ -26,7 +26,7 @@ from typing import Optional
 
 import bcrypt
 import jwt
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Header
 from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy import (Boolean, Column, DateTime, Integer, String,
                          create_engine, or_)
@@ -61,7 +61,12 @@ EMAIL_ENABLED = bool(SMTP_HOST and SMTP_USER and SMTP_PASSWORD)
 # ----------------------------------------------------------------------------
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
-engine = create_engine(DATABASE_URL, connect_args=connect_args)
+# pool_pre_ping: tests each connection with a lightweight ping before handing
+# it out. Render's free Postgres tier silently drops idle connections; without
+# this, the first request after any idle period reuses a dead connection and
+# has to fail + reconnect (adding latency, occasionally a full timeout) before
+# it even gets to your query.
+engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
@@ -309,7 +314,7 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 @router.post("/signup", status_code=201)
-def signup(payload: SignupRequest, db: Session = Depends(get_db)):
+def signup(payload: SignupRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     normalized_email = payload.email.lower().strip()
 
     existing = db.query(User).filter(
@@ -337,7 +342,13 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(user)
 
-    send_welcome_email(user)
+    # Fire-and-forget: this used to be a direct call here, which meant the
+    # signup request blocked on a live SMTP handshake (DNS + TLS + login +
+    # send) before the response could return -- easily several seconds, more
+    # if the SMTP host is slow to respond. FastAPI runs background_tasks
+    # AFTER the response is sent, so the user gets their token and is signed
+    # in immediately; the welcome email goes out a moment later regardless.
+    background_tasks.add_task(send_welcome_email, user)
 
     token = create_access_token(user)
     return {
@@ -370,7 +381,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/forgot-password")
-def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+def forgot_password(payload: ForgotPasswordRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     normalized_email = payload.email.lower().strip()
     user = db.query(User).filter(User.email.ilike(normalized_email)).first()
 
@@ -392,7 +403,7 @@ def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db
     db.add(entry)
     db.commit()
 
-    send_password_reset_email(user, reset_token)
+    background_tasks.add_task(send_password_reset_email, user, reset_token)
     return generic_response
 
 
