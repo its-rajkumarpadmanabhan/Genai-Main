@@ -2,14 +2,14 @@ import base64
 import io
 import os
 import wave
-from math import atan2, cos, radians, sin, sqrt
+import json
 from typing import Optional
+import urllib.parse
+import urllib.request
 
-import requests
 import uvicorn
-from auth import User, get_current_user, router as auth_router
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, Query
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
@@ -18,7 +18,9 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
-load_dotenv()  # local dev convenience — no-op if no .env file is present
+from auth import User, get_current_user, router as auth_router
+
+load_dotenv()
 
 app = FastAPI(
     title="Beacon - GenAI Recovery & Prevention Platform",
@@ -26,7 +28,6 @@ app = FastAPI(
     description="Zero-Typing Voice Emergency Intervention Engine",
 )
 
-# Enable CORS for public access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -38,21 +39,13 @@ app.add_middleware(
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request, exc: RequestValidationError):
-    """
-    Flatten Pydantic validation errors into a single string so frontend displays
-    the actual error message directly.
-    """
-    messages = [
-        err.get("msg", "Invalid input").replace("Value error, ", "")
-        for err in exc.errors()
-    ]
+    messages = [err.get("msg", "Invalid input").replace("Value error, ", "") for err in exc.errors()]
     return JSONResponse(
         status_code=422,
         content={"detail": "; ".join(messages) or "Invalid input."},
     )
 
 
-# Account system: signup / login / forgot-password / reset-password
 app.include_router(auth_router)
 
 
@@ -61,64 +54,32 @@ async def root():
     return FileResponse("templates/login.html")
 
 
-GEMINI_API_KEY = (
-    (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
-)
+GEMINI_API_KEY = (os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-# Active Gemini 3.x production endpoints
 ANALYSIS_MODEL = "gemini-3.6-flash"
 FALLBACK_ANALYSIS_MODEL = "gemini-3.5-flash-lite"
 TTS_MODEL = "gemini-3.1-flash-tts-preview"
 TTS_FALLBACK_MODEL = "gemini-2.5-flash-preview-tts"
 TTS_VOICE = "Kore"
 
-# Google Maps: powers the "find nearest hospital/clinic" feature.
-# Not required for the rest of the app to work -- /api/nearby-care simply
-# returns a clear config error until this is set.
-GOOGLE_MAPS_API_KEY = (
-    (os.getenv("GOOGLE_MAPS_API_KEY") or "").strip().strip('"').strip("'")
-)
 
-
-def google_maps_configured() -> bool:
-    return bool(GOOGLE_MAPS_API_KEY)
-
-
-# Pydantic Schema guarantees Gemini outputs 100% valid, auto-escaped JSON every time
 class VoiceInterventionResponse(BaseModel):
-    intent_type: str = Field(
-        description="Exactly one of: 'informational', 'emergency', or 'facility_search'."
-    )
-    facility_query: str = Field(
-        description="Only for intent_type='facility_search': the short medical symptom/condition keyword "
-        "extracted from the user's speech, written in English (e.g. 'headache', 'stomach ache', 'vomiting') "
-        "so it can be used as a place-search keyword. Empty string for all other intent types."
-    )
     vocal_risk_analysis: str = Field(
-        description="Analysis of vocal tone, distress level, or summary of platform informational inquiry translated into the requested language."
+        description="Analysis of vocal tone, distress level, or summary of platform informational inquiry."
     )
     immediate_safety_steps: str = Field(
-        description="Text bullet points or summary of immediate physical safety steps translated into the requested language."
+        description="Text bullet points or summary of immediate physical safety steps."
     )
     deescalation_script: str = Field(
-        description="The COMPLETE spoken response script combining empathetic validation AND immediate physical safety instructions into one single spoken response strictly written in the requested language."
+        description="Spoken response script combining empathetic validation AND immediate safety instructions."
     )
 
 
 def gemini_auth_error_detail(e: Exception, context: str) -> str:
     msg = str(e)
-    if (
-        "UNAUTHENTICATED" in msg
-        or "401" in msg
-        or "PERMISSION_DENIED" in msg
-        or "403" in msg
-    ):
-        return (
-            f"{context}: Gemini rejected the API key (invalid or malformed GEMINI_API_KEY). "
-            "Generate a fresh key at https://aistudio.google.com/apikey, set it as GEMINI_API_KEY "
-            "in your host's environment variables, then redeploy."
-        )
+    if "UNAUTHENTICATED" in msg or "401" in msg or "PERMISSION_DENIED" in msg or "403" in msg:
+        return f"{context}: Gemini rejected the API key."
     return f"{context}: {msg}"
 
 
@@ -152,11 +113,7 @@ def synthesize_speech(text: str, retries: int = 3):
                 if not candidates:
                     continue
 
-                parts = (
-                    candidates[0].content.parts
-                    if candidates[0].content
-                    else None
-                )
+                parts = candidates[0].content.parts if candidates[0].content else None
                 if not parts or not getattr(parts[0], "inline_data", None):
                     continue
 
@@ -178,18 +135,10 @@ def synthesize_speech(text: str, retries: int = 3):
 @app.get("/api/health")
 async def health_check():
     if not client:
-        return {
-            "status": "online",
-            "gemini_configured": False,
-            "gemini_key_valid": False,
-        }
+        return {"status": "online", "gemini_configured": False, "gemini_key_valid": False}
     try:
         next(iter(client.models.list()))
-        return {
-            "status": "online",
-            "gemini_configured": True,
-            "gemini_key_valid": True,
-        }
+        return {"status": "online", "gemini_configured": True, "gemini_key_valid": True}
     except Exception as e:
         return {
             "status": "online",
@@ -197,6 +146,100 @@ async def health_check():
             "gemini_key_valid": False,
             "gemini_error": gemini_auth_error_detail(e, "Key check failed"),
         }
+
+
+@app.get("/api/nearest-hospitals")
+async def get_nearest_hospitals(
+    lat: Optional[float] = Query(None),
+    lon: Optional[float] = Query(None),
+    location_query: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Scans for hospitals/clinics via OpenStreetMap (Overpass API).
+    Accepts latitude/longitude OR a text location query (e.g. "Thiruvananthapuram").
+    """
+    headers = {"User-Agent": "BeaconEmergencyPlatform/1.0"}
+
+    # If user provided a text query instead of GPS coordinates, geocode it first
+    if (lat is None or lon is None) and location_query:
+        try:
+            encoded_q = urllib.parse.quote(location_query)
+            geo_url = f"https://nominatim.openstreetmap.org/search?q={encoded_q}&format=json&limit=1"
+            req = urllib.request.Request(geo_url, headers=headers)
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                geo_data = json.loads(resp.read().decode())
+                if geo_data:
+                    lat = float(geo_data[0]["lat"])
+                    lon = float(geo_data[0]["lon"])
+                else:
+                    raise HTTPException(status_code=404, detail=f"Location '{location_query}' not found.")
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to geocode location query: {str(e)}")
+
+    if lat is None or lon is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Latitude and longitude OR a location search query are required.",
+        )
+
+    # Query Overpass API for hospitals/clinics within 10,000 meters (10 km)
+    overpass_query = f"""
+    [out:json][timeout:10];
+    (
+      node["amenity"="hospital"](around:10000, {lat}, {lon});
+      node["amenity"="clinic"](around:10000, {lat}, {lon});
+      way["amenity"="hospital"](around:10000, {lat}, {lon});
+      way["amenity"="clinic"](around:10000, {lat}, {lon});
+    );
+    out center 10;
+    """
+
+    try:
+        url = "https://overpass-api.de/api/interpreter"
+        data = urllib.parse.urlencode({"data": overpass_query}).encode("utf-8")
+        req = urllib.request.Request(url, data=data, headers=headers)
+
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            result = json.loads(resp.read().decode())
+
+        elements = result.get("elements", [])
+        hospitals = []
+
+        for elem in elements:
+            tags = elem.get("tags", {})
+            name = tags.get("name") or tags.get("name:en") or "Medical Facility / Clinic"
+            facility_type = tags.get("amenity", "hospital").capitalize()
+            phone = tags.get("phone") or tags.get("contact:phone") or tags.get("emergency:phone") or "N/A"
+            address = tags.get("addr:street") or tags.get("addr:full") or tags.get("addr:suburb") or "Nearby"
+
+            elem_lat = elem.get("lat") or (elem.get("center", {}).get("lat") if "center" in elem else None)
+            elem_lon = elem.get("lon") or (elem.get("center", {}).get("lon") if "center" in elem else None)
+
+            maps_url = ""
+            if elem_lat and elem_lon:
+                maps_url = f"https://www.google.com/maps/dir/?api=1&destination={elem_lat},{elem_lon}"
+
+            hospitals.append({
+                "name": name,
+                "type": facility_type,
+                "phone": phone,
+                "address": address,
+                "maps_url": maps_url,
+                "lat": elem_lat,
+                "lon": elem_lon
+            })
+
+        return {
+            "status": "success",
+            "search_center": {"lat": lat, "lon": lon},
+            "count": len(hospitals),
+            "hospitals": hospitals[:6]  # Return top 6 nearest facilities
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Hospital search service unavailable: {str(e)}")
 
 
 @app.post("/api/voice-intervention")
@@ -207,63 +250,33 @@ async def process_voice_crisis(
     current_user: User = Depends(get_current_user),
 ):
     if not client:
-        raise HTTPException(
-            status_code=500,
-            detail="Gemini Engine missing. Set GEMINI_API_KEY env variable.",
-        )
+        raise HTTPException(status_code=500, detail="Gemini Engine missing. Set GEMINI_API_KEY env variable.")
 
     try:
         audio_bytes = await file.read()
         if not audio_bytes:
-            raise HTTPException(
-                status_code=400,
-                detail="No audio received. Please try recording again.",
-            )
+            raise HTTPException(status_code=400, detail="No audio received.")
 
         mime_type = file.content_type or "audio/webm"
-        audio_part = types.Part.from_bytes(
-            data=audio_bytes, mime_type=mime_type
-        )
+        audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
 
         prompt = f"""
         You are Beacon, an emergency response and crisis AI assistant.
         Analyze this audio clip from a {user_type}.
 
         CRITICAL LANGUAGE INSTRUCTION:
-        You MUST provide ALL outputs in the JSON schema (vocal_risk_analysis, immediate_safety_steps, and deescalation_script) exclusively in the following language: {language}.
-        Even if the input user audio is spoken in a different dialect or language, understand the intent and respond completely in {language}.
+        You MUST provide ALL outputs in the JSON schema exclusively in language: {language}.
 
-        Evaluate user intent and choose EXACTLY ONE of the three cases below. Always fill
-        "intent_type" with the matching value ('informational', 'emergency', or 'facility_search')
-        and always fill "facility_query" (empty string "" unless case 3 applies).
+        Evaluate user intent:
+        1. IF GENERAL/META QUESTIONS ("Who are you?", "What do you do?"):
+           - vocal_risk_analysis: Informational inquiry regarding Beacon system.
+           - immediate_safety_steps: No emergency physical action required.
+           - deescalation_script: Friendly concise response explaining Beacon emergency assistant capabilities.
 
-        1. IF THE USER IS ASKING GENERAL/META QUESTIONS ABOUT THE SYSTEM (e.g., "Who are you?", "What do you do?", "How many people do you help?", "What can you do?"):
-           - intent_type: "informational"
-           - facility_query: ""
-           - vocal_risk_analysis: State "Informational inquiry regarding Beacon system identity and capabilities." in {language}.
-           - immediate_safety_steps: State "No emergency physical action required." in {language}.
-           - deescalation_script: Provide a concise, friendly response in {language} explaining that you are Beacon, an AI-powered crisis response assistant built to offer real-time voice guidance, de-escalation, and physical safety instructions during emergency situations.
-
-        2. IF THE USER IS EXPERIENCING AN ACTUAL EMERGENCY OR CRISIS (e.g., panic, physical injury, distress, pain):
-           - intent_type: "emergency"
-           - facility_query: ""
-           - vocal_risk_analysis: Identify emotional state, distress level, and risk assessment from vocal markers in {language}.
-           - immediate_safety_steps: Provide 2 immediate physical action/first-aid steps for screen reference in {language}.
-           - deescalation_script: CRITICAL REQUIREMENT — "deescalation_script" MUST combine BOTH warm empathetic reassurance AND the immediate physical safety/first-aid steps (e.g., keeping an injured leg still, applying pressure, slow deep breathing) into one single spoken response (3-5 sentences) written entirely in {language}.
-
-        3. IF THE USER ASKS TO FIND THE NEAREST HOSPITAL OR CLINIC FOR A SYMPTOM/CONDITION
-           (e.g., "check nearest hospital or clinic for headache", "find a clinic near me for stomach ache",
-           "where can I go for vomiting", "scan nearby hospitals for my condition"):
-           - intent_type: "facility_search"
-           - facility_query: the short symptom/condition keyword extracted from the request, written in ENGLISH
-             regardless of {language} (e.g. "headache", "stomach ache", "vomiting"), so the backend can use it
-             as a place-search keyword.
-           - vocal_risk_analysis: Brief note that the user is requesting nearby care for that condition, in {language}.
-           - immediate_safety_steps: 1-2 general precautions to take while getting to care, in {language}.
-           - deescalation_script: A short, reassuring message in {language} telling the user Beacon is now
-             locating the nearest hospital or clinic (checking both open and closed ones) for their condition,
-             and that it will tell them how long it will take to get there. Do NOT invent a hospital name or
-             travel time here -- the real facility list and travel time are looked up separately.
+        2. IF EMERGENCY OR CRISIS:
+           - vocal_risk_analysis: Identify emotional state, distress level, and risk assessment.
+           - immediate_safety_steps: Provide 2 immediate physical action/first-aid steps.
+           - deescalation_script: COMBINE BOTH empathetic reassurance AND physical safety steps into 1 spoken script (3-5 sentences).
         """
 
         try:
@@ -289,12 +302,9 @@ async def process_voice_crisis(
                 raise model_err
 
         result_text = response.text
-
         spoken_text = ""
         try:
-            import json as _json
-
-            parsed_data = _json.loads(result_text)
+            parsed_data = json.loads(result_text)
             spoken_text = parsed_data.get("deescalation_script", "")
         except Exception as parse_err:
             print(f"[JSON PARSE ERROR] {parse_err}")
@@ -311,234 +321,10 @@ async def process_voice_crisis(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=gemini_auth_error_detail(e, "Audio Processing Error"),
-        )
+        raise HTTPException(status_code=500, detail=gemini_auth_error_detail(e, "Audio Processing Error"))
 
 
-# ----------------------------------------------------------------------------
-# Nearest hospital/clinic lookup ("check nearest hospital for headache" etc.)
-# ----------------------------------------------------------------------------
-
-
-class NearbyCareRequest(BaseModel):
-    condition: str
-    language: str = "English"
-    # Caller supplies EITHER lat/lng (preferred, from browser GPS) OR a
-    # free-text address/city (fallback when the user denies location access).
-    lat: Optional[float] = None
-    lng: Optional[float] = None
-    address: Optional[str] = None
-
-
-def google_maps_error_detail(context: str) -> str:
-    return (
-        f"{context}: Location search isn't configured yet. Generate an API key at "
-        "https://console.cloud.google.com/google/maps-apis (enable Places API, "
-        "Distance Matrix API, and Geocoding API), set it as GOOGLE_MAPS_API_KEY in "
-        "your host's environment variables, then redeploy."
-    )
-
-
-def geocode_address(address: str):
-    """Free-text address/city -> (lat, lng). Used when GPS is unavailable/denied."""
-    try:
-        resp = requests.get(
-            "https://maps.googleapis.com/maps/api/geocode/json",
-            params={"address": address, "key": GOOGLE_MAPS_API_KEY},
-            timeout=10,
-        )
-        data = resp.json()
-    except Exception as e:
-        return None, f"Could not reach the location service: {e}"
-
-    if data.get("status") != "OK" or not data.get("results"):
-        return None, f"Couldn't find '{address}'. Try a more specific address, city, or landmark."
-
-    loc = data["results"][0]["geometry"]["location"]
-    return (loc["lat"], loc["lng"]), None
-
-
-def haversine_km(lat1, lon1, lat2, lon2) -> float:
-    r = 6371.0
-    p1, p2 = radians(lat1), radians(lat2)
-    dphi = radians(lat2 - lat1)
-    dlambda = radians(lon2 - lon1)
-    a = sin(dphi / 2) ** 2 + cos(p1) * cos(p2) * sin(dlambda / 2) ** 2
-    return 2 * r * atan2(sqrt(a), sqrt(1 - a))
-
-
-def search_nearby_facilities(lat: float, lng: float, condition: str, radius_m: int = 5000):
-    """
-    Queries Google Places Nearby Search for both hospitals and doctors/clinics.
-    Deliberately does NOT pass `opennow`, so both open AND currently-closed
-    facilities are returned (closed ones are still useful to know about/plan
-    around, per the "scan both open and close" requirement).
-    """
-    seen = {}
-    for place_type in ("hospital", "doctor"):
-        try:
-            resp = requests.get(
-                "https://maps.googleapis.com/maps/api/place/nearbysearch/json",
-                params={
-                    "location": f"{lat},{lng}",
-                    "radius": radius_m,
-                    "type": place_type,
-                    "keyword": condition,
-                    "key": GOOGLE_MAPS_API_KEY,
-                },
-                timeout=10,
-            )
-            data = resp.json()
-        except Exception:
-            continue
-
-        if data.get("status") not in ("OK", "ZERO_RESULTS"):
-            continue
-
-        for result in data.get("results", []):
-            place_id = result.get("place_id")
-            if place_id and place_id not in seen:
-                seen[place_id] = result
-
-    return list(seen.values())
-
-
-def eta_for_places(lat: float, lng: float, place_ids: list):
-    """Real driving distance + 'time to reach' for a list of place_ids."""
-    if not place_ids:
-        return {}
-    try:
-        resp = requests.get(
-            "https://maps.googleapis.com/maps/api/distancematrix/json",
-            params={
-                "origins": f"{lat},{lng}",
-                "destinations": "|".join(f"place_id:{pid}" for pid in place_ids),
-                "mode": "driving",
-                "key": GOOGLE_MAPS_API_KEY,
-            },
-            timeout=10,
-        )
-        data = resp.json()
-    except Exception:
-        return {}
-
-    result_map = {}
-    if data.get("status") == "OK" and data.get("rows"):
-        elements = data["rows"][0].get("elements", [])
-        for pid, el in zip(place_ids, elements):
-            if el.get("status") == "OK":
-                result_map[pid] = {
-                    "distance_text": el["distance"]["text"],
-                    "duration_text": el["duration"]["text"],
-                }
-    return result_map
-
-
-@app.post("/api/nearby-care")
-async def nearby_care(
-    payload: NearbyCareRequest,
-    current_user: User = Depends(get_current_user),
-):
-    if not google_maps_configured():
-        raise HTTPException(status_code=500, detail=google_maps_error_detail("Nearby Care"))
-
-    lat, lng = payload.lat, payload.lng
-    if lat is None or lng is None:
-        if not payload.address:
-            raise HTTPException(
-                status_code=400,
-                detail="No location provided. Share GPS access, or type a city/address to search near.",
-            )
-        coords, err = geocode_address(payload.address)
-        if err:
-            raise HTTPException(status_code=400, detail=err)
-        lat, lng = coords
-
-    try:
-        raw_results = search_nearby_facilities(lat, lng, payload.condition)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Places lookup failed: {e}")
-
-    if not raw_results:
-        return {
-            "status": "success",
-            "condition": payload.condition,
-            "facilities": [],
-            "message": (
-                f"No hospitals or clinics were found nearby for '{payload.condition}'. "
-                "If this is urgent, call 911 (or your local emergency number) or 988 for crisis support."
-            ),
-        }
-
-    for r in raw_results:
-        loc = r["geometry"]["location"]
-        r["_distance_km"] = haversine_km(lat, lng, loc["lat"], loc["lng"])
-    raw_results.sort(key=lambda r: r["_distance_km"])
-
-    # Real driving ETA for the closest handful only, to keep Distance Matrix calls small.
-    top_results = raw_results[:5]
-    eta_map = eta_for_places(lat, lng, [r["place_id"] for r in top_results])
-
-    facilities = []
-    for r in top_results:
-        eta = eta_map.get(r["place_id"], {})
-        facilities.append({
-            "name": r.get("name"),
-            "address": r.get("vicinity"),
-            "open_now": r.get("opening_hours", {}).get("open_now"),  # True / False / None (unknown)
-            "rating": r.get("rating"),
-            "distance_text": eta.get("distance_text") or f"~{r['_distance_km']:.1f} km",
-            "duration_text": eta.get("duration_text") or "Time to reach unavailable",
-            "place_id": r["place_id"],
-            "lat": r["geometry"]["location"]["lat"],
-            "lng": r["geometry"]["location"]["lng"],
-        })
-
-    # Short spoken summary (nearest option + real ETA), translated + read aloud.
-    spoken_summary, audio_b64, audio_error = None, None, None
-    if client:
-        try:
-            nearest = facilities[0]
-            if nearest["open_now"] is True:
-                status_word = "open now"
-            elif nearest["open_now"] is False:
-                status_word = "currently closed"
-            else:
-                status_word = "hours unknown"
-
-            summary_prompt = f"""
-            Write ONLY 2-3 short, calm, spoken sentences in {payload.language} (no preamble, no labels)
-            telling someone that for "{payload.condition}", the nearest option is "{nearest['name']}",
-            it is {status_word}, and it is about {nearest['duration_text']} away by car
-            ({nearest['distance_text']}). If it is closed, gently suggest calling ahead or checking
-            the next nearest option.
-            """
-            summary_resp = client.models.generate_content(
-                model=ANALYSIS_MODEL, contents=summary_prompt
-            )
-            spoken_summary = (summary_resp.text or "").strip()
-        except Exception as e:
-            print(f"[NEARBY-CARE SUMMARY ERROR] {e}")
-
-        if spoken_summary:
-            audio_b64, audio_error = synthesize_speech(spoken_summary)
-
-    return {
-        "status": "success",
-        "condition": payload.condition,
-        "facilities": facilities,
-        "spoken_summary": spoken_summary,
-        "audio_base64": audio_b64,
-        "audio_mime": "audio/wav",
-        "audio_error": audio_error,
-    }
-
-
-app.mount(
-    "/", StaticFiles(directory="templates", html=True), name="templates"
-)
+app.mount("/", StaticFiles(directory="templates", html=True), name="templates")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))

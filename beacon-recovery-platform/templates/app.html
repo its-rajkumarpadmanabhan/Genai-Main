@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BEACON — Emergency Voice Intervention Engine</title>
 
-<!-- Auth Guard: runs before anything renders. No valid session -> straight to login. -->
 <script>
   (function () {
     const token = localStorage.getItem('beacon_token');
@@ -45,7 +44,6 @@
     min-height: 100vh;
   }
 
-  /* Ambient background glow layers */
   .bg-glow{
     position:fixed;
     inset:0;
@@ -65,11 +63,10 @@
     padding:0 32px;
   }
 
-  /* NAV */
   nav{
     display:flex;
     align-items:center;
-    justify-space-between;
+    justify-content:space-between;
     padding:26px 32px;
     max-width:1100px;
     margin:0 auto;
@@ -98,7 +95,6 @@
     box-shadow:0 0 18px rgba(91,143,255,0.55);
   }
 
-  /* HERO */
   .hero{
     text-align:center;
     padding:20px 20px 10px;
@@ -113,7 +109,7 @@
     color:var(--ink-mid);
     letter-spacing:-0.3px;
   }
-  .hero h1 b, .hero h1 strong{
+  .hero h1 b{
     color:var(--ink-hi);
     font-weight:700;
   }
@@ -162,7 +158,7 @@
     align-items:center;
     justify-content:center;
     pointer-events:none;
-    transition:transform .25s ease, background .25s ease;
+    transition:transform .25s ease;
   }
   .orb-stage.listening .mic-center{ transform:scale(1.2); }
 
@@ -180,7 +176,7 @@
     font-weight:600;
     cursor:pointer;
     box-shadow:0 0 24px rgba(60,100,240,0.35), inset 0 1px 0 rgba(255,255,255,0.15);
-    transition:transform .15s ease, box-shadow .15s ease, background .15s ease;
+    transition:transform .15s ease, box-shadow .15s ease;
   }
   .speak-btn:hover{ transform:translateY(-1px); box-shadow:0 0 34px rgba(60,100,240,0.55); }
   .speak-btn .dot{
@@ -192,63 +188,17 @@
 
   @keyframes blink{ 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
-  .speak-wrap{ text-align:center; margin-bottom:40px; }
+  .speak-wrap{ text-align:center; margin-bottom:30px; }
   .status-label{
     display:block;
     margin-top:14px;
     font-size:13px;
     color:var(--ink-mid);
-    letter-spacing:0.3px;
   }
 
   @media (max-width:640px){
     .hero h1{ font-size:26px; }
     nav{ padding:20px; }
-  }
-
-  /* Nearby-care facility cards */
-  .facility-card{
-    background: rgba(7,11,24,0.9);
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    padding: 14px 16px;
-    margin-bottom: 10px;
-  }
-  .facility-card .name{ font-weight:700; font-size:14px; color:var(--ink-hi); }
-  .facility-card .addr{ font-size:12px; color:var(--ink-mid); margin-top:2px; }
-  .facility-card .meta{ display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
-  .badge{
-    display:inline-flex; align-items:center; gap:5px;
-    font-size:11px; font-weight:700; letter-spacing:0.3px;
-    padding:4px 9px; border-radius:999px;
-  }
-  .badge-open{ background:rgba(16,185,129,0.15); color:#34d399; border:1px solid rgba(16,185,129,0.35); }
-  .badge-closed{ background:rgba(244,63,94,0.15); color:#fb7185; border:1px solid rgba(244,63,94,0.35); }
-  .badge-unknown{ background:rgba(255,255,255,0.08); color:var(--ink-mid); border:1px solid var(--line); }
-  .badge-eta{ background:rgba(47,107,255,0.15); color:#8fb0ff; border:1px solid rgba(47,107,255,0.35); }
-
-  /* Manual location fallback prompt */
-  .location-prompt{
-    display:flex; gap:8px; margin-top:10px;
-  }
-  .location-prompt input{
-    flex:1;
-    background: rgba(7,11,24,0.9);
-    border:1px solid var(--line);
-    border-radius:10px;
-    padding:10px 12px;
-    color:var(--ink-hi);
-    font-size:13px;
-  }
-  .location-prompt button{
-    background: linear-gradient(180deg, rgba(60,100,240,0.6), rgba(30,50,140,0.6));
-    border:1px solid rgba(120,150,255,0.4);
-    color:#fff;
-    border-radius:10px;
-    padding:10px 16px;
-    font-size:13px;
-    font-weight:600;
-    cursor:pointer;
   }
 </style>
 </head>
@@ -265,11 +215,9 @@
 
 <main class="wrap relative z-10 max-w-2xl mx-auto space-y-8 pb-12">
 
-  <!-- Voice Intervention Section -->
   <section class="hero">
     <h1>Speak to <b>Beacon AI</b> — Instant<br>Emergency Guidance</h1>
 
-    <!-- Language Selector Dropdown -->
     <div class="max-w-xs mx-auto my-6">
         <label for="language-select" class="block text-xs font-semibold text-slate-300 mb-1 tracking-wider uppercase">Response Language</label>
         <select id="language-select" class="w-full bg-slate-900/90 border border-slate-700 text-teal-300 text-xs rounded-xl p-3 focus:ring-teal-500 focus:border-teal-500 font-medium shadow-inner">
@@ -282,7 +230,6 @@
         </select>
     </div>
 
-    <!-- 3D Interactive Orb Stage -->
     <div class="orb-stage" id="orbStage">
       <div class="orb-halo"></div>
       <canvas id="orbCanvas" width="600" height="600" aria-label="Beacon voice orb, tap to speak"></canvas>
@@ -299,7 +246,7 @@
     </div>
   </section>
 
-  <!-- Response Output Display -->
+  <!-- Output Pane -->
   <section id="output-pane" class="hidden bg-slate-900/80 backdrop-blur-md border border-teal-500/30 rounded-2xl p-6 shadow-2xl space-y-4">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
           <span class="text-xs font-mono text-teal-400 flex items-center gap-2">
@@ -316,27 +263,39 @@
       <div id="script-results" class="space-y-4 text-sm"></div>
   </section>
 
-  <!-- Nearby Hospital/Clinic Results -->
-  <section id="care-pane" class="hidden bg-slate-900/80 backdrop-blur-md border border-blue-500/30 rounded-2xl p-6 shadow-2xl space-y-3">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
-          <span class="text-xs font-mono text-blue-400 flex items-center gap-2">
-              <i class="fa-solid fa-hospital"></i> <span id="care-pane-title">Nearby Care</span>
-          </span>
+  <!-- Hospital & Clinic Scanner Section -->
+  <section class="bg-gradient-to-br from-slate-900/90 to-slate-950/90 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+      <div class="flex items-center justify-between">
+          <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <i class="fa-solid fa-hospital-user text-red-400"></i> Nearest Hospitals & Clinics
+          </h3>
+          <button onclick="detectLocationAndScan()" class="text-xs bg-slate-800 hover:bg-slate-700 text-teal-300 px-3 py-1.5 rounded-lg border border-slate-700 transition">
+              <i class="fa-solid fa-location-crosshairs"></i> Auto-Detect
+          </button>
       </div>
 
-      <div id="care-status" class="text-xs text-slate-400"></div>
+      <p class="text-xs text-slate-400">
+          Find medical help near you. If location permissions are blocked by your browser, type your city or area below.
+      </p>
 
-      <!-- Shown only if GPS is denied/unavailable -->
-      <div id="location-fallback" class="hidden">
-          <p class="text-xs text-slate-400 mb-2">Couldn't access your GPS location. Type your city or address instead:</p>
-          <div class="location-prompt">
-              <input id="location-input" type="text" placeholder="e.g. Kochi, Kerala" />
-              <button onclick="submitManualLocation()">Search</button>
+      <!-- Search Input for Manual Location Fallback -->
+      <div class="flex gap-2">
+          <input type="text" id="hospital-search-input" placeholder="Type city or area (e.g., Thiruvananthapuram, Kochi)..." 
+                 class="flex-1 bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-teal-500">
+          <button onclick="searchHospitalsManual()" class="bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition">
+              Search
+          </button>
+      </div>
+
+      <!-- Location Status Bar -->
+      <div id="location-status" class="text-xs text-amber-300 hidden"></div>
+
+      <!-- Hospitals Grid -->
+      <div id="hospitals-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <div class="col-span-full text-center py-4 text-xs text-slate-500">
+              Detecting location or waiting for search input...
           </div>
       </div>
-
-      <div id="care-audio" class="hidden"></div>
-      <div id="care-results" class="space-y-2"></div>
   </section>
 
   <!-- Emergency Contacts -->
@@ -363,7 +322,6 @@
 </main>
 
 <script>
-  // Session verification
   async function verifySession() {
       const token = localStorage.getItem('beacon_token');
       try {
@@ -375,6 +333,7 @@
           localStorage.setItem('beacon_user', JSON.stringify(user));
           document.body.classList.add('beacon-authed');
           renderAccountWidget();
+          detectLocationAndScan(); // Trigger hospital scan on valid login session
       } catch (err) {
           localStorage.removeItem('beacon_token');
           localStorage.removeItem('beacon_user');
@@ -397,7 +356,7 @@
           localStorage.removeItem('beacon_token');
           localStorage.removeItem('beacon_user');
           window.location.replace('/login.html');
-          throw new Error('Session expired. Redirecting to login...');
+          throw new Error('Session expired.');
       }
       return response;
   }
@@ -424,7 +383,83 @@
       window.location.replace('/login.html');
   }
 
-  // Audio Recording & WebRTC
+  // Location & Hospital Scanner
+  function detectLocationAndScan() {
+      const status = document.getElementById('location-status');
+      const list = document.getElementById('hospitals-list');
+
+      status.classList.remove('hidden');
+      status.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Detecting location...`;
+
+      if (!navigator.geolocation) {
+          status.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Browser geolocation not supported. Type your location below.`;
+          return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+          async (position) => {
+              const lat = position.coords.latitude;
+              const lon = position.coords.longitude;
+              status.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> GPS Location acquired. Fetching medical facilities...`;
+              await fetchHospitals(`/api/nearest-hospitals?lat=${lat}&lon=${lon}`);
+          },
+          (error) => {
+              status.innerHTML = `<i class="fa-solid fa-lock text-amber-400"></i> Location access blocked/unavailable. Please type your city above.`;
+              list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-amber-300/80">Location permissions were blocked. Type your city or address above to search hospitals.</div>`;
+          },
+          { timeout: 8000, maximumAge: 60000 }
+      );
+  }
+
+  async function searchHospitalsManual() {
+      const query = document.getElementById('hospital-search-input').value.trim();
+      const status = document.getElementById('location-status');
+      if (!query) return;
+
+      status.classList.remove('hidden');
+      status.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Searching hospitals near "${query}"...`;
+      await fetchHospitals(`/api/nearest-hospitals?location_query=${encodeURIComponent(query)}`);
+  }
+
+  async function fetchHospitals(endpoint) {
+      const status = document.getElementById('location-status');
+      const list = document.getElementById('hospitals-list');
+
+      try {
+          const resp = await authFetch(endpoint);
+          const data = await resp.json();
+
+          if (!resp.ok) throw new Error(data.detail || "Failed to find medical facilities.");
+
+          if (!data.hospitals || data.hospitals.length === 0) {
+              list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-slate-400">No medical facilities found nearby. Try searching a larger nearby city.</div>`;
+              status.innerHTML = `<i class="fa-solid fa-info-circle"></i> No hospitals returned within 10km radius.`;
+              return;
+          }
+
+          status.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i> Found ${data.count} medical facilities nearby.`;
+
+          list.innerHTML = data.hospitals.map(h => `
+              <div class="p-3.5 bg-slate-900 border border-slate-800 rounded-xl hover:border-slate-700 transition space-y-1.5">
+                  <div class="flex items-start justify-between gap-2">
+                      <h4 class="text-xs font-bold text-white line-clamp-1">${h.name}</h4>
+                      <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-teal-950 text-teal-400 border border-teal-800/60">${h.type}</span>
+                  </div>
+                  <p class="text-[11px] text-slate-400 line-clamp-1"><i class="fa-solid fa-location-dot text-slate-500 mr-1"></i>${h.address}</p>
+                  <div class="flex items-center justify-between pt-1 text-[11px]">
+                      <span class="text-slate-300 font-mono"><i class="fa-solid fa-phone text-emerald-400 mr-1"></i>${h.phone}</span>
+                      ${h.maps_url ? `<a href="${h.maps_url}" target="_blank" class="bg-teal-600/30 hover:bg-teal-600/50 text-teal-300 px-2.5 py-1 rounded-lg border border-teal-500/40 text-[10px] font-semibold transition">Directions <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i></a>` : ''}
+                  </div>
+              </div>
+          `).join('');
+
+      } catch (err) {
+          status.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-400"></i> ${err.message}`;
+          list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-red-400">Could not fetch hospitals. Please check your connection or location input.</div>`;
+      }
+  }
+
+  // Audio Recording & WebRTC Engine
   let mediaRecorder;
   let audioChunks = [];
   let isRecording = false;
@@ -547,155 +582,18 @@
                       <i class="fa-solid fa-triangle-exclamation text-amber-400 text-lg"></i>
                       <div>
                           <p class="text-xs font-bold">Audio Output Unavailable</p>
-                          <p class="text-[11px] text-amber-200/80">Voice generation paused. Please refer to the text response below.</p>
+                          <p class="text-[11px] text-amber-200/80">Voice generation paused. Refer to text response above.</p>
                       </div>
                   </div>
               `;
           }
 
           status.innerText = "Tap the orb or button to start recording";
-
-          // If Beacon detected a "find nearest hospital/clinic" request, kick off
-          // the location -> nearby-care lookup flow.
-          if (parsed.intent_type === 'facility_search' && parsed.facility_query) {
-              startFacilitySearch(parsed.facility_query, selectedLanguage);
-          }
       } catch (err) {
           spinner.classList.add('hidden');
           results.innerHTML = `<p class="text-red-400 text-xs">Audio Processing Error: ${err.message}</p>`;
           status.innerText = "Tap the orb or button to start recording";
       }
-  }
-
-  // ---------------------------------------------------------------------
-  // Nearest hospital/clinic search: GPS location -> /api/nearby-care
-  // ---------------------------------------------------------------------
-
-  let pendingCareCondition = null;
-  let pendingCareLanguage = 'English';
-
-  function startFacilitySearch(condition, language) {
-      pendingCareCondition = condition;
-      pendingCareLanguage = language;
-
-      const carePane = document.getElementById('care-pane');
-      const careStatus = document.getElementById('care-status');
-      const careResults = document.getElementById('care-results');
-      const fallback = document.getElementById('location-fallback');
-      const careAudio = document.getElementById('care-audio');
-      const title = document.getElementById('care-pane-title');
-
-      title.innerText = `Nearby Care for "${condition}"`;
-      carePane.classList.remove('hidden');
-      fallback.classList.add('hidden');
-      careResults.innerHTML = '';
-      careAudio.innerHTML = '';
-      careAudio.classList.add('hidden');
-      careStatus.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Getting your location...`;
-
-      if (!('geolocation' in navigator)) {
-          careStatus.innerText = 'Geolocation is not available in this browser.';
-          fallback.classList.remove('hidden');
-          return;
-      }
-
-      navigator.geolocation.getCurrentPosition(
-          (position) => {
-              fetchNearbyCare({
-                  lat: position.coords.latitude,
-                  lng: position.coords.longitude,
-                  condition,
-                  language,
-              });
-          },
-          (err) => {
-              // Permission denied, timeout, or position unavailable -> ask the user to type it.
-              careStatus.innerText = 'Location access was denied or unavailable — please enter your location below.';
-              fallback.classList.remove('hidden');
-          },
-          { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
-      );
-  }
-
-  function submitManualLocation() {
-      const input = document.getElementById('location-input');
-      const address = input.value.trim();
-      if (!address) return;
-      fetchNearbyCare({
-          address,
-          condition: pendingCareCondition,
-          language: pendingCareLanguage,
-      });
-  }
-
-  async function fetchNearbyCare(opts) {
-      const lat = opts.lat, lng = opts.lng, address = opts.address;
-      const condition = opts.condition, language = opts.language;
-      const careStatus = document.getElementById('care-status');
-      const careResults = document.getElementById('care-results');
-      const fallback = document.getElementById('location-fallback');
-      const careAudio = document.getElementById('care-audio');
-
-      careStatus.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Scanning nearby hospitals & clinics for "${condition}"...`;
-      careResults.innerHTML = '';
-
-      try {
-          const response = await authFetch('/api/nearby-care', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ lat, lng, address, condition, language }),
-          });
-          const res = await response.json();
-          if (!response.ok) {
-              throw new Error(res.detail || 'Could not search nearby care.');
-          }
-
-          fallback.classList.add('hidden');
-
-          if (!res.facilities || res.facilities.length === 0) {
-              careStatus.innerText = res.message || `No hospitals or clinics found nearby for "${condition}".`;
-              return;
-          }
-
-          careStatus.innerText = `Found ${res.facilities.length} option(s) near you — showing both open and closed:`;
-          careResults.innerHTML = res.facilities.map(renderFacilityCard).join('');
-
-          if (!res.audio_error && res.audio_base64) {
-              careAudio.classList.remove('hidden');
-              careAudio.innerHTML = `<audio controls autoplay class="w-full mb-2" src="data:${res.audio_mime || 'audio/wav'};base64,${res.audio_base64}"></audio>`;
-          }
-      } catch (err) {
-          careStatus.innerText = `Error: ${err.message}`;
-      }
-  }
-
-  function renderFacilityCard(f) {
-      let badge;
-      if (f.open_now === true) {
-          badge = `<span class="badge badge-open"><i class="fa-solid fa-circle-check"></i> Open now</span>`;
-      } else if (f.open_now === false) {
-          badge = `<span class="badge badge-closed"><i class="fa-solid fa-circle-xmark"></i> Closed now</span>`;
-      } else {
-          badge = `<span class="badge badge-unknown"><i class="fa-solid fa-question"></i> Hours unknown</span>`;
-      }
-
-      const mapsLink = `https://www.google.com/maps/search/?api=1&query=${f.lat},${f.lng}&query_place_id=${f.place_id}`;
-
-      return `
-        <div class="facility-card">
-            <div class="name">${f.name}</div>
-            <div class="addr">${f.address || ''}</div>
-            <div class="meta">
-                ${badge}
-                <span class="badge badge-eta"><i class="fa-solid fa-car"></i> ${f.duration_text} to reach</span>
-                <span class="badge badge-unknown"><i class="fa-solid fa-route"></i> ${f.distance_text}</span>
-                ${f.rating ? `<span class="badge badge-unknown"><i class="fa-solid fa-star"></i> ${f.rating}</span>` : ''}
-            </div>
-            <a href="${mapsLink}" target="_blank" class="text-[11px] text-blue-400 hover:underline mt-2 inline-block">
-                <i class="fa-solid fa-diamond-turn-right"></i> Open in Google Maps
-            </a>
-        </div>
-      `;
   }
 
   // 3D Fibonacci Sphere Voice Orb Animation Engine
