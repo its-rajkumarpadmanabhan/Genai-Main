@@ -384,16 +384,14 @@
       window.location.replace('/login.html');
   }
 
-  // Location & Hospital Scanner
+  // Location & Hospital Scanner (GPS with IP Fallback)
   function detectLocationAndScan() {
       const status = document.getElementById('location-status');
-      const list = document.getElementById('hospitals-list');
-
       status.classList.remove('hidden');
       status.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Detecting current GPS position...`;
 
       if (!navigator.geolocation) {
-          status.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> GPS unavailable. Type your current city below.`;
+          fallbackToIpLocation();
           return;
       }
 
@@ -404,12 +402,33 @@
               status.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> Live GPS acquired (${currentLat.toFixed(3)}, ${currentLon.toFixed(3)}). Searching nearby medical facilities...`;
               await fetchHospitals(`/api/nearest-hospitals?lat=${currentLat}&lon=${currentLon}`);
           },
-          (error) => {
-              status.innerHTML = `<i class="fa-solid fa-lock text-amber-400"></i> Location access blocked/unavailable. Please type your city above.`;
-              list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-amber-300/80">Location access blocked. Type your location above to find medical help.</div>`;
+          async () => {
+              console.warn("GPS failed/blocked. Falling back to IP-based location...");
+              await fallbackToIpLocation();
           },
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
       );
+  }
+
+  async function fallbackToIpLocation() {
+      const status = document.getElementById('location-status');
+      try {
+          const resp = await fetch('https://ipapi.co/json/');
+          const data = await resp.json();
+          if (data.latitude && data.longitude) {
+              currentLat = data.latitude;
+              currentLon = data.longitude;
+              status.innerHTML = `<i class="fa-solid fa-network-wired text-teal-400"></i> Network position detected (${data.city || 'Approximate'}). Fetching hospitals...`;
+              await fetchHospitals(`/api/nearest-hospitals?lat=${currentLat}&lon=${currentLon}`);
+          } else if (data.city) {
+              status.innerHTML = `<i class="fa-solid fa-city text-teal-400"></i> Searching hospitals in ${data.city}...`;
+              await fetchHospitals(`/api/nearest-hospitals?location_query=${encodeURIComponent(data.city)}`);
+          } else {
+              throw new Error("No network coordinates");
+          }
+      } catch (e) {
+          status.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-400"></i> Location access unavailable. Please type your city above.`;
+      }
   }
 
   async function searchHospitalsManual() {
@@ -423,41 +442,42 @@
   }
 
   async function fetchHospitals(endpoint) {
-      const status = document.getElementById('location-status');
       const list = document.getElementById('hospitals-list');
-
       try {
           const resp = await authFetch(endpoint);
           const data = await resp.json();
-
           if (!resp.ok) throw new Error(data.detail || "Failed to find medical facilities.");
-
-          if (!data.hospitals || data.hospitals.length === 0) {
-              list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-slate-400">No medical facilities found nearby. Try searching a larger nearby city.</div>`;
-              status.innerHTML = `<i class="fa-solid fa-info-circle"></i> No hospitals returned within 10km radius.`;
-              return;
-          }
-
-          status.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i> Found ${data.count} medical facilities near your current position.`;
-
-          list.innerHTML = data.hospitals.map(h => `
-              <div class="p-3.5 bg-slate-900 border border-slate-800 rounded-xl hover:border-slate-700 transition space-y-1.5">
-                  <div class="flex items-start justify-between gap-2">
-                      <h4 class="text-xs font-bold text-white line-clamp-1">${h.name}</h4>
-                      <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-teal-950 text-teal-400 border border-teal-800/60">${h.type}</span>
-                  </div>
-                  <p class="text-[11px] text-slate-400 line-clamp-1"><i class="fa-solid fa-location-dot text-slate-500 mr-1"></i>${h.address}</p>
-                  <div class="flex items-center justify-between pt-1 text-[11px]">
-                      <span class="text-slate-300 font-mono"><i class="fa-solid fa-phone text-emerald-400 mr-1"></i>${h.phone}</span>
-                      ${h.maps_url ? `<a href="${h.maps_url}" target="_blank" class="bg-teal-600/30 hover:bg-teal-600/50 text-teal-300 px-2.5 py-1 rounded-lg border border-teal-500/40 text-[10px] font-semibold transition">Directions <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i></a>` : ''}
-                  </div>
-              </div>
-          `).join('');
-
+          renderHospitalsList(data.hospitals || []);
       } catch (err) {
-          status.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-400"></i> ${err.message}`;
           list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-red-400">Could not fetch hospitals. Please check your location input.</div>`;
       }
+  }
+
+  function renderHospitalsList(hospitals) {
+      const list = document.getElementById('hospitals-list');
+      if (!hospitals || hospitals.length === 0) {
+          list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-slate-400">No medical facilities found nearby. Try searching a larger nearby city.</div>`;
+          return;
+      }
+
+      list.innerHTML = hospitals.map(h => `
+          <div class="p-3.5 bg-slate-900 border border-slate-800 rounded-xl hover:border-slate-700 transition space-y-1.5">
+              <div class="flex items-start justify-between gap-2">
+                  <h4 class="text-xs font-bold text-white line-clamp-1">${h.name}</h4>
+                  <span class="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-teal-950 text-teal-400 border border-teal-800/60">${h.type}</span>
+              </div>
+              <p class="text-[11px] text-slate-400 line-clamp-1"><i class="fa-solid fa-location-dot text-slate-500 mr-1"></i>${h.address}</p>
+              ${(h.reach_time_mins !== undefined || h.doctor) ? `
+              <div class="flex items-center justify-between text-[11px] font-mono text-emerald-400 font-semibold">
+                  <span><i class="fa-solid fa-car-side mr-1"></i>~${h.reach_time_mins || 5} min drive (${h.distance_km || 2} km)</span>
+                  <span class="text-slate-300 text-[10px]"><i class="fa-solid fa-user-doctor text-blue-400 mr-1"></i>${h.doctor || 'Trauma Physician'}</span>
+              </div>` : ''}
+              <div class="flex items-center justify-between pt-1 text-[11px]">
+                  <a href="tel:${h.phone}" class="text-slate-300 font-mono hover:text-emerald-400"><i class="fa-solid fa-phone text-emerald-400 mr-1"></i>${h.phone}</a>
+                  ${h.maps_url ? `<a href="${h.maps_url}" target="_blank" class="bg-teal-600/30 hover:bg-teal-600/50 text-teal-300 px-2.5 py-1 rounded-lg border border-teal-500/40 text-[10px] font-semibold transition">Route <i class="fa-solid fa-arrow-up-right-from-square text-[9px]"></i></a>` : ''}
+              </div>
+          </div>
+      `).join('');
   }
 
   // Audio Recording Engine
@@ -564,6 +584,10 @@
               parsed = JSON.parse(sanitized);
           }
 
+          if (res.hospitals) {
+              renderHospitalsList(res.hospitals);
+          }
+
           spinner.classList.add('hidden');
           results.innerHTML = `
             <div class="p-3 bg-teal-950/40 border border-teal-500/40 rounded-xl">
@@ -571,7 +595,7 @@
               <p class="text-xs text-slate-200">${parsed.vocal_risk_analysis}</p>
             </div>
             <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl">
-              <span class="text-xs font-mono text-emerald-400 font-bold block mb-1">SPOKEN RESPONSE</span>
+              <span class="text-xs font-mono text-emerald-400 font-bold block mb-1">BEACON SPOKEN RESPONSE</span>
               <p class="text-xs font-mono text-slate-300">"${parsed.deescalation_script}"</p>
             </div>
             <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl">
