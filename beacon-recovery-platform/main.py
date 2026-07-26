@@ -155,13 +155,9 @@ async def get_nearest_hospitals(
     location_query: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
 ):
-    """
-    Scans for hospitals/clinics via OpenStreetMap (Overpass API).
-    Accepts latitude/longitude OR a text location query (e.g. "Thiruvananthapuram").
-    """
     headers = {"User-Agent": "BeaconEmergencyPlatform/1.0"}
 
-    # If user provided a text query instead of GPS coordinates, geocode it first
+    # Geocode text query if lat/lon is not provided
     if (lat is None or lon is None) and location_query:
         try:
             encoded_q = urllib.parse.quote(location_query)
@@ -177,15 +173,15 @@ async def get_nearest_hospitals(
         except HTTPException:
             raise
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to geocode location query: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to geocode location: {str(e)}")
 
     if lat is None or lon is None:
         raise HTTPException(
             status_code=400,
-            detail="Latitude and longitude OR a location search query are required.",
+            detail="Current GPS coordinates or location name required.",
         )
 
-    # Query Overpass API for hospitals/clinics within 10,000 meters (10 km)
+    # Search Overpass API for medical facilities within 10 km
     overpass_query = f"""
     [out:json][timeout:10];
     (
@@ -210,7 +206,7 @@ async def get_nearest_hospitals(
 
         for elem in elements:
             tags = elem.get("tags", {})
-            name = tags.get("name") or tags.get("name:en") or "Medical Facility / Clinic"
+            name = tags.get("name") or tags.get("name:en") or "Medical Facility / Emergency Clinic"
             facility_type = tags.get("amenity", "hospital").capitalize()
             phone = tags.get("phone") or tags.get("contact:phone") or tags.get("emergency:phone") or "N/A"
             address = tags.get("addr:street") or tags.get("addr:full") or tags.get("addr:suburb") or "Nearby"
@@ -236,10 +232,10 @@ async def get_nearest_hospitals(
             "status": "success",
             "search_center": {"lat": lat, "lon": lon},
             "count": len(hospitals),
-            "hospitals": hospitals[:6]  # Return top 6 nearest facilities
+            "hospitals": hospitals[:6]
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Hospital search service unavailable: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Hospital search service error: {str(e)}")
 
 
 @app.post("/api/voice-intervention")
@@ -247,6 +243,9 @@ async def process_voice_crisis(
     file: UploadFile = File(...),
     user_type: str = Form("individual"),
     language: str = Form("English"),
+    lat: Optional[str] = Form(None),
+    lon: Optional[str] = Form(None),
+    user_location_text: Optional[str] = Form(None),
     current_user: User = Depends(get_current_user),
 ):
     if not client:
@@ -260,9 +259,18 @@ async def process_voice_crisis(
         mime_type = file.content_type or "audio/webm"
         audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
 
+        location_info = ""
+        if lat and lon:
+            location_info = f"User's current GPS location: latitude {lat}, longitude {lon}."
+        elif user_location_text:
+            location_info = f"User's current location stated as: {user_location_text}."
+        else:
+            location_info = "Location currently UNKNOWN. Gently advise the user to state their location or city so nearby emergency services can be located."
+
         prompt = f"""
         You are Beacon, an emergency response and crisis AI assistant.
         Analyze this audio clip from a {user_type}.
+        LOCATION CONTEXT: {location_info}
 
         CRITICAL LANGUAGE INSTRUCTION:
         You MUST provide ALL outputs in the JSON schema exclusively in language: {language}.
@@ -271,12 +279,12 @@ async def process_voice_crisis(
         1. IF GENERAL/META QUESTIONS ("Who are you?", "What do you do?"):
            - vocal_risk_analysis: Informational inquiry regarding Beacon system.
            - immediate_safety_steps: No emergency physical action required.
-           - deescalation_script: Friendly concise response explaining Beacon emergency assistant capabilities.
+           - deescalation_script: Friendly concise response explaining Beacon capabilities.
 
         2. IF EMERGENCY OR CRISIS:
            - vocal_risk_analysis: Identify emotional state, distress level, and risk assessment.
            - immediate_safety_steps: Provide 2 immediate physical action/first-aid steps.
-           - deescalation_script: COMBINE BOTH empathetic reassurance AND physical safety steps into 1 spoken script (3-5 sentences).
+           - deescalation_script: COMBINE BOTH empathetic reassurance AND physical safety steps into 1 spoken script (3-5 sentences). If location is unknown, gently ask them to name their current location.
         """
 
         try:

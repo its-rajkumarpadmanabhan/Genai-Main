@@ -270,30 +270,28 @@
               <i class="fa-solid fa-hospital-user text-red-400"></i> Nearest Hospitals & Clinics
           </h3>
           <button onclick="detectLocationAndScan()" class="text-xs bg-slate-800 hover:bg-slate-700 text-teal-300 px-3 py-1.5 rounded-lg border border-slate-700 transition">
-              <i class="fa-solid fa-location-crosshairs"></i> Auto-Detect
+              <i class="fa-solid fa-location-crosshairs"></i> Refresh GPS
           </button>
       </div>
 
       <p class="text-xs text-slate-400">
-          Find medical help near you. If location permissions are blocked by your browser, type your city or area below.
+          Scans for emergency medical facilities based on your live position. If location access is blocked, type your current city or landmark below.
       </p>
 
-      <!-- Search Input for Manual Location Fallback -->
+      <!-- Manual Search Fallback -->
       <div class="flex gap-2">
-          <input type="text" id="hospital-search-input" placeholder="Type city or area (e.g., Thiruvananthapuram, Kochi)..." 
+          <input type="text" id="hospital-search-input" placeholder="Type city, town, or landmark..." 
                  class="flex-1 bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-teal-500">
           <button onclick="searchHospitalsManual()" class="bg-teal-600 hover:bg-teal-500 text-white font-semibold text-xs px-4 py-2.5 rounded-xl transition">
               Search
           </button>
       </div>
 
-      <!-- Location Status Bar -->
       <div id="location-status" class="text-xs text-amber-300 hidden"></div>
 
-      <!-- Hospitals Grid -->
       <div id="hospitals-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
           <div class="col-span-full text-center py-4 text-xs text-slate-500">
-              Detecting location or waiting for search input...
+              Detecting current location...
           </div>
       </div>
   </section>
@@ -322,6 +320,9 @@
 </main>
 
 <script>
+  let currentLat = null;
+  let currentLon = null;
+
   async function verifySession() {
       const token = localStorage.getItem('beacon_token');
       try {
@@ -333,7 +334,7 @@
           localStorage.setItem('beacon_user', JSON.stringify(user));
           document.body.classList.add('beacon-authed');
           renderAccountWidget();
-          detectLocationAndScan(); // Trigger hospital scan on valid login session
+          detectLocationAndScan();
       } catch (err) {
           localStorage.removeItem('beacon_token');
           localStorage.removeItem('beacon_user');
@@ -389,25 +390,25 @@
       const list = document.getElementById('hospitals-list');
 
       status.classList.remove('hidden');
-      status.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Detecting location...`;
+      status.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Detecting current GPS position...`;
 
       if (!navigator.geolocation) {
-          status.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> Browser geolocation not supported. Type your location below.`;
+          status.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> GPS unavailable. Type your current city below.`;
           return;
       }
 
       navigator.geolocation.getCurrentPosition(
           async (position) => {
-              const lat = position.coords.latitude;
-              const lon = position.coords.longitude;
-              status.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> GPS Location acquired. Fetching medical facilities...`;
-              await fetchHospitals(`/api/nearest-hospitals?lat=${lat}&lon=${lon}`);
+              currentLat = position.coords.latitude;
+              currentLon = position.coords.longitude;
+              status.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> Live GPS acquired (${currentLat.toFixed(3)}, ${currentLon.toFixed(3)}). Searching nearby medical facilities...`;
+              await fetchHospitals(`/api/nearest-hospitals?lat=${currentLat}&lon=${currentLon}`);
           },
           (error) => {
               status.innerHTML = `<i class="fa-solid fa-lock text-amber-400"></i> Location access blocked/unavailable. Please type your city above.`;
-              list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-amber-300/80">Location permissions were blocked. Type your city or address above to search hospitals.</div>`;
+              list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-amber-300/80">Location access blocked. Type your location above to find medical help.</div>`;
           },
-          { timeout: 8000, maximumAge: 60000 }
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
       );
   }
 
@@ -437,7 +438,7 @@
               return;
           }
 
-          status.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i> Found ${data.count} medical facilities nearby.`;
+          status.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i> Found ${data.count} medical facilities near your current position.`;
 
           list.innerHTML = data.hospitals.map(h => `
               <div class="p-3.5 bg-slate-900 border border-slate-800 rounded-xl hover:border-slate-700 transition space-y-1.5">
@@ -455,11 +456,11 @@
 
       } catch (err) {
           status.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-red-400"></i> ${err.message}`;
-          list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-red-400">Could not fetch hospitals. Please check your connection or location input.</div>`;
+          list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-red-400">Could not fetch hospitals. Please check your location input.</div>`;
       }
   }
 
-  // Audio Recording & WebRTC Engine
+  // Audio Recording Engine
   let mediaRecorder;
   let audioChunks = [];
   let isRecording = false;
@@ -527,6 +528,7 @@
       const audioReplyBox = document.getElementById('audio-reply');
       const status = document.getElementById('record-status');
       const selectedLanguage = document.getElementById('language-select').value || 'English';
+      const manualLocation = document.getElementById('hospital-search-input').value.trim();
 
       pane.classList.remove('hidden');
       spinner.classList.remove('hidden');
@@ -539,6 +541,13 @@
       formData.append('file', blob, `panic_audio.${ext}`);
       formData.append('user_type', 'individual');
       formData.append('language', selectedLanguage);
+
+      if (currentLat && currentLon) {
+          formData.append('lat', currentLat);
+          formData.append('lon', currentLon);
+      } else if (manualLocation) {
+          formData.append('user_location_text', manualLocation);
+      }
 
       try {
           const response = await authFetch('/api/voice-intervention', { method: 'POST', body: formData });
