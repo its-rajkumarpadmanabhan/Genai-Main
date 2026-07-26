@@ -6,7 +6,7 @@ import os
 import urllib.parse
 import urllib.request
 import wave
-import struct
+import struct  # Added to replace audioop
 from typing import List, Optional
 
 import uvicorn
@@ -57,7 +57,7 @@ ANALYSIS_MODEL = "gemini-3.6-flash"
 FALLBACK_ANALYSIS_MODEL = "gemini-3.5-flash-lite"
 TTS_VOICE = "Kore"
 
-# Threshold for Voice Activity Detection
+# Noise Detection Threshold
 MIN_AUDIO_THRESHOLD = 500
 
 
@@ -77,10 +77,10 @@ class VoiceInterventionResponse(BaseModel):
 
 
 def is_valid_speech(audio_data: bytes) -> bool:
-    """Fast RMS check to ignore background noise/silence."""
+    """Calculates RMS of PCM audio data to filter out background noise."""
     if len(audio_data) < 2:
         return False
-    # Use struct to unpack and calculate energy without external audioop library
+    # Unpack 16-bit samples (little-endian)
     count = len(audio_data) // 2
     samples = struct.unpack('<' + 'h' * count, audio_data[:count * 2])
     rms = math.sqrt(sum(s * s for s in samples) / count)
@@ -341,7 +341,7 @@ async def process_voice_crisis(
         if not audio_bytes:
             raise HTTPException(status_code=400, detail="No audio received.")
 
-        # Ignore noise/static immediately
+        # Ignore noise/static
         if not is_valid_speech(audio_bytes):
              return {"status": "ignore", "message": "Noise detected"}
 
@@ -369,16 +369,15 @@ async def process_voice_crisis(
         You are Beacon, an intelligent voice emergency health assistant.
         Analyze the audio input from user '{current_user.username}'.
 
-        DETECTED REAL-TIME NEARBY MEDICAL FACILITIES (SCANNED AT EXACT USER GPS LATITUDE/LONGITUDE: {lat}, {lon}):
+        DETECTED REAL-TIME NEARBY MEDICAL FACILITIES:
         {hospital_context_str}
 
         CRITICAL CONVERSATIONAL FLOW RULES:
         1. FIRST: If the user describes a condition (headache, chest pain, body pain, etc.), ALWAYS provide the immediate first-aid, safety advice, or 'what to do' FIRST. 
         2. SECOND: ONLY AFTER providing safety advice, provide the nearest hospital referral.
-        3. IF USER ASKS 'WHICH ARE THE HOSPITALS NEAR ME?': Analyze the disease/condition they previously mentioned (if any) and list the most appropriate hospitals near them using the GPS data provided.
-        4. COUNT REQUESTS: If the user asks for a specific number of hospitals (e.g., 'give me 5 hospitals'), mention exactly that many in your spoken response based on the provided list. If no number is requested, default to the most relevant one.
-        5. HOSPITAL REFERRAL DETAILS: For every hospital mentioned, explicitly state: NAME, OWNERSHIP (Government/Private), DISTANCE (km), and TIME (mins). 
-        6. IF CLOSED: If the nearest is closed, announce it and redirect to the next nearest OPEN facility.
+        3. USER COUNT REQUESTS: If the user asks for '5 hospitals' or '10 hospitals', you MUST provide that specific number from the list above. If no number is asked, default to the most relevant one.
+        4. HOSPITAL REFERRAL DETAILS: For each hospital mentioned, explicitly state: NAME, OWNERSHIP (Government/Private), DISTANCE (km), and TIME (mins). 
+        5. IF CLOSED: If the nearest is closed, announce it and redirect to the next nearest OPEN facility.
 
         LANGUAGE: Generate response in {language} (use native script for non-English).
         OUTPUT MUST BE VALID JSON MATCHING THE SCHEMA EXACTLY.
