@@ -456,7 +456,7 @@
   function renderHospitalsList(hospitals) {
       const list = document.getElementById('hospitals-list');
       if (!hospitals || hospitals.length === 0) {
-          list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-slate-400">No medical facilities found nearby. Try searching a larger nearby city.</div>`;
+          list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-slate-400">No medical emergency centers loaded for current view.</div>`;
           return;
       }
 
@@ -584,9 +584,7 @@
               parsed = JSON.parse(sanitized);
           }
 
-          if (res.hospitals) {
-              renderHospitalsList(res.hospitals);
-          }
+          renderHospitalsList(res.hospitals || []);
 
           spinner.classList.add('hidden');
           results.innerHTML = `
@@ -611,14 +609,17 @@
           } else {
               audioReplyBox.classList.remove('hidden');
               audioReplyBox.innerHTML = `
-                  <div class="p-3 bg-amber-950/50 border border-amber-500/50 rounded-xl flex items-center gap-3 text-amber-300">
-                      <i class="fa-solid fa-triangle-exclamation text-amber-400 text-lg"></i>
-                      <div>
-                          <p class="text-xs font-bold">Audio Output Unavailable</p>
-                          <p class="text-[11px] text-amber-200/80">Voice generation paused. Refer to text response above.</p>
-                      </div>
+                  <div class="p-2.5 bg-teal-950/60 border border-teal-500/40 rounded-xl flex items-center justify-between text-teal-300 text-xs">
+                      <span><i class="fa-solid fa-volume-high text-teal-400 mr-2"></i> Playing response via Web Voice</span>
+                      <button onclick="speechSynthesis.cancel()" class="text-[10px] bg-slate-800 px-2 py-1 rounded text-slate-300">Stop</button>
                   </div>
               `;
+              if ('speechSynthesis' in window && parsed.deescalation_script) {
+                  speechSynthesis.cancel();
+                  const utterance = new SpeechSynthesisUtterance(parsed.deescalation_script);
+                  utterance.rate = 0.95;
+                  speechSynthesis.speak(utterance);
+              }
           }
 
           status.innerText = "Tap the orb or button to start recording";
