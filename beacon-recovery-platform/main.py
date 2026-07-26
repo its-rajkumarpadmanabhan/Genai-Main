@@ -6,6 +6,7 @@ import os
 import urllib.parse
 import urllib.request
 import wave
+import audioop
 from typing import List, Optional
 
 import uvicorn
@@ -56,6 +57,9 @@ ANALYSIS_MODEL = "gemini-3.6-flash"
 FALLBACK_ANALYSIS_MODEL = "gemini-3.5-flash-lite"
 TTS_VOICE = "Kore"
 
+# Noise Detection Constant
+MIN_AUDIO_THRESHOLD = 500
+
 
 class VoiceInterventionResponse(BaseModel):
     vocal_risk_analysis: str = Field(
@@ -70,6 +74,15 @@ class VoiceInterventionResponse(BaseModel):
     deescalation_script: str = Field(
         description="The COMPLETE spoken script written strictly in the native script of the requested response language. MUST follow conversational flow: 1. Safety Advice for the condition, 2. Hospital Referral (Name, Ownership, Distance, Time)."
     )
+
+
+def is_valid_speech(audio_data: bytes) -> bool:
+    """Analyzes if the input is actual human speech rather than static/noise."""
+    try:
+        rms = audioop.rms(audio_data, 2)
+        return rms > MIN_AUDIO_THRESHOLD
+    except:
+        return False
 
 
 def calculate_distance_and_time(
@@ -232,7 +245,7 @@ def fetch_hospitals_data(lat: float, lon: float, specialty_keyword: Optional[str
 
     # Sort strictly: Open facilities first, matching specialty, then by exact distance in kilometers
     hospitals.sort(key=lambda x: (not x["is_open"], not x["specialty_match"], x["distance_km"]))
-    return hospitals[:8]
+    return hospitals[:10] # Increased to 10 to support "top 10" requests
 
 
 async def generate_free_neural_speech(text: str, target_language: str) -> Optional[str]:
@@ -326,6 +339,10 @@ async def process_voice_crisis(
         if not audio_bytes:
             raise HTTPException(status_code=400, detail="No audio received.")
 
+        # Pre-flight check: Ignore noise
+        if not is_valid_speech(audio_bytes):
+            return {"status": "ignore", "message": "Noise detected"}
+
         mime_type = file.content_type or "audio/webm"
         audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
 
@@ -350,15 +367,15 @@ async def process_voice_crisis(
         You are Beacon, an intelligent voice emergency health assistant.
         Analyze the audio input from user '{current_user.username}'.
 
-        DETECTED REAL-TIME NEARBY MEDICAL FACILITIES (SCANNED AT EXACT USER GPS LATITUDE/LONGITUDE: {lat}, {lon}):
+        DETECTED REAL-TIME NEARBY MEDICAL FACILITIES (GPS-VERIFIED):
         {hospital_context_str}
 
         CRITICAL CONVERSATIONAL FLOW RULES:
         1. FIRST: If the user describes a condition (headache, chest pain, body pain, etc.), ALWAYS provide the immediate first-aid, safety advice, or 'what to do' FIRST. 
         2. SECOND: ONLY AFTER providing safety advice, provide the nearest hospital referral.
-        3. IF USER ASKS 'WHICH ARE THE HOSPITALS NEAR ME?': Analyze the disease/condition they previously mentioned (if any) and list the most appropriate hospitals near them using the GPS data provided.
-        4. HOSPITAL REFERRAL: You MUST explicitly tell the user the PARTICULAR HOSPITAL NAME, OWNERSHIP (Government/Private), EXACT DISTANCE IN KILOMETERS, and ESTIMATED REACH TIME IN MINUTES. Do not list all hospitals in the audio; focus on the most relevant one(s).
-        5. IF CLOSED: If the nearest is closed, announce it and redirect to the next nearest OPEN facility.
+        3. COUNT REQUESTS: If the user asks for a specific number of hospitals (e.g., 'give me 5 hospitals'), mention exactly that many in your spoken response based on the provided list. If no number is requested, default to the single most relevant hospital.
+        4. REFERRAL DETAILS: For every hospital mentioned, explicitly state: NAME, OWNERSHIP (Government/Private), DISTANCE (km), and TIME (mins). 
+        5. CLOSED FACILITIES: If the nearest is closed, announce it and redirect to the next nearest OPEN facility.
 
         LANGUAGE: Generate response in {language} (use native script for non-English).
         OUTPUT MUST BE VALID JSON MATCHING THE SCHEMA EXACTLY.
