@@ -480,36 +480,6 @@
       `).join('');
   }
 
-  // Multi-Language Native Web Voice Player Fallback
-  function playNativeSpeech(text, language) {
-      if (!('speechSynthesis' in window) || !text) return;
-      speechSynthesis.cancel(); // Clear any playing voice
-
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.rate = 0.95;
-
-      const langCodeMap = {
-          'English': 'en-US',
-          'Malayalam': 'ml-IN',
-          'Tamil': 'ta-IN',
-          'Hindi': 'hi-IN',
-          'Spanish': 'es-ES',
-          'Arabic': 'ar-SA'
-      };
-
-      const targetLang = langCodeMap[language] || 'en-US';
-      utterance.lang = targetLang;
-
-      // Select matching regional voice if available in browser
-      const voices = speechSynthesis.getVoices();
-      const matchedVoice = voices.find(v => v.lang.startsWith(targetLang.split('-')[0]) || v.lang === targetLang);
-      if (matchedVoice) {
-          utterance.voice = matchedVoice;
-      }
-
-      speechSynthesis.speak(utterance);
-  }
-
   // Audio Recording Engine
   let mediaRecorder;
   let audioChunks = [];
@@ -639,12 +609,14 @@
           } else {
               audioReplyBox.classList.remove('hidden');
               audioReplyBox.innerHTML = `
-                  <div class="p-2.5 bg-teal-950/60 border border-teal-500/40 rounded-xl flex items-center justify-between text-teal-300 text-xs">
-                      <span><i class="fa-solid fa-volume-high text-teal-400 mr-2"></i> Playing response in ${selectedLanguage}</span>
-                      <button onclick="speechSynthesis.cancel()" class="text-[10px] bg-slate-800 px-2 py-1 rounded text-slate-300">Stop</button>
+                  <div class="p-3 bg-amber-950/50 border border-amber-500/50 rounded-xl flex items-center gap-3 text-amber-300">
+                      <i class="fa-solid fa-triangle-exclamation text-amber-400 text-lg"></i>
+                      <div>
+                          <p class="text-xs font-bold">Audio Output Unavailable</p>
+                          <p class="text-[11px] text-amber-200/80">Voice generation paused. Refer to text response below.</p>
+                      </div>
                   </div>
               `;
-              playNativeSpeech(parsed.deescalation_script, selectedLanguage);
           }
 
           status.innerText = "Tap the orb or button to start recording";

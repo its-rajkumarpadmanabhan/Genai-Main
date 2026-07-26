@@ -86,7 +86,7 @@ class VoiceInterventionResponse(BaseModel):
         description="Immediate physical safety or guidance steps."
     )
     deescalation_script: str = Field(
-        description="The COMPLETE spoken response script written strictly in the requested language."
+        description="The COMPLETE spoken response script written strictly in the native script of the requested language."
     )
 
 
@@ -206,7 +206,7 @@ def fetch_hospitals_data(lat: float, lon: float) -> List[dict]:
         return []
 
 
-def synthesize_speech(text: str, retries: int = 2):
+def synthesize_speech(text: str, retries: int = 3):
     if not client or not text:
         return None, "TTS unavailable"
 
@@ -245,7 +245,8 @@ def synthesize_speech(text: str, retries: int = 2):
                     wf.setframerate(24000)
                     wf.writeframes(pcm_data)
                 return base64.b64encode(buf.getvalue()).decode("utf-8"), None
-            except Exception:
+            except Exception as e:
+                print(f"[TTS ATTEMPT {attempt+1} ERROR] {e}")
                 continue
 
     return None, "TTS synthesis failed."
@@ -313,22 +314,18 @@ async def process_voice_crisis(
             raise HTTPException(status_code=400, detail="No audio received.")
 
         mime_type = file.content_type or "audio/webm"
-        audio_part = types.Part.from_bytes(
-            data=audio_bytes, mime_type=mime_type
-        )
+        audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
 
-        # Retrieve past user medical history from SQLite via SQLAlchemy
         history_records = get_user_medical_history(db, current_user.id)
         history_str = "No prior recorded medical visits."
         if history_records:
             history_str = "\n".join(
                 [
-                    f"- Date: {r['date']}, Reported Condition/Ailment: '{r['condition']}', Recommended Hospital: '{r['hospital']}'"
+                    f"- Date: {r['date']}, Reported Condition: '{r['condition']}', Recommended Hospital: '{r['hospital']}'"
                     for r in history_records
                 ]
             )
 
-        # Query OpenStreetMap for nearest medical facilities
         hospitals_list = []
         if lat is not None and lon is not None:
             hospitals_list = fetch_hospitals_data(lat, lon)
@@ -339,7 +336,7 @@ async def process_voice_crisis(
             top_h_str = f"Name: {top_h['name']}, Distance: {top_h['distance_km']} km, Drive Reach Time: ~{top_h['reach_time_mins']} minutes away, Specialist: {top_h['doctor']}."
 
         prompt = f"""
-        You are Beacon, an intelligent emergency health and crisis AI assistant.
+        You are Beacon, an intelligent emergency health AI assistant.
         Analyze the audio input from user '{current_user.username}'.
 
         USER'S PREVIOUS MEDICAL HISTORY LOGS:
@@ -348,29 +345,27 @@ async def process_voice_crisis(
         NEARBY DETECTED MEDICAL CENTER CONTEXT:
         {top_h_str}
 
-        CRITICAL INTENT AND MEDICAL MEMORY LOGIC:
+        STRICT INTENT, SAFETY & LANGUAGE MANDATES:
 
-        1. LANGUAGE MANDATE:
-           Generate ALL outputs (vocal_risk_analysis, immediate_safety_steps, and deescalation_script) strictly in: {language}.
+        1. EXACT NATIVE LANGUAGE & SCRIPT MANDATE:
+           - Selected target language: {language}.
+           - You MUST write the ENTIRE JSON fields (vocal_risk_analysis, immediate_safety_steps, and deescalation_script) in native script of language {language}.
+           - For example, if {language} is Malayalam, write in Malayalam script (മലയാളം). If Tamil, write in Tamil script (தமிழ்). If Hindi, write in Devanagari (हिंदी).
 
-        2. PREVIOUS MEDICAL HISTORY INTEGRATION (CRITICAL):
-           - Review the user's past medical history above.
-           - IF THE USER IS REPORTING AN AILMENT/CONDITION THEY HAD BEFORE (e.g. headache, toothache, chest pain, eye pain):
-             - Acknowledge their history warmly in the spoken response! 
-               (Example: "I notice that previously you also reported a headache and visited [Previous Hospital Name]. Would you like to return to [Previous Hospital Name] for continuity of care, or should I guide you to the nearest available hospital right now, which is [Nearest Hospital Name]?")
-             - Provide immediate first-aid steps in {language}.
+        2. STRICT SCOPE & MEDICAL PRIORITIZATION:
+           - NEVER search for or offer restaurants, food, entertainment, or non-medical services.
+           - If user mentions medical pain/symptom mixed with a casual task (e.g. "I am hungry and have a headache", "I have eye pain and I'm going to a movie"):
+             - Prioritize the health issue immediately. Warn against delaying medical care for non-essential tasks.
+             - Focus 100% on first-aid and reaching the hospital.
 
-        3. MIXED / COMPLEX / RISKY ACTIONS (e.g. "I have eye pain and I'm going to a theater", "I am hungry and I have a headache"):
-           - Warn them clearly against risky behavior first (e.g. "Do not go to the movie theater as bright lights will strain your eyes.").
-           - Guide them to the nearest hospital or their previously visited facility.
+        3. PREVIOUS HISTORY ACKNOWLEDGMENT:
+           - If user reports a recurring ailment (headache, toothache, etc.) found in history:
+             - Acknowledge prior visit in native script of {language} (e.g., mentioning previous hospital visit for continuity of care vs nearest current hospital).
 
-        4. PURELY CASUAL / NON-MEDICAL (e.g. "I am hungry", "Who are you?"):
-           - Respond conversationally and politely in {language}. DO NOT invent hospitals or mention past medical records if there is no medical ailment.
+        4. CASUAL ONLY:
+           - If query is 100% non-medical (e.g. "Who are you?"), answer politely in native script of {language} without citing hospitals.
 
-        5. PURE MEDICAL CRISIS / FIRST VISIT FOR THIS AILMENT:
-           - Assess distress, give 2 immediate safety steps, and state the nearest facility name ({hospitals_list[0]['name'] if hospitals_list else 'medical center'}), reach time (~{hospitals_list[0]['reach_time_mins'] if hospitals_list else '5'} mins), and attending doctor ({hospitals_list[0]['doctor'] if hospitals_list else 'Specialist'}).
-
-        OUTPUT MUST BE VALID JSON IN {language} MATCHING THE SCHEMA EXACTLY.
+        OUTPUT MUST BE VALID JSON MATCHING SCHEMA.
         """
 
         try:
@@ -398,7 +393,6 @@ async def process_voice_crisis(
             parsed_data = json.loads(result_text)
             spoken_text = parsed_data.get("deescalation_script", "")
 
-            # Automatically log medical events into SQLite history
             condition_desc = parsed_data.get("vocal_risk_analysis", "")
             if hospitals_list and not any(
                 k in result_text.lower()
@@ -429,9 +423,7 @@ async def process_voice_crisis(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-app.mount(
-    "/", StaticFiles(directory="templates", html=True), name="templates"
-)
+app.mount("/", StaticFiles(directory="templates", html=True), name="templates")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
