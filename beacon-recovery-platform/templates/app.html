@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Sandra AI | Beacon Emergency Voice Support</title>
+    <title>Beacon AI | Emergency Voice Support</title>
 
     <!-- Auth guard: runs before anything renders. No valid session -> straight to login. -->
     <!-- UNCHANGED from the original app.html. -->
@@ -41,7 +41,7 @@
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <!-- Sandra AI visual template (from sandra-ai.html), unchanged. -->
+    <!-- AI AI visual template (from AI-ai.html), unchanged. -->
     <style>
       :root{
         --bg-0:#04060d;
@@ -180,7 +180,7 @@
       }
 
       /* Real functional mic button (#record-btn), restyled to sit at the
-         center of the orb like Sandra's decorative .mic-center did.
+         center of the orb like AI's decorative .mic-center did.
          classList still contains bg-red-600 / bg-amber-500 so the original
          toggleRecording() classList.replace() calls keep working exactly as
          before -- these rules just override how those classes render here. */
@@ -244,7 +244,7 @@
       }
 
       /* Panels below the orb (Beacon response + Emergency Contacts) restyled
-         to match Sandra's glass/blue aesthetic. Inner content is still
+         to match AI's glass/blue aesthetic. Inner content is still
          produced verbatim by the original, unchanged JS. */
       .glass-panel{
         background:rgba(255,255,255,0.03);
@@ -266,18 +266,18 @@
 <div class="bg-glow"></div>
 
 <nav>
-  <div class="logo"><span class="mark">S</span> Sandra AI</div>
+  <div class="logo"><span class="mark">S</span> Beacon AI</div>
   <!-- Original account widget -- populated by the unchanged renderAccountWidget() -->
   <div id="account-widget" class="nav-actions"></div>
 </nav>
 
 <section class="wrap hero">
-  <h1>Talk to <b>Sandra AI</b> — Smarter,<br>Faster, Better</h1>
+  <h1>Talk to <b>Bacon</b> — Smarter,<br>Faster, Better</h1>
   <p class="tagline">When typing is impossible, tap the orb and talk. You'll get a spoken response right away.</p>
 
   <div class="orb-stage" id="orbStage">
     <div class="orb-halo"></div>
-    <canvas id="orbCanvas" width="600" height="600" aria-label="Sandra AI voice orb"></canvas>
+    <canvas id="orbCanvas" width="600" height="600" aria-label="AI AI voice orb"></canvas>
     <!-- Real functional mic button (was id="record-btn" in the original app.html) -->
     <button id="record-btn" onclick="toggleRecording()">
       <i id="record-icon" class="fa-solid fa-microphone"></i>
@@ -286,7 +286,7 @@
 
   <div class="speak-wrap">
     <button class="speak-btn" onclick="toggleRecording()">
-      <span class="dot"></span> Speak with Sandra
+      <span class="dot"></span> Speak with AI
     </button>
     <!-- Original status element (was id="record-status") -->
     <span class="status-label" id="record-status">Tap to speak</span>
@@ -339,7 +339,7 @@
 
 </section>
 
-<!-- Sandra's decorative orb renderer, unchanged, purely cosmetic (no backend calls). -->
+<!-- AI's decorative orb renderer, unchanged, purely cosmetic (no backend calls). -->
 <script>
 (function(){
   const canvas = document.getElementById('orbCanvas');
@@ -553,7 +553,7 @@
             btn.classList.replace('bg-red-600', 'bg-amber-500');
             icon.classList.replace('fa-microphone', 'fa-stop');
             status.innerText = "Recording... tap again to stop and send";
-            if (window.setOrbListening) window.setOrbListening(true); // visual only, added for the Sandra orb
+            if (window.setOrbListening) window.setOrbListening(true); // visual only, added for the AI orb
         } else {
             mediaRecorder.stop();
             isRecording = false;
@@ -561,7 +561,7 @@
             btn.classList.replace('bg-amber-500', 'bg-red-600');
             icon.classList.replace('fa-stop', 'fa-microphone');
             status.innerText = "Processing...";
-            if (window.setOrbListening) window.setOrbListening(false); // visual only, added for the Sandra orb
+            if (window.setOrbListening) window.setOrbListening(false); // visual only, added for the AI orb
         }
     }
 
