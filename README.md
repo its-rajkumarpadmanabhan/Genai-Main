@@ -1,9 +1,5 @@
 <img width="1912" height="945" alt="image" src="https://github.com/user-attachments/assets/7343a5e4-08dd-441e-a131-cb46887b2f97" />
 
-To provide you with a high-quality README that you can copy and paste into your GitHub repository (which will display perfectly as documentation), I have formatted it below.
-
-GitHub uses Markdown for READMEs, so you don't need a PDF file. Simply create a file named README.md in your repository root, paste the content below, and it will render beautifully with emojis and structure.
-
 🚨 Beacon Engine: Universal Emergency Voice Assistant
 Beacon Engine is a cross-platform, intelligent voice-driven emergency health assistant designed for rapid, real-time medical triage. Built on the Gemini 3.6-flash engine, it combines GPS-verified hospital routing with instant AI-driven first-aid advice.
 
