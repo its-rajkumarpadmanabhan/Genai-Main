@@ -157,10 +157,12 @@ def fetch_hospitals_data(lat: float, lon: float, specialty_keyword: Optional[str
     
     for radius in radiuses:
         overpass_query = f"""
-        [out:json][timeout:15];
+        [out:json][timeout:25];
         (
-          node["amenity"~"hospital|clinic"](around:{radius}, {lat}, {lon});
-          way["amenity"~"hospital|clinic"](around:{radius}, {lat}, {lon});
+          node["amenity"~"hospital|clinic|doctors"](around:{radius}, {lat}, {lon});
+          way["amenity"~"hospital|clinic|doctors"](around:{radius}, {lat}, {lon});
+          node["healthcare"~"hospital|clinic|doctor"](around:{radius}, {lat}, {lon});
+          way["healthcare"~"hospital|clinic|doctor"](around:{radius}, {lat}, {lon});
         );
         out center 20;
         """
