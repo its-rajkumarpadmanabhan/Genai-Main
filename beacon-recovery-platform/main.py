@@ -775,7 +775,6 @@ async def process_voice_crisis(
                 )
             else:
                 raise e
-
         result_text = response.text
         spoken_text = ""
         try:
