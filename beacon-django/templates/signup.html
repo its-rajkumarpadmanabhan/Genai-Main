@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carewell — Sign Up</title>
+<script>
+  (function(){
+    const token = localStorage.getItem('beacon_token') || localStorage.getItem('access_token');
+    const userRaw = localStorage.getItem('beacon_user');
+    if(token && userRaw){
+      try {
+        const user = JSON.parse(userRaw);
+        const role = user.role || 'patient';
+        const target = role === 'admin' ? '/admin-dashboard.html' :
+                       role === 'doctor' ? '/doctor-profile.html' :
+                       role === 'caretaker' ? '/caretaker-dashboard.html' : '/patient-profile.html';
+        window.location.href = target;
+      } catch(e){}
+    }
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script>
+  if (localStorage.getItem('beacon_token') || localStorage.getItem('access_token')) {
+    const userRaw = localStorage.getItem('beacon_user');
+    if (userRaw) {
+      try {
+        const u = JSON.parse(userRaw);
+        const role = u.role || 'patient';
+        const targetPage = role === 'admin' ? '/admin-dashboard.html' :
+                           role === 'doctor' ? '/doctor-profile.html' :
+                           role === 'caretaker' ? '/caretaker-dashboard.html' : '/patient-profile.html';
+        window.location.replace(targetPage);
+      } catch(e){}
+    }
+  }
+</script>
+<style>
+  :root{
+    --ink:#1E2A22; --paper:#EAF0EC; --surface:#FFFFFF; --line:#D7DFD9;
+    --pine:#33604F; --pine-deep:#25473A; --brick:#AE4436; --brick-soft:#F3DFDA;
+    --slate:#4A6E8C; --slate-soft:#DCE7EF; --muted:#6E7D75; --amber:#B9873A; --amber-soft:#F1E3CB;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  a{color:inherit;text-decoration:none;}
+  button{font-family:inherit;}
+
+  #view-auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 50% 20%,#F2F6F3 0%,var(--paper) 60%);}
+  .auth-card{width:100%;max-width:460px;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:32px;box-shadow:0 20px 60px rgba(37,71,58,.08);}
+  .auth-brand{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:6px;}
+  .auth-brand .brand-mark{width:38px;height:38px;border-radius:10px;background:linear-gradient(160deg,#4C8A72,#2C5344);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:600;font-size:19px;color:#fff;}
+  .auth-brand .brand-name{font-family:'Fraunces',serif;font-size:22px;font-weight:600;}
+  .auth-sub{text-align:center;color:var(--muted);font-size:13px;margin:0 0 24px;}
+
+  .role-picker{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px;}
+  .role-picker button{padding:12px 4px;border-radius:11px;border:1.5px solid var(--line);background:var(--paper);cursor:pointer;font-size:11.5px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:6px;}
+  .role-picker button svg{width:18px;height:18px;}
+  .role-picker button.active{border-color:var(--pine);background:#DCE9E2;color:var(--pine-deep);}
+
+  .auth-tabs{display:flex;gap:6px;background:var(--paper);border-radius:10px;padding:4px;margin-bottom:18px;}
+  .auth-tabs button{flex:1;border:none;background:transparent;padding:8px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;}
+  .auth-tabs button.active{background:var(--pine-deep);color:#EFF3F0;}
+
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+  .field input{width:100%;border:1px solid var(--line);border-radius:99px;padding:10px 14px;font-size:13.5px;font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);}
+
+  .btn-primary{width:100%;background:var(--pine-deep);color:#EFF3F0;border:none;border-radius:10px;padding:12px;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:8px;transition:background .2s;}
+  .btn-primary:hover{background:var(--pine);}
+
+  .form-msg{font-size:12px;text-align:center;margin-top:12px;min-height:16px;color:var(--brick);}
+  .form-msg.ok{color:var(--pine);}
+  .form-sublink{text-align:center;font-size:12px;margin-top:14px;color:var(--muted);}
+  .form-sublink a{color:var(--pine);font-weight:600;}
+</style>
+</head>
+<body>
+
+<div id="view-auth">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <div class="brand-mark">C</div>
+      <div class="brand-name">Carewell</div>
+    </div>
+    <p class="auth-sub">One account, one role. Choose how you're joining.</p>
+
+    <div class="role-picker" id="rolePicker">
+      <button data-role="patient" class="active" onclick="pickRole('patient')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7"/></svg>Patient</button>
+      <button data-role="caretaker" onclick="pickRole('caretaker')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.5 1-1a5.5 5.5 0 0 0 0-7.9z"/></svg>Caretaker</button>
+      <button data-role="doctor" onclick="pickRole('doctor')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>Doctor</button>
+    </div>
+
+    <div class="auth-tabs">
+      <button onclick="window.location.href='/login.html'">Log in</button>
+      <button class="active">Sign up</button>
+    </div>
+
+    <form id="signupForm" onsubmit="handleSignup(event)">
+      <div class="field">
+        <label>Username</label>
+        <input id="suUsername" type="text" placeholder="e.g. jordan_smith" required>
+      </div>
+      <div class="field">
+        <label>Email Address</label>
+        <input id="suEmail" type="email" placeholder="you@example.com" required>
+      </div>
+      <div class="field">
+        <label>Mobile Number</label>
+        <input id="suMobile" type="tel" placeholder="+1 555 123 4567" required>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input id="suPw" type="password" placeholder="••••••••" required>
+      </div>
+      <div class="field">
+        <label>Confirm Password</label>
+        <input id="suConfirmPw" type="password" placeholder="••••••••" required>
+      </div>
+      <button class="btn-primary" type="submit" id="submitBtn">Create <span id="roleLabel">patient</span> account</button>
+    </form>
+
+    <div class="form-msg" id="authMsg"></div>
+
+    <div class="form-sublink">
+      Already have an account? <a href="/login.html">Log in here</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  let selectedRole = 'patient';
+
+  function pickRole(role){
+    selectedRole = role;
+    document.querySelectorAll('#rolePicker button').forEach(b => {
+      b.classList.toggle('active', b.dataset.role === role);
+    });
+    document.getElementById('roleLabel').textContent = role;
+  }
+
+  function safeDetail(detail) {
+    if (!detail) return '';
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail)) {
+      return detail.map(d => (typeof d === 'string' ? d : d.msg || JSON.stringify(d))).join('; ');
+    }
+    return detail.msg || JSON.stringify(detail);
+  }
+
+  async function handleSignup(e){
+    e.preventDefault();
+    const msg = document.getElementById('authMsg');
+    const btn = document.getElementById('submitBtn');
+    msg.className = 'form-msg';
+    msg.textContent = '';
+
+    const username = document.getElementById('suUsername').value.trim();
+    const email = document.getElementById('suEmail').value.trim();
+    const mobile_number = document.getElementById('suMobile').value.trim();
+    const password = document.getElementById('suPw').value;
+    const confirmPassword = document.getElementById('suConfirmPw').value;
+
+    if(!username || !email || !mobile_number || !password || !confirmPassword){
+      msg.textContent = 'Please fill in all fields.';
+      return;
+    }
+
+    if(password !== confirmPassword){
+      msg.textContent = 'Passwords do not match.';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Creating account...';
+
+    try {
+      const res = await fetch('/api/auth/signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: selectedRole, username, email, mobile_number, password })
+      });
+
+      const ct = res.headers.get('content-type') || '';
+      let data = {};
+      if(ct.includes('application/json')){
+        data = await res.json();
+      } else {
+        throw new Error('Server returned invalid response (' + res.status + ').');
+      }
+
+      if(!res.ok){
+        const errDetail = safeDetail(data.detail) || 'Signup failed.';
+        if(errDetail.toLowerCase().includes('email already exists')){
+          msg.innerHTML = 'An account with this email already exists. <a href="/login.html" style="color:var(--pine);font-weight:600;text-decoration:underline;">Click here to log in</a>.';
+          btn.disabled = false;
+          btn.textContent = 'Create ' + selectedRole + ' account';
+          return;
+        }
+        throw new Error(errDetail);
+      }
+
+      localStorage.setItem('beacon_token', data.access_token);
+      localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('beacon_user', JSON.stringify(data.user));
+
+      msg.className = 'form-msg ok';
+      msg.textContent = 'Account created! Redirecting to dashboard...';
+
+      const role = data.user && data.user.role ? data.user.role : selectedRole;
+      const targetPage = role === 'admin' ? '/admin-dashboard.html' :
+                         role === 'doctor' ? '/doctor-profile.html' :
+                         role === 'caretaker' ? '/caretaker-dashboard.html' : '/patient-profile.html';
+
+      setTimeout(() => window.location.href = targetPage, 1200);
+    } catch(err){
+      msg.textContent = err.message;
+      btn.disabled = false;
+      btn.textContent = 'Create ' + selectedRole + ' account';
+    }
+  }
+</script>
+</body>
+</html>

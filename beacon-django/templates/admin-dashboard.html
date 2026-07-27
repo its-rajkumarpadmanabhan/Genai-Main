@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carewell — Admin Console</title>
+<script>
+  (function(){
+    const token = localStorage.getItem('beacon_token') || localStorage.getItem('access_token');
+    const userRaw = localStorage.getItem('beacon_user');
+    if(!token || !userRaw){ window.location.href = '/login.html'; return; }
+    try {
+      const user = JSON.parse(userRaw);
+      if(user.role !== 'admin'){
+        const target = user.role === 'doctor' ? '/doctor-profile.html' :
+                       user.role === 'caretaker' ? '/caretaker-dashboard.html' : '/patient-profile.html';
+        window.location.href = target;
+      }
+    } catch(e){ window.location.href = '/login.html'; }
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1E2A22; --paper:#EAF0EC; --surface:#FFFFFF; --line:#D7DFD9;
+    --pine:#33604F; --pine-deep:#25473A; --brick:#AE4436; --brick-soft:#F3DFDA;
+    --slate:#4A6E8C; --slate-soft:#DCE7EF; --muted:#6E7D75; --amber:#B9873A; --amber-soft:#F1E3CB;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  button{font-family:inherit;}
+  .app{display:grid;grid-template-columns:220px 1fr;max-width:1520px;margin:0 auto;min-height:100vh;}
+
+  /* SIDEBAR */
+  .sidebar{background:var(--pine-deep);color:#EFF3F0;padding:28px 20px;display:flex;flex-direction:column;gap:30px;}
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand-mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(160deg,#4C8A72,#2C5344);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:600;font-size:17px;flex-shrink:0;}
+  .brand-name{font-family:'Fraunces',serif;font-size:17px;font-weight:600;}
+  .brand-sub{font-size:11px;color:#9FB6AB;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;}
+  nav{display:flex;flex-direction:column;gap:3px;}
+  nav button{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:99px;color:#D7E4DE;font-size:13.5px;font-weight:500;border:none;background:transparent;cursor:pointer;text-align:left;width:100%;position:relative;}
+  nav button svg{width:16px;height:16px;flex-shrink:0;}
+  nav button.active{background:#EFF3F0;color:var(--pine-deep);}
+  nav button:not(.active):hover{background:rgba(255,255,255,.08);}
+  .nav-count{margin-left:auto;font-size:10.5px;font-family:'JetBrains Mono',monospace;color:#9FB6AB;}
+  nav button.active .nav-count{color:var(--muted);}
+  .sidebar-foot{margin-top:auto;}
+  .help-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:var(--radius);padding:14px;font-size:12.5px;color:#C7DACF;}
+  .help-card b{display:block;font-family:'Fraunces',serif;font-size:14px;color:#EFF3F0;margin-bottom:4px;}
+
+  /* MAIN */
+  main{padding:24px 26px;}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:14px;}
+  .breadcrumb{font-family:'Fraunces',serif;font-size:19px;font-weight:600;color:var(--muted);}
+  .breadcrumb span{color:var(--ink);}
+  .topbar-right{display:flex;align-items:center;gap:12px;}
+  .admin-chip{display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:6px 12px 6px 6px;}
+  .admin-chip .av{width:32px;height:32px;border-radius:9px;background:var(--slate-soft);display:flex;align-items:center;justify-content:center;color:var(--slate);flex-shrink:0;}
+  .admin-chip .av svg{width:16px;height:16px;}
+  .admin-chip .dname{font-size:12.5px;font-weight:600;line-height:1.2;}
+  .admin-chip .dspec{font-size:10.5px;color:var(--muted);}
+
+  /* Overview */
+  .stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:22px;}
+  .stat-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px;display:flex;flex-direction:column;gap:8px;}
+  .stat-card .top{display:flex;justify-content:space-between;align-items:flex-start;}
+  .stat-card .icon{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;}
+  .stat-card .icon svg{width:17px;height:17px;}
+  .stat-card .num{font-family:'Fraunces',serif;font-size:26px;font-weight:600;}
+  .stat-card .lbl{font-size:12px;color:var(--muted);}
+  .bg-pine{background:#DCE9E2;color:var(--pine);}
+  .bg-slate{background:var(--slate-soft);color:var(--slate);}
+  .bg-brick{background:var(--brick-soft);color:var(--brick);}
+  .bg-amber{background:var(--amber-soft);color:var(--amber);}
+
+  .section-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:20px;}
+  .section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .section-head h2{font-family:'Fraunces',serif;font-size:16.5px;font-weight:600;margin:0;}
+  .recent-row{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--line);font-size:12.5px;}
+  .recent-row:last-child{border-bottom:none;}
+  .recent-row .dot{width:6px;height:6px;border-radius:50%;background:var(--pine);flex-shrink:0;}
+  .recent-row .t{color:var(--muted);margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:11px;}
+
+  /* Table sections */
+  .table-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;}
+  .table-search{position:relative;flex:1;min-width:220px;max-width:340px;}
+  .table-search svg{position:absolute;left:11px;top:50%;transform:translateY(-50%);width:14px;height:14px;color:var(--muted);}
+  .table-search input{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 11px 9px 32px;font-size:13px;background:var(--paper);font-family:'Inter',sans-serif;}
+  .tabs{display:flex;gap:6px;background:var(--paper);border-radius:10px;padding:4px;width:fit-content;}
+  .tabs button{border:none;background:transparent;padding:7px 14px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;font-family:inherit;}
+  .tabs button.active{background:var(--pine-deep);color:#EFF3F0;}
+  .btn-add{background:var(--pine-deep);color:#EFF3F0;border:none;border-radius:9px;padding:10px 16px;font-size:12.5px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:7px;white-space:nowrap;}
+  .btn-add svg{width:14px;height:14px;}
+
+  table.admin-table{width:100%;border-collapse:collapse;}
+  table.admin-table thead th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding:0 12px 10px;font-weight:600;}
+  table.admin-table tbody tr{border-top:1px solid var(--line);}
+  table.admin-table tbody tr:hover{background:var(--paper);}
+  table.admin-table tbody td{padding:12px;font-size:13px;vertical-align:middle;}
+  .name-cell{display:flex;align-items:center;gap:10px;}
+  .t-avatar{width:32px;height:32px;border-radius:9px;background:var(--slate-soft);color:var(--slate);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .t-avatar svg{width:15px;height:15px;}
+  .t-avatar.brick{background:var(--brick-soft);color:var(--brick);}
+  .t-avatar.amber{background:var(--amber-soft);color:var(--amber);}
+  .t-name{font-weight:600;font-size:13px;}
+  .t-sub{font-size:11px;color:var(--muted);}
+  .status-pill{font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:99px;display:inline-block;}
+  .status-pill.active{background:#DCE9E2;color:var(--pine);}
+  .status-pill.inactive{background:var(--brick-soft);color:var(--brick);}
+  .row-actions{display:flex;gap:6px;justify-content:flex-end;}
+  .icon-action{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--paper);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);}
+  .icon-action:hover{color:var(--pine-deep);border-color:var(--pine);}
+  .icon-action.danger:hover{color:var(--brick);border-color:var(--brick-soft);}
+  .icon-action svg{width:14px;height:14px;}
+  .empty-note{text-align:center;padding:36px 10px;color:var(--muted);font-size:13px;}
+
+  /* Modal */
+  .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(30,42,34,.45);align-items:center;justify-content:center;z-index:50;padding:20px;}
+  .modal-backdrop.open{display:flex;}
+  .modal{background:var(--surface);border-radius:16px;max-width:480px;width:100%;padding:24px;max-height:88vh;overflow-y:auto;}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;}
+  .modal-head h3{font-family:'Fraunces',serif;font-size:18px;margin:0;}
+  .modal-close{border:none;background:var(--paper);width:30px;height:30px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:15px;}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+  .field input,.field select{width:100%;border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:13.5px;font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);}
+  .modal-actions{display:flex;gap:10px;margin-top:18px;}
+  .btn-primary{flex:1;background:var(--pine-deep);color:#EFF3F0;border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;}
+  .btn-cancel{flex:1;background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:10px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;}
+
+  /* Analytics Charts */
+  .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+  .chart-legend{display:flex;gap:14px;}
+  .chart-legend .lg{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);font-weight:500;}
+  .chart-legend .sw{width:9px;height:9px;border-radius:3px;display:inline-block;}
+  .bar-chart{display:flex;align-items:flex-end;gap:14px;height:180px;padding:6px 4px 0;}
+  .bar-group{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;flex:1;height:100%;gap:6px;}
+  .bar-set{display:flex;align-items:flex-end;gap:3px;height:100%;}
+  .bar{width:10px;border-radius:4px 4px 0 0;position:relative;}
+  .bar-single{width:26px;border-radius:6px 6px 0 0;}
+  .bar-label{font-size:10.5px;color:var(--muted);font-weight:600;}
+  .bar-value{font-size:9.5px;color:var(--muted);font-family:'JetBrains Mono',monospace;position:absolute;top:-16px;left:50%;transform:translateX(-50%);white-space:nowrap;}
+  .hbar-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+  .hbar-row:last-child{margin-bottom:0;}
+  .hbar-label{width:130px;font-size:12px;font-weight:600;flex-shrink:0;}
+  .hbar-track{flex:1;background:var(--paper);border-radius:99px;height:12px;overflow:hidden;}
+  .hbar-fill{height:100%;border-radius:99px;}
+  .hbar-value{width:32px;text-align:right;font-size:11.5px;color:var(--muted);font-family:'JetBrains Mono',monospace;flex-shrink:0;}
+
+  /* Reviews */
+  .stars{color:var(--amber);display:inline-flex;gap:1px;}
+  .stars svg{width:13px;height:13px;}
+  .review-card{border:1px solid var(--line);border-radius:12px;padding:15px 16px;margin-bottom:12px;}
+  .review-card:last-child{margin-bottom:0;}
+  .review-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+  .review-who{display:flex;gap:11px;align-items:center;}
+  .review-name{font-size:13.5px;font-weight:600;}
+  .review-sub{font-size:11.5px;color:var(--muted);margin-top:1px;}
+  .review-text{font-size:12.5px;color:var(--ink);margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);line-height:1.5;}
+  .review-date{font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--pine-deep);color:#EFF3F0;padding:11px 20px;border-radius:10px;font-size:12.5px;font-weight:600;opacity:0;pointer-events:none;transition:.25s;z-index:60;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  @media (max-width:980px){.stat-grid,.chart-grid{grid-template-columns:repeat(2,1fr);}}
+  @media (max-width:820px){
+    .app{grid-template-columns:1fr;}
+    .sidebar{flex-direction:row;overflow-x:auto;align-items:center;gap:16px;}
+    .sidebar nav{flex-direction:row;}
+    .sidebar-foot,.brand-sub,.nav-count{display:none;}
+    .chart-grid{grid-template-columns:1fr;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="brand" style="cursor:pointer;" onclick="switchSection('overview')">
+      <div class="brand-mark">C</div>
+      <div><div class="brand-name">Carewell</div><div class="brand-sub">ADMIN CONSOLE</div></div>
+    </div>
+    <nav>
+      <button data-sec="patients" onclick="switchSection('patients')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7"/></svg><span>Patients</span><span class="nav-count" id="navCountPatients">0</span></button>
+      <button data-sec="doctors" onclick="switchSection('doctors')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg><span>Doctors</span><span class="nav-count" id="navCountDoctors">0</span></button>
+      <button data-sec="caretakers" onclick="switchSection('caretakers')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.5 1-1a5.5 5.5 0 0 0 0-7.9z"/></svg><span>Caretakers</span><span class="nav-count" id="navCountCaretakers">0</span></button>
+      <button onclick="localStorage.clear(); window.location.href='/login.html';">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></button>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="help-card"><b>Admin Console</b>Full live control over system accounts and profiles.</div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <main>
+    <div class="topbar">
+      <div class="breadcrumb">Admin › <span id="bcLabel">Overview</span></div>
+      <div class="topbar-right">
+        <div class="admin-chip">
+          <div class="av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7"/></svg></div>
+          <div><div class="dname" id="adminName">System Admin</div><div class="dspec">admin@hospitaltest.com</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OVERVIEW -->
+    <div id="sec-overview">
+      <div class="stat-grid">
+        <div class="stat-card"><div class="top"><div class="icon bg-pine"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7"/></svg></div></div><div class="num" id="statPatients">0</div><div class="lbl">Total patients</div></div>
+        <div class="stat-card"><div class="top"><div class="icon bg-slate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg></div></div><div class="num" id="statDoctors">0</div><div class="lbl">Total doctors</div></div>
+        <div class="stat-card"><div class="top"><div class="icon bg-amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.5 1-1a5.5 5.5 0 0 0 0-7.9z"/></svg></div></div><div class="num" id="statCaretakers">0</div><div class="lbl">Total caretakers</div></div>
+        <div class="stat-card"><div class="top"><div class="icon bg-brick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></div></div><div class="num" id="statInactive">0</div><div class="lbl">Inactive accounts</div></div>
+      </div>
+      
+      <div class="section-card">
+        <div class="section-head"><h2>Recently registered users</h2></div>
+        <div id="recentList"></div>
+      </div>
+
+      <div class="chart-grid" style="margin-top:20px;">
+        <div class="section-card">
+          <div class="section-head"><h2>New sign-ups by month</h2><span class="chart-legend">
+            <span class="lg"><span class="sw" style="background:var(--pine);"></span>Patients</span>
+            <span class="lg"><span class="sw" style="background:var(--slate);"></span>Doctors</span>
+            <span class="lg"><span class="sw" style="background:var(--amber);"></span>Caretakers</span>
+          </span></div>
+          <div id="chartSignups"></div>
+        </div>
+        <div class="section-card">
+          <div class="section-head"><h2>Appointments per week</h2></div>
+          <div id="chartAppointments"></div>
+        </div>
+      </div>
+
+      <div class="chart-grid" style="margin-top:20px;">
+        <div class="section-card">
+          <div class="section-head"><h2>Doctors by specialty</h2></div>
+          <div id="chartSpecialty"></div>
+        </div>
+        <div class="section-card">
+          <div class="section-head"><h2>Patients by location</h2></div>
+          <div id="chartLocation"></div>
+        </div>
+      </div>
+
+      <div class="stat-grid" style="margin-top:20px;">
+        <div class="stat-card"><div class="top"><div class="icon bg-amber"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 17.3l-6.2 3.6 1.6-7L2 9.2l7.1-.6L12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7z"/></svg></div></div><div class="num" id="statAvgRating">4.8</div><div class="lbl">Average rating</div></div>
+        <div class="stat-card"><div class="top"><div class="icon bg-slate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div></div><div class="num" id="statTotalReviews">12</div><div class="lbl">Total reviews</div></div>
+        <div class="stat-card"><div class="top"><div class="icon bg-pine"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg></div></div><div class="num" id="statDoctorAvg">4.9</div><div class="lbl">Avg. doctor rating</div></div>
+        <div class="stat-card"><div class="top"><div class="icon bg-brick"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.5 1-1a5.5 5.5 0 0 0 0-7.9z"/></svg></div></div><div class="num" id="statCaretakerAvg">4.7</div><div class="lbl">Avg. caretaker rating</div></div>
+      </div>
+
+      <div class="section-card" style="margin-top:20px;">
+        <div class="table-head">
+          <div class="section-head" style="margin:0;"><h2>Reviews & Feedback</h2></div>
+          <div class="tabs" style="margin:0;">
+            <button class="active" data-rf="all" onclick="filterReviews('all')">All</button>
+            <button data-rf="doctor" onclick="filterReviews('doctor')">Doctors</button>
+            <button data-rf="caretaker" onclick="filterReviews('caretaker')">Caretakers</button>
+          </div>
+          <div class="table-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" id="searchReviews" placeholder="Search reviews…" oninput="renderReviews()"></div>
+        </div>
+        <div id="reviewList"></div>
+      </div>
+    </div>
+
+    <!-- PATIENTS -->
+    <div id="sec-patients" style="display:none;">
+      <div class="section-card">
+        <div class="table-head">
+          <div class="table-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" id="searchPatients" placeholder="Search patients…" oninput="renderPatients()"></div>
+          <button class="btn-add" onclick="openModal('patient')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Add patient</button>
+        </div>
+        <table class="admin-table">
+          <thead><tr><th>Name</th><th>Email ID</th><th>Mobile Number</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="tbodyPatients"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DOCTORS -->
+    <div id="sec-doctors" style="display:none;">
+      <div class="section-card">
+        <div class="table-head">
+          <div class="table-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" id="searchDoctors" placeholder="Search doctors…" oninput="renderDoctors()"></div>
+          <button class="btn-add" onclick="openModal('doctor')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Add doctor</button>
+        </div>
+        <table class="admin-table">
+          <thead><tr><th>Name</th><th>Email ID</th><th>Mobile Number</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="tbodyDoctors"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CARETAKERS -->
+    <div id="sec-caretakers" style="display:none;">
+      <div class="section-card">
+        <div class="table-head">
+          <div class="table-search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" id="searchCaretakers" placeholder="Search caretakers…" oninput="renderCaretakers()"></div>
+          <button class="btn-add" onclick="openModal('caretaker')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Add caretaker</button>
+        </div>
+        <table class="admin-table">
+          <thead><tr><th>Name</th><th>Email ID</th><th>Mobile Number</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+          <tbody id="tbodyCaretakers"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modalTitle">Add patient</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <form id="modalForm" onsubmit="saveRecord(event)">
+      <div id="modalFields"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn-primary" id="modalSaveBtn">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const ICON = {
+  person: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7"/></svg>',
+  stetho: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>',
+  heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.5 1-1a5.5 5.5 0 0 0 0-7.9z"/></svg>',
+  edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>'
+};
+
+let allUsers = [];
+let modalType = null;
+let modalEditId = null;
+
+function getAuthHeader(){
+  const token = localStorage.getItem('access_token') || localStorage.getItem('beacon_token');
+  return token ? { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+}
+
+async function fetchAdminData(){
+  try {
+    const res = await fetch('/api/auth/admin/users', { headers: getAuthHeader() });
+    if(res.ok){
+      allUsers = await res.json();
+      renderOverview();
+      renderAnalytics();
+      renderReviews();
+      renderPatients();
+      renderDoctors();
+      renderCaretakers();
+    } else if(res.status === 401 || res.status === 403){
+      localStorage.clear();
+      window.location.href = '/login.html';
+    }
+  } catch(e){ console.log(e); }
+}
+
+function switchSection(sec){
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.sec === sec));
+  ['overview','patients','doctors','caretakers'].forEach(s => {
+    const el = document.getElementById('sec-'+s);
+    if(el) el.style.display = s===sec ? 'block' : 'none';
+  });
+  document.getElementById('bcLabel').textContent = sec.charAt(0).toUpperCase()+sec.slice(1);
+  if(sec==='overview'){ renderOverview(); renderAnalytics(); renderReviews(); }
+  if(sec==='patients') renderPatients();
+  if(sec==='doctors') renderDoctors();
+  if(sec==='caretakers') renderCaretakers();
+}
+
+function renderOverview(){
+  const patients = allUsers.filter(u => u.role === 'patient');
+  const doctors = allUsers.filter(u => u.role === 'doctor');
+  const caretakers = allUsers.filter(u => u.role === 'caretaker');
+  const inactive = allUsers.filter(u => !u.is_active);
+
+  document.getElementById('statPatients').textContent = patients.length;
+  document.getElementById('statDoctors').textContent = doctors.length;
+  document.getElementById('statCaretakers').textContent = caretakers.length;
+  document.getElementById('statInactive').textContent = inactive.length;
+  
+  document.getElementById('navCountPatients').textContent = patients.length;
+  document.getElementById('navCountDoctors').textContent = doctors.length;
+  document.getElementById('navCountCaretakers').textContent = caretakers.length;
+
+  const recent = allUsers.slice(0, 5);
+  document.getElementById('recentList').innerHTML = recent.length ? recent.map(u => `
+    <div class="recent-row">
+      <span class="dot"></span>
+      <span style="font-weight:600;">${u.username}</span>
+      <span style="color:var(--muted);">· ${u.email}</span>
+      <span class="t">${u.role.toUpperCase()}</span>
+    </div>
+  `).join('') : '<div class="empty-note">No registered users found.</div>';
+}
+
+/* ================= ANALYTICS ================= */
+const signupData = {
+  months: ['Feb','Mar','Apr','May','Jun','Jul'],
+  patients: [4, 6, 5, 8, 7, 14],
+  doctors:  [2, 3, 2, 4, 3, 14],
+  caretakers:[1, 2, 3, 2, 4, 14],
+};
+const apptWeekData = {
+  labels: ['Wk 1','Wk 2','Wk 3','Wk 4','Wk 5'],
+  values: [14, 19, 16, 22, 28],
+};
+
+function renderAnalytics(){
+  renderGroupedBars('chartSignups', signupData.months, [
+    {values: signupData.patients, color:'var(--pine)'},
+    {values: signupData.doctors, color:'var(--slate)'},
+    {values: signupData.caretakers, color:'var(--amber)'},
+  ]);
+  renderSingleBars('chartAppointments', apptWeekData.labels, apptWeekData.values, 'var(--slate)');
+
+  const doctors = allUsers.filter(u => u.role === 'doctor');
+  const byDept = { Cardiology: 3, Geriatrics: 2, Neurology: 2, 'General Medicine': 3, Orthopedics: 1, Pediatrics: 1 };
+  doctors.forEach(d => {
+    const dept = d.username.includes('Mehta') ? 'Cardiology' : (d.username.includes('Thomas') ? 'Geriatrics' : 'General Medicine');
+    byDept[dept] = (byDept[dept]||0) + 1;
+  });
+
+  renderHBars('chartSpecialty', Object.entries(byDept).map(([label,value]) => ({label, value, color:'var(--pine)'})));
+
+  const locationCounts = [
+    {label:'Kochi', value:8, color:'var(--pine)'},
+    {label:'Kottayam', value:5, color:'var(--slate)'},
+    {label:'Kozhikode', value:4, color:'var(--amber)'},
+    {label:'Thiruvananthapuram', value:3, color:'var(--brick)'},
+  ];
+  renderHBars('chartLocation', locationCounts);
+}
+
+function renderGroupedBars(containerId, labels, series){
+  const max = Math.max(1, ...series.flatMap(s => s.values));
+  const html = labels.map((lab, i) => `
+    <div class="bar-group">
+      <div class="bar-set">
+        ${series.map(s => {
+          const h = Math.round((s.values[i]/max)*140) || 2;
+          return `<div class="bar" style="height:${h}px;background:${s.color};"><span class="bar-value">${s.values[i]}</span></div>`;
+        }).join('')}
+      </div>
+      <div class="bar-label">${lab}</div>
+    </div>
+  `).join('');
+  document.getElementById(containerId).innerHTML = `<div class="bar-chart">${html}</div>`;
+}
+function renderSingleBars(containerId, labels, values, color){
+  const max = Math.max(1, ...values);
+  const html = labels.map((lab, i) => {
+    const h = Math.round((values[i]/max)*140) || 2;
+    return `<div class="bar-group"><div class="bar-set"><div class="bar bar-single" style="height:${h}px;background:${color};"><span class="bar-value">${values[i]}</span></div></div><div class="bar-label">${lab}</div></div>`;
+  }).join('');
+  document.getElementById(containerId).innerHTML = `<div class="bar-chart">${html}</div>`;
+}
+function renderHBars(containerId, data){
+  const max = Math.max(1, ...data.map(d => d.value));
+  document.getElementById(containerId).innerHTML = data.map(d => `
+    <div class="hbar-row">
+      <div class="hbar-label">${d.label}</div>
+      <div class="hbar-track"><div class="hbar-fill" style="width:${Math.round((d.value/max)*100)}%;background:${d.color};"></div></div>
+      <div class="hbar-value">${d.value}</div>
+    </div>
+  `).join('');
+}
+
+/* ================= REVIEWS ================= */
+let reviews = [
+  {id:'r1', reviewer:'Aarav Sharma', targetType:'doctor', target:'Dr. Amit Kapoor', rating:5, text:'Extremely patient with my father, explained the cardiology test results clearly.', date:'26 Jul 2026'},
+  {id:'r2', reviewer:'Priya Nair', targetType:'caretaker', target:'Suresh Pillai', rating:5, text:'Suresh has been reliable and genuinely caring — always punctual for home check-ins.', date:'25 Jul 2026'},
+  {id:'r3', reviewer:'Rahul Verma', targetType:'doctor', target:'Dr. Neha Thomas', rating:5, text:'Excellent geriatrics consultation for elderly care.', date:'24 Jul 2026'},
+  {id:'r4', reviewer:'Sneha Reddy', targetType:'caretaker', target:'Lakshmi Devi', rating:4, text:'Attentive and communicates very well with family members.', date:'23 Jul 2026'},
+  {id:'r5', reviewer:'Joseph Thomas', targetType:'doctor', target:'Dr. Rohan Mehta', rating:5, text:'Very thorough examination and accurate prescription.', date:'22 Jul 2026'},
+];
+let reviewFilter = 'all';
+
+function starIcons(rating){
+  let out = '';
+  for(let i=1;i<=5;i++){
+    out += i<=rating
+      ? '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 17.3l-6.2 3.6 1.6-7L2 9.2l7.1-.6L12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7z"/></svg>'
+      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 17.3l-6.2 3.6 1.6-7L2 9.2l7.1-.6L12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7z"/></svg>';
+  }
+  return out;
+}
+function avg(list){ return list.length ? (list.reduce((s,r) => s+r.rating,0)/list.length) : 0; }
+
+function filterReviews(type){
+  reviewFilter = type;
+  document.querySelectorAll('[data-rf]').forEach(b => b.classList.toggle('active', b.dataset.rf === type));
+  renderReviews();
+}
+function renderReviews(){
+  document.getElementById('statAvgRating').textContent = avg(reviews).toFixed(1);
+  document.getElementById('statTotalReviews').textContent = reviews.length;
+  document.getElementById('statDoctorAvg').textContent = avg(reviews.filter(r => r.targetType==='doctor')).toFixed(1);
+  document.getElementById('statCaretakerAvg').textContent = avg(reviews.filter(r => r.targetType==='caretaker')).toFixed(1);
+
+  const q = document.getElementById('searchReviews').value.trim().toLowerCase();
+  const list = reviews.filter(r => {
+    if(reviewFilter !== 'all' && r.targetType !== reviewFilter) return false;
+    if(q && !(r.reviewer.toLowerCase().includes(q) || r.target.toLowerCase().includes(q) || r.text.toLowerCase().includes(q))) return false;
+    return true;
+  });
+
+  document.getElementById('reviewList').innerHTML = list.length ? list.map(r => `
+    <div class="review-card">
+      <div class="review-top">
+        <div class="review-who">
+          <div class="t-avatar ${r.targetType==='doctor'?'brick':'amber'}">${ICON.person}</div>
+          <div><div class="review-name">${r.target}</div><div class="review-sub">Reviewed by ${r.reviewer} · ${r.targetType==='doctor'?'Doctor':'Caretaker'}</div></div>
+        </div>
+        <span class="stars">${starIcons(r.rating)}</span>
+      </div>
+      <div class="review-text">${r.text}</div>
+      <div class="review-date" style="margin-top:6px;">${r.date}</div>
+    </div>
+  `).join('') : '<div class="empty-note">No reviews match this filter.</div>';
+}
+
+function renderPatients(){
+  const q = document.getElementById('searchPatients').value.trim().toLowerCase();
+  const patients = allUsers.filter(u => u.role === 'patient' && (!q || u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)));
+  
+  document.getElementById('tbodyPatients').innerHTML = patients.length ? patients.map(u => `
+    <tr>
+      <td><div class="name-cell"><div class="t-avatar">${ICON.person}</div><div><div class="t-name">${u.username}</div><div class="t-sub mono">ID: #${u.id}</div></div></div></td>
+      <td>${u.email}</td>
+      <td>${u.mobile_number || 'Not provided'}</td>
+      <td>Patient</td>
+      <td><span class="status-pill ${u.is_active?'active':'inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
+      <td><div class="row-actions">
+        <button class="icon-action" onclick="openModal('patient', ${u.id})">${ICON.edit}</button>
+        <button class="icon-action danger" onclick="deleteRecord('patient', ${u.id})">${ICON.trash}</button>
+      </div></td>
+    </tr>
+  `).join('') : '<tr><td colspan="6"><div class="empty-note">No patients found.</div></td></tr>';
+}
+
+function renderDoctors(){
+  const q = document.getElementById('searchDoctors').value.trim().toLowerCase();
+  const doctors = allUsers.filter(u => u.role === 'doctor' && (!q || u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)));
+
+  document.getElementById('tbodyDoctors').innerHTML = doctors.length ? doctors.map(u => `
+    <tr>
+      <td><div class="name-cell"><div class="t-avatar brick">${ICON.stetho}</div><div><div class="t-name">${u.username}</div><div class="t-sub mono">ID: #${u.id}</div></div></div></td>
+      <td>${u.email}</td>
+      <td>${u.mobile_number || 'Not provided'}</td>
+      <td>Doctor</td>
+      <td><span class="status-pill ${u.is_active?'active':'inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
+      <td><div class="row-actions">
+        <button class="icon-action" onclick="openModal('doctor', ${u.id})">${ICON.edit}</button>
+        <button class="icon-action danger" onclick="deleteRecord('doctor', ${u.id})">${ICON.trash}</button>
+      </div></td>
+    </tr>
+  `).join('') : '<tr><td colspan="6"><div class="empty-note">No doctors found.</div></td></tr>';
+}
+
+function renderCaretakers(){
+  const q = document.getElementById('searchCaretakers').value.trim().toLowerCase();
+  const caretakers = allUsers.filter(u => u.role === 'caretaker' && (!q || u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)));
+
+  document.getElementById('tbodyCaretakers').innerHTML = caretakers.length ? caretakers.map(u => `
+    <tr>
+      <td><div class="name-cell"><div class="t-avatar amber">${ICON.heart}</div><div><div class="t-name">${u.username}</div><div class="t-sub mono">ID: #${u.id}</div></div></div></td>
+      <td>${u.email}</td>
+      <td>${u.mobile_number || 'Not provided'}</td>
+      <td>Caretaker</td>
+      <td><span class="status-pill ${u.is_active?'active':'inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
+      <td><div class="row-actions">
+        <button class="icon-action" onclick="openModal('caretaker', ${u.id})">${ICON.edit}</button>
+        <button class="icon-action danger" onclick="deleteRecord('caretaker', ${u.id})">${ICON.trash}</button>
+      </div></td>
+    </tr>
+  `).join('') : '<tr><td colspan="6"><div class="empty-note">No caretakers found.</div></td></tr>';
+}
+
+function openModal(roleType, userId){
+  modalType = roleType;
+  modalEditId = userId || null;
+  const user = userId ? allUsers.find(x => x.id === userId) : null;
+
+  document.getElementById('modalTitle').textContent = (userId ? 'Edit ' : 'Add ') + roleType.toUpperCase();
+  document.getElementById('modalSaveBtn').textContent = userId ? 'Save changes' : 'Create user';
+
+  document.getElementById('modalFields').innerHTML = `
+    <div class="field"><label>Full Name</label><input id="mf_username" type="text" value="${user?user.username:''}" required></div>
+    <div class="field"><label>Email Address</label><input id="mf_email" type="email" value="${user?user.email:''}" required></div>
+    <div class="field"><label>Mobile Number</label><input id="mf_mobile_number" type="tel" value="${user?(user.mobile_number||''):''}"></div>
+    ${!userId ? '<div class="field"><label>Password</label><input id="mf_password" type="password" placeholder="••••••••" required></div>' : '<div class="field"><label>New Password (Leave blank to keep unchanged)</label><input id="mf_password" type="password" placeholder="••••••••"></div>'}
+    <div class="field"><label>Status</label>
+      <select id="mf_is_active">
+        <option value="true" ${user && user.is_active !== false ? 'selected' : ''}>Active</option>
+        <option value="false" ${user && user.is_active === false ? 'selected' : ''}>Inactive</option>
+      </select>
+    </div>
+  `;
+
+  document.getElementById('modalBackdrop').classList.add('open');
+}
+
+function closeModal(){
+  document.getElementById('modalBackdrop').classList.remove('open');
+  modalType = null; modalEditId = null;
+}
+
+async function saveRecord(e){
+  e.preventDefault();
+  const username = document.getElementById('mf_username').value.trim();
+  const email = document.getElementById('mf_email').value.trim();
+  const mobile_number = document.getElementById('mf_mobile_number').value.trim();
+  const password = document.getElementById('mf_password').value;
+  const is_active = document.getElementById('mf_is_active').value === 'true';
+
+  const payload = {
+    username, email, mobile_number, is_active, role: modalType
+  };
+  if(password) payload.password = password;
+
+  if(modalEditId){
+    payload.user_id = modalEditId;
+    try {
+      const res = await fetch('/api/auth/admin/users', {
+        method: 'PUT',
+        headers: getAuthHeader(),
+        body: JSON.stringify(payload)
+      });
+      if(res.ok){
+        showToast(modalType.toUpperCase() + ' updated successfully.');
+        closeModal();
+        fetchAdminData();
+      } else {
+        const err = await res.json();
+        alert(err.detail || 'Could not update user.');
+      }
+    } catch(err){ alert(err.message); }
+  } else {
+    try {
+      const res = await fetch('/api/auth/admin/users', {
+        method: 'POST',
+        headers: getAuthHeader(),
+        body: JSON.stringify(payload)
+      });
+      if(res.ok){
+        showToast(modalType.toUpperCase() + ' created successfully.');
+        closeModal();
+        fetchAdminData();
+      } else {
+        const err = await res.json();
+        alert(err.detail || 'Could not create user.');
+      }
+    } catch(err){ alert(err.message); }
+  }
+}
+
+async function deleteRecord(type, id){
+  if(!confirm(`Delete user account permanently? This cannot be undone.`)) return;
+  try {
+    const res = await fetch('/api/auth/admin/users', {
+      method: 'DELETE',
+      headers: getAuthHeader(),
+      body: JSON.stringify({ user_id: id })
+    });
+    if(res.ok){
+      showToast('User account deleted.');
+      fetchAdminData();
+    } else {
+      const err = await res.json();
+      alert(err.detail || 'Could not delete user.');
+    }
+  } catch(err){ alert(err.message); }
+}
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const userRaw = localStorage.getItem('beacon_user');
+  if(userRaw){
+    try {
+      const user = JSON.parse(userRaw);
+      document.getElementById('adminName').textContent = user.username || 'System Admin';
+    } catch(e){}
+  }
+  fetchAdminData();
+});
+</script>
+</body>
+</html>

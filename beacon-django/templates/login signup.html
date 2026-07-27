@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carewell — Connect</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1E2A22; --paper:#EAF0EC; --surface:#FFFFFF; --line:#D7DFD9;
+    --pine:#33604F; --pine-deep:#25473A; --brick:#AE4436; --brick-soft:#F3DFDA;
+    --slate:#4A6E8C; --slate-soft:#DCE7EF; --muted:#6E7D75; --amber:#B9873A; --amber-soft:#F1E3CB;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+  a{color:inherit;}
+  button{font-family:inherit;}
+
+  /* ===== AUTH SCREEN ===== */
+  #view-auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 50% 20%,#F2F6F3 0%,var(--paper) 60%);}
+  .auth-card{width:100%;max-width:440px;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:32px;box-shadow:0 20px 60px rgba(37,71,58,.08);}
+  .auth-brand{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:6px;}
+  .auth-brand .brand-mark{width:38px;height:38px;border-radius:10px;background:linear-gradient(160deg,#4C8A72,#2C5344);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:600;font-size:19px;color:#fff;}
+  .auth-brand .brand-name{font-family:'Fraunces',serif;font-size:22px;font-weight:600;}
+  .auth-sub{text-align:center;color:var(--muted);font-size:13px;margin:0 0 24px;}
+
+  .role-picker{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px;}
+  .role-picker button{padding:12px 6px;border-radius:11px;border:1.5px solid var(--line);background:var(--paper);cursor:pointer;font-size:12.5px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:6px;}
+  .role-picker button svg{width:18px;height:18px;}
+  .role-picker button.active{border-color:var(--pine);background:#DCE9E2;color:var(--pine-deep);}
+
+  .auth-tabs{display:flex;gap:6px;background:var(--paper);border-radius:10px;padding:4px;margin-bottom:18px;}
+  .auth-tabs button{flex:1;border:none;background:transparent;padding:8px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;}
+  .auth-tabs button.active{background:var(--pine-deep);color:#EFF3F0;}
+
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
+  .field input,.field select,.field textarea{width:100%;border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-size:13.5px;font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);}
+  .field textarea{resize:vertical;min-height:64px;}
+
+  .btn-primary{width:100%;background:var(--pine-deep);color:#EFF3F0;border:none;border-radius:10px;padding:12px;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:6px;}
+  .btn-primary:hover{background:var(--pine);}
+  .btn-ghost{width:100%;background:transparent;color:var(--pine);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:12.5px;font-weight:600;cursor:pointer;margin-top:8px;}
+
+  .form-msg{font-size:12px;text-align:center;margin-top:10px;min-height:16px;color:var(--brick);}
+
+  /* ===== APP SHELL ===== */
+  .app{display:none;grid-template-columns:220px 1fr;max-width:1440px;margin:0 auto;min-height:100vh;}
+  .app.active{display:grid;}
+  .sidebar{background:var(--pine-deep);color:#EFF3F0;padding:28px 20px;display:flex;flex-direction:column;gap:26px;}
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand-mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(160deg,#4C8A72,#2C5344);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:600;font-size:17px;flex-shrink:0;}
+  .brand-name{font-family:'Fraunces',serif;font-size:17px;font-weight:600;}
+  .brand-sub{font-size:11px;color:#9FB6AB;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;}
+  nav{display:flex;flex-direction:column;gap:3px;}
+  nav button{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:9px;color:#D7E4DE;text-decoration:none;font-size:13.5px;font-weight:500;position:relative;border:none;background:transparent;cursor:pointer;text-align:left;width:100%;font-family:inherit;}
+  nav button svg{width:16px;height:16px;flex-shrink:0;}
+  nav button.active{background:#EFF3F0;color:var(--pine-deep);}
+  nav button:not(.active):hover{background:rgba(255,255,255,.08);}
+  .nav-badge{position:absolute;right:12px;width:16px;height:16px;border-radius:50%;background:var(--brick);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:'Inter',sans-serif;}
+  .sidebar-foot{margin-top:auto;display:flex;flex-direction:column;gap:10px;}
+  .help-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:var(--radius);padding:14px;font-size:12.5px;color:#C7DACF;}
+  .help-card b{display:block;font-family:'Fraunces',serif;font-size:14px;color:#EFF3F0;margin-bottom:4px;}
+  .logout-btn{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#EFF3F0;border-radius:10px;padding:9px;font-size:12px;font-weight:600;cursor:pointer;}
+
+  main{padding:24px 26px;}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:14px;}
+  .breadcrumb{font-family:'Fraunces',serif;font-size:19px;font-weight:600;color:var(--muted);}
+  .breadcrumb span{color:var(--ink);}
+  .topbar-right{display:flex;align-items:center;gap:12px;}
+  .who-chip{display:flex;align-items:center;gap:9px;background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:6px 12px 6px 6px;}
+  .who-chip .av{width:32px;height:32px;border-radius:9px;background:var(--slate-soft);display:flex;align-items:center;justify-content:center;color:var(--slate);flex-shrink:0;}
+  .who-chip .av svg{width:16px;height:16px;}
+  .who-chip .dname{font-size:12.5px;font-weight:600;line-height:1.2;}
+  .who-chip .dspec{font-size:10.5px;color:var(--muted);}
+
+  .grid-cols{display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;}
+  .stack{display:flex;flex-direction:column;gap:20px;}
+
+  .profile-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px;}
+  .profile-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;}
+  .profile-id{display:flex;gap:16px;align-items:center;}
+  .avatar-photo{width:66px;height:66px;border-radius:16px;background:var(--slate-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .avatar-photo svg{width:34px;height:34px;color:var(--slate);}
+  .p-name{font-family:'Fraunces',serif;font-size:19px;font-weight:600;}
+  .p-name .verified{display:inline-flex;width:15px;height:15px;background:var(--pine);color:#fff;border-radius:50%;align-items:center;justify-content:center;margin-left:6px;vertical-align:middle;}
+  .p-name .verified svg{width:9px;height:9px;}
+  .p-condition{font-size:12.5px;color:var(--pine);font-weight:600;margin-top:2px;}
+  .contact-btns{display:flex;gap:8px;}
+  .contact-btns button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--paper);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--pine-deep);}
+  .contact-btns svg{width:16px;height:16px;}
+  .p-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:20px;padding-top:18px;border-top:1px dashed var(--line);}
+  .p-meta .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:3px;}
+  .p-meta .v{font-size:13px;font-weight:500;}
+  .stat-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:18px;}
+  .stat-box{background:var(--paper);border-radius:11px;padding:12px 14px;}
+  .stat-box .num{font-family:'Fraunces',serif;font-size:20px;font-weight:600;}
+  .stat-box .lbl{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px;}
+
+  .section-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px;}
+  .section-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;}
+  .section-head h2{font-family:'Fraunces',serif;font-size:16.5px;font-weight:600;margin:0;}
+  .tabs{display:flex;gap:6px;background:var(--paper);border-radius:10px;padding:4px;}
+  .tabs button{border:none;background:transparent;padding:7px 14px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;}
+  .tabs button.active{background:var(--pine-deep);color:#EFF3F0;}
+  .req-count{font-size:11px;font-weight:700;background:var(--brick);color:#fff;border-radius:99px;padding:1px 7px;margin-left:5px;}
+
+  .req-card{border:1px solid var(--line);border-radius:12px;padding:15px 16px;margin-bottom:12px;}
+  .req-card:last-child{margin-bottom:0;}
+  .req-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;}
+  .req-person{display:flex;gap:11px;align-items:center;}
+  .req-avatar{width:38px;height:38px;border-radius:10px;background:var(--slate-soft);color:var(--slate);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .req-avatar svg{width:18px;height:18px;}
+  .req-name{font-size:13.5px;font-weight:600;}
+  .req-sub{font-size:11.5px;color:var(--muted);margin-top:1px;}
+  .booked-by{font-size:10.5px;font-weight:600;padding:2px 8px;border-radius:99px;white-space:nowrap;}
+  .booked-by.patient{background:#DCE9E2;color:var(--pine);}
+  .booked-by.caretaker{background:var(--slate-soft);color:var(--slate);}
+  .req-reason{font-size:12.5px;color:var(--ink);margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);}
+  .req-reason b{font-weight:600;}
+  .req-preferred{font-size:11.5px;color:var(--muted);margin-top:4px;font-family:'JetBrains Mono',monospace;}
+  .req-actions{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center;}
+  .btn-accept{background:var(--pine-deep);color:#EFF3F0;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;}
+  .btn-decline{background:transparent;color:var(--brick);border:1px solid var(--brick-soft);border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;}
+  .btn-view{background:transparent;color:var(--slate);border:1px solid var(--slate-soft);border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;}
+  .btn-accept svg{width:13px;height:13px;}
+  .allocate-row{display:none;gap:8px;align-items:center;margin-top:12px;padding-top:12px;border-top:1px dashed var(--line);flex-wrap:wrap;}
+  .allocate-row.open{display:flex;}
+  .allocate-row label{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;}
+  .allocate-row input{border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-size:12.5px;background:var(--paper);}
+  .confirm-slot{background:var(--pine);color:#fff;border:none;border-radius:7px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;}
+
+  .appt-table{width:100%;border-collapse:collapse;}
+  .appt-table thead th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding:0 10px 10px;font-weight:600;}
+  .appt-table tbody tr{border-top:1px solid var(--line);}
+  .appt-table tbody td{padding:13px 10px;font-size:13px;vertical-align:middle;}
+  .date-badge{display:flex;align-items:center;gap:9px;}
+  .date-badge .dot{width:7px;height:7px;border-radius:50%;background:var(--pine);flex-shrink:0;}
+  .date-badge .day{font-weight:600;}
+  .date-badge .month{font-size:10.5px;color:var(--muted);text-transform:uppercase;}
+  .status-pill{font-size:11px;font-weight:600;padding:3px 10px;border-radius:99px;display:inline-block;}
+  .status-pill.confirmed{background:#DCE9E2;color:var(--pine);}
+  .status-pill.pending{background:var(--amber-soft);color:var(--amber);}
+  .status-pill.completed{background:var(--slate-soft);color:var(--slate);}
+  .empty-note{font-size:12.5px;color:var(--muted);text-align:center;padding:26px 10px;}
+
+  .panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px;}
+  .panel-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;}
+  .panel-head h2{font-family:'Fraunces',serif;font-size:15.5px;font-weight:600;margin:0;}
+  .patient-row{display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid var(--line);}
+  .patient-row:last-child{border-bottom:none;}
+  .pr-avatar{width:36px;height:36px;border-radius:10px;background:var(--slate-soft);color:var(--slate);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .pr-avatar svg{width:17px;height:17px;}
+  .pr-name{font-size:12.5px;font-weight:600;}
+  .pr-sub{font-size:11px;color:var(--muted);margin-top:1px;}
+  .pr-caretag{margin-left:auto;font-size:10px;color:var(--muted);text-align:right;font-family:'JetBrains Mono',monospace;}
+
+  /* Browse cards (caretakers / doctors) */
+  .browse-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:14px;}
+  .browse-card{border:1px solid var(--line);border-radius:13px;padding:16px;display:flex;flex-direction:column;gap:10px;}
+  .browse-card .bc-top{display:flex;gap:11px;align-items:center;}
+  .browse-card .bc-name{font-size:13.5px;font-weight:600;}
+  .browse-card .bc-role{font-size:11px;color:var(--pine);font-weight:600;}
+  .browse-card .bc-meta{font-size:12px;color:var(--muted);line-height:1.5;}
+  .live-tag{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;color:var(--pine);text-transform:uppercase;letter-spacing:.4px;}
+  .live-tag .dot{width:6px;height:6px;border-radius:50%;background:var(--pine);box-shadow:0 0 0 3px #DCE9E2;}
+  .bc-btn{margin-top:auto;background:var(--pine-deep);color:#EFF3F0;border:none;border-radius:8px;padding:9px;font-size:12px;font-weight:600;cursor:pointer;}
+  .bc-btn:disabled{background:var(--paper);color:var(--muted);cursor:default;}
+  .bc-btn.secondary{background:transparent;border:1px solid var(--slate-soft);color:var(--slate);}
+
+  .my-caretaker-card{display:flex;gap:14px;align-items:center;padding:16px;border:1px solid var(--line);border-radius:13px;background:var(--paper);}
+  .my-caretaker-card .av{width:48px;height:48px;border-radius:12px;background:var(--slate-soft);color:var(--slate);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .my-caretaker-card .av svg{width:24px;height:24px;}
+  .empty-state{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:24px;color:var(--muted);font-size:12.5px;}
+
+  .see-all{width:100%;text-align:center;font-size:12px;font-weight:600;color:var(--pine);background:var(--paper);border:none;border-radius:8px;padding:9px;cursor:pointer;margin-top:4px;}
+
+  .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(30,42,34,.45);align-items:center;justify-content:center;z-index:50;padding:20px;}
+  .modal-backdrop.open{display:flex;}
+  .modal{background:var(--surface);border-radius:16px;max-width:460px;width:100%;padding:22px;max-height:88vh;overflow-y:auto;}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .modal-head h3{font-family:'Fraunces',serif;font-size:17px;margin:0;}
+  .modal-close{border:none;background:var(--paper);width:30px;height:30px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:15px;}
+
+  @media (max-width:980px){
+    .grid-cols{grid-template-columns:1fr;}
+    .p-meta{grid-template-columns:repeat(2,1fr);}
+    .stat-strip{grid-template-columns:repeat(2,1fr);}
+  }
+  @media (max-width:820px){
+    .app{grid-template-columns:1fr;}
+    .sidebar{flex-direction:row;overflow-x:auto;align-items:center;gap:16px;}
+    .sidebar nav{flex-direction:row;}
+    .sidebar-foot,.brand-sub{display:none;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ===================== AUTH SCREEN ===================== -->
+<div id="view-auth">
+  <div class="auth-card">
+    <div class="auth-brand"><div class="brand-mark">C</div><div class="brand-name">Carewell</div></div>
+    <p class="auth-sub">One account, one role. Choose how you're joining.</p>
+
+    <div class="role-picker" id="rolePicker">
+      <button data-role="patient" class="active" onclick="pickRole('patient')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7"/></svg>Patient</button>
+      <button data-role="caretaker" onclick="pickRole('caretaker')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.5 1-1a5.5 5.5 0 0 0 0-7.9z"/></svg>Caretaker</button>
+      <button data-role="doctor" onclick="pickRole('doctor')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>Doctor</button>
+    </div>
+
+    <div class="auth-tabs">
+      <button id="tabLogin" class="active" onclick="setAuthTab('login')">Log in</button>
+      <button id="tabSignup" onclick="setAuthTab('signup')">Sign up</button>
+    </div>
+
+    <form id="loginForm" onsubmit="return handleLogin(event)">
+      <div class="field"><label>Username or email</label><input id="loginId" type="text" required></div>
+      <div class="field"><label>Password</label><input id="loginPw" type="password" required></div>
+      <button class="btn-primary" type="submit">Log in as <span id="loginRoleLabel">patient</span></button>
+    </form>
+
+    <form id="signupForm" style="display:none;" onsubmit="return handleSignup(event)">
+      <div class="field"><label>Full name</label><input id="suName" type="text" required></div>
+      <div class="field"><label>Email</label><input id="suEmail" type="email" required></div>
+      <div class="field"><label>Password</label><input id="suPw" type="password" required></div>
+      <button class="btn-primary" type="submit">Create <span id="suRoleLabel">patient</span> account</button>
+    </form>
+
+    <div class="form-msg" id="authMsg"></div>
+  </div>
+</div>
+
+<!-- ===================== ONBOARDING SCREEN ===================== -->
+<div id="view-onboarding" style="display:none;min-height:100vh;align-items:center;justify-content:center;padding:24px;">
+  <div class="auth-card" style="max-width:520px;">
+    <div class="auth-brand"><div class="brand-mark">C</div><div class="brand-name">Set up your profile</div></div>
+    <p class="auth-sub" id="onboardSub">Tell us a bit more so people can find you.</p>
+    <form id="onboardForm" onsubmit="return handleOnboarding(event)">
+      <div id="onboardFields"></div>
+      <button class="btn-primary" type="submit">Save & continue</button>
+    </form>
+  </div>
+</div>
+
+<!-- ===================== PATIENT APP ===================== -->
+<div class="app" id="app-patient">
+  <div class="sidebar">
+    <div class="brand"><div class="brand-mark">C</div><div><div class="brand-name">Carewell</div><div class="brand-sub">PATIENT PORTAL</div></div></div>
+    <nav>
+      <button class="active" data-tab="home" onclick="patientTab('home')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Home</span></button>
+      <button data-tab="caretakers" onclick="patientTab('caretakers')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.5 1-1a5.5 5.5 0 0 0 0-7.9z"/></svg><span>Find caretaker</span></button>
+      <button data-tab="doctors" onclick="patientTab('doctors')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg><span>Doctors</span></button>
+      <button data-tab="appts" onclick="patientTab('appts')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span>My appointments</span></button>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="help-card"><b>Need help?</b>Reach patient support any time.</div>
+      <button class="logout-btn" onclick="logout()">Log out</button>
+    </div>
+  </div>
+  <main>
+    <div class="topbar">
+      <div class="breadcrumb">Patient › <span id="patientBcName"></span></div>
+      <div class="topbar-right"><div class="who-chip"><div class="av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7"/></svg></div><div><div class="dname" id="patientChipName"></div><div class="dspec">Patient</div></div></div></div>
+    </div>
+    <div id="patient-home"></div>
+    <div id="patient-caretakers" style="display:none;"></div>
+    <div id="patient-doctors" style="display:none;"></div>
+    <div id="patient-appts" style="display:none;"></div>
+  </main>
+</div>
+
+<!-- ===================== CARETAKER APP ===================== -->
+<div class="app" id="app-caretaker">
+  <div class="sidebar">
+    <div class="brand"><div class="brand-mark">C</div><div><div class="brand-name">Carewell</div><div class="brand-sub">CARETAKER PORTAL</div></div></div>
+    <nav>
+      <button class="active" data-tab="requests" onclick="caretakerTab('requests')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.5a8.4 8.4 0 0 1-11.8 7.7L3 21l1.8-6.2A8.4 8.4 0 1 1 21 11.5z"/></svg><span>Requests</span><span class="nav-badge" id="careReqBadge" style="display:none;"></span></button>
+      <button data-tab="patients" onclick="caretakerTab('patients')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>My patients</span></button>
+      <button data-tab="doctors" onclick="caretakerTab('doctors')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg><span>Book a doctor</span></button>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="help-card"><b>Need help?</b>Reach caretaker support any time.</div>
+      <button class="logout-btn" onclick="logout()">Log out</button>
+    </div>
+  </div>
+  <main>
+    <div class="topbar">
+      <div class="breadcrumb">Caretaker › <span id="careBcName"></span></div>
+      <div class="topbar-right"><div class="who-chip"><div class="av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7"/></svg></div><div><div class="dname" id="careChipName"></div><div class="dspec">Caretaker</div></div></div></div>
+    </div>
+    <div id="care-requests"></div>
+    <div id="care-patients" style="display:none;"></div>
+    <div id="care-doctors" style="display:none;"></div>
+  </main>
+</div>
+
+<!-- ===================== DOCTOR APP ===================== -->
+<div class="app" id="app-doctor">
+  <div class="sidebar">
+    <div class="brand"><div class="brand-mark">C</div><div><div class="brand-name">Carewell</div><div class="brand-sub">DOCTOR PORTAL</div></div></div>
+    <nav>
+      <button class="active" data-tab="requests" onclick="doctorTab('requests')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg><span>Appointments</span><span class="nav-badge" id="docReqBadge" style="display:none;"></span></button>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="help-card"><b>Need help?</b>Reach platform support any time.</div>
+      <button class="logout-btn" onclick="logout()">Log out</button>
+    </div>
+  </div>
+  <main>
+    <div class="topbar">
+      <div class="breadcrumb">Doctors › <span id="docBcName"></span></div>
+      <div class="topbar-right"><div class="who-chip"><div class="av"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7"/></svg></div><div><div class="dname" id="docChipName"></div><div class="dspec" id="docChipSpec">Doctor</div></div></div></div>
+    </div>
+    <div class="grid-cols">
+      <div>
+        <div class="profile-card" id="docProfileCard" style="margin-bottom:20px;"></div>
+        <div class="section-card">
+          <div class="section-head">
+            <div class="tabs">
+              <button class="active" onclick="doctorSubTab('requests')">Requests<span class="req-count" id="docReqCount">0</span></button>
+              <button onclick="doctorSubTab('confirmed')">Confirmed</button>
+            </div>
+          </div>
+          <div id="doc-requests"></div>
+          <div id="doc-confirmed" style="display:none;"></div>
+        </div>
+      </div>
+      <div>
+        <div class="panel"><div class="panel-head"><h2>My patients</h2></div><div id="doc-patients"></div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ===================== MODAL (patient detail preview) ===================== -->
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <div class="modal-head"><h3 id="modalTitle">Patient profile</h3><button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   IN-MEMORY MOCK BACKEND — session only, resets on page reload.
+   This is what makes the three roles actually talk to each other.
+============================================================ */
+const ICON = {
+  person: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7"/></svg>',
+  heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.5 1-1a5.5 5.5 0 0 0 0-7.9z"/></svg>',
+  stetho: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6L9 17l-5-5"/></svg>'
+};
+
+let uid = 100;
+const nextId = () => 'u' + (uid++);
+
+const db = {
+  doctors: [
+    {id:'d1', role:'doctor', name:'Dr. Arlene McCoy', email:'arlene@carewell.clinic', password:'demo', specialty:'Geriatrics', license:'KMC-88213', clinic:'Lakeview Senior Care, Kochi', experience:'18 years', fee:'₹600', hours:'Mon–Sat, 9:00–17:00', active:true, complete:true},
+    {id:'d2', role:'doctor', name:'Dr. Cameron Williamson', email:'cameron@carewell.clinic', password:'demo', specialty:'Cardiology', license:'KMC-77410', clinic:'Heartline Clinic, Kochi', experience:'12 years', fee:'₹800', hours:'Mon–Fri, 10:00–18:00', active:true, complete:true},
+    {id:'d3', role:'doctor', name:'Dr. Kevin Djones', email:'kevin@carewell.clinic', password:'demo', specialty:'Physiotherapy', license:'KMC-51092', clinic:'MoveWell Therapy Center', experience:'9 years', fee:'₹450', hours:'Tue–Sun, 8:00–14:00', active:true, complete:true},
+  ],
+  caretakers: [
+    {id:'c1', role:'caretaker', name:'Ravi Menon', email:'ravi@carewell.clinic', password:'demo', experience:'6 years', area:'Kochi & suburbs', bio:'Specializes in elder care and post-surgical support.', active:true, complete:true},
+    {id:'c2', role:'caretaker', name:'Divya S.', email:'divya@carewell.clinic', password:'demo', experience:'4 years', area:'Kochi', bio:'Focused on chronic condition monitoring and mobility support.', active:true, complete:true},
+  ],
+  patients: [
+    {id:'p1', role:'patient', name:'Padmavathi Krishnan', email:'padma@carewell.clinic', password:'demo', dob:'14 Mar 1952', address:'Kochi, Kerala', condition:'Hypertension', caretakerId:null, active:true, complete:true},
+  ],
+  careRequests: [],      // {id, patientId, caretakerId, status}
+  apptRequests: []       // {id, patientId, doctorId, bookedBy, bookedByName, reason, preferred, status, date, time}
+};
+
+let currentUser = null;   // {id, role}
+let pendingRole = 'patient';
+let pendingOnboardUser = null;
+
+function findUser(role, id){
+  return db[role+'s'].find(u => u.id === id);
+}
+function allOfRole(role){ return db[role+'s']; }
+
+/* ---------------- AUTH SCREEN ---------------- */
+function pickRole(role){
+  pendingRole = role;
+  document.querySelectorAll('#rolePicker button').forEach(b => b.classList.toggle('active', b.dataset.role === role));
+  document.getElementById('loginRoleLabel').textContent = role;
+  document.getElementById('suRoleLabel').textContent = role;
+}
+function setAuthTab(which){
+  document.getElementById('tabLogin').classList.toggle('active', which==='login');
+  document.getElementById('tabSignup').classList.toggle('active', which==='signup');
+  document.getElementById('loginForm').style.display = which==='login' ? 'flex' : 'none';
+  document.getElementById('loginForm').style.flexDirection = 'column';
+  document.getElementById('signupForm').style.display = which==='signup' ? 'flex' : 'none';
+  document.getElementById('signupForm').style.flexDirection = 'column';
+  document.getElementById('authMsg').textContent = '';
+}
+function handleLogin(e){
+  e.preventDefault();
+  const id = document.getElementById('loginId').value.trim().toLowerCase();
+  const pw = document.getElementById('loginPw').value;
+  const list = allOfRole(pendingRole);
+  const user = list.find(u => u.email.toLowerCase() === id || u.name.toLowerCase() === id);
+  if(!user || user.password !== pw){
+    document.getElementById('authMsg').textContent = 'No matching account — try a demo login below, or sign up.';
+    return false;
+  }
+  user.active = true;
+  currentUser = {role: pendingRole, id: user.id};
+  enterApp();
+  return false;
+}
+function handleSignup(e){
+  e.preventDefault();
+  const name = document.getElementById('suName').value.trim();
+  const email = document.getElementById('suEmail').value.trim();
+  const pw = document.getElementById('suPw').value;
+  if(!name || !email || !pw){ return false; }
+  const id = nextId();
+  const base = {id, role: pendingRole, name, email, password: pw, active: true, complete: false};
+  if(pendingRole === 'patient'){ base.dob=''; base.address=''; base.condition=''; base.caretakerId=null; }
+  if(pendingRole === 'caretaker'){ base.experience=''; base.area=''; base.bio=''; }
+  if(pendingRole === 'doctor'){ base.specialty=''; base.license=''; base.clinic=''; base.experience=''; base.fee=''; base.hours=''; }
+  db[pendingRole+'s'].push(base);
+  currentUser = {role: pendingRole, id};
+  pendingOnboardUser = base;
+  showOnboarding(base);
+  return false;
+}
+
+/* ---------------- ONBOARDING ---------------- */
+function showOnboarding(user){
+  document.getElementById('view-auth').style.display = 'none';
+  document.getElementById('view-onboarding').style.display = 'flex';
+  document.getElementById('onboardSub').textContent =
+    user.role === 'doctor' ? 'Patients and caretakers will see this on your public profile.' :
+    user.role === 'caretaker' ? 'Patients will see this when choosing a caretaker.' :
+    'This helps your caretaker and doctors understand your needs.';
+
+  let fields = '';
+  if(user.role === 'doctor'){
+    fields = `
+      <div class="field"><label>Specialty</label><input id="f_specialty" required placeholder="e.g. Cardiology"></div>
+      <div class="field"><label>License number</label><input id="f_license" required placeholder="e.g. KMC-12345"></div>
+      <div class="field"><label>Clinic / hospital</label><input id="f_clinic" required placeholder="Clinic name, city"></div>
+      <div class="field"><label>Experience</label><input id="f_experience" required placeholder="e.g. 10 years"></div>
+      <div class="field"><label>Consultation fee</label><input id="f_fee" required placeholder="e.g. ₹500"></div>
+      <div class="field"><label>Available hours</label><input id="f_hours" required placeholder="e.g. Mon–Sat, 9:00–17:00"></div>`;
+  } else if(user.role === 'caretaker'){
+    fields = `
+      <div class="field"><label>Experience</label><input id="f_experience" required placeholder="e.g. 5 years"></div>
+      <div class="field"><label>Service area</label><input id="f_area" required placeholder="e.g. Kochi & suburbs"></div>
+      <div class="field"><label>About you</label><textarea id="f_bio" required placeholder="What kind of care do you specialize in?"></textarea></div>`;
+  } else {
+    fields = `
+      <div class="field"><label>Date of birth</label><input id="f_dob" required placeholder="e.g. 14 Mar 1952"></div>
+      <div class="field"><label>Address</label><input id="f_address" required placeholder="City, state"></div>
+      <div class="field"><label>Medical condition</label><input id="f_condition" required placeholder="e.g. Hypertension"></div>`;
+  }
+  document.getElementById('onboardFields').innerHTML = fields;
+}
+function handleOnboarding(e){
+  e.preventDefault();
+  const u = pendingOnboardUser;
+  document.querySelectorAll('#onboardFields [id^="f_"]').forEach(inp => {
+    u[inp.id.slice(2)] = inp.value.trim();
+  });
+  u.complete = true;
+  document.getElementById('view-onboarding').style.display = 'none';
+  enterApp();
+  return false;
+}
+
+/* ---------------- APP ENTRY / LOGOUT ---------------- */
+function enterApp(){
+  document.getElementById('view-auth').style.display = 'none';
+  document.getElementById('view-onboarding').style.display = 'none';
+  document.querySelectorAll('.app').forEach(a => a.classList.remove('active'));
+  const user = findUser(currentUser.role, currentUser.id);
+  if(!user.complete){ pendingOnboardUser = user; showOnboarding(user); return; }
+
+  if(currentUser.role === 'patient'){
+    document.getElementById('app-patient').classList.add('active');
+    document.getElementById('patientBcName').textContent = user.name;
+    document.getElementById('patientChipName').textContent = user.name;
+    patientTab('home');
+  } else if(currentUser.role === 'caretaker'){
+    document.getElementById('app-caretaker').classList.add('active');
+    document.getElementById('careBcName').textContent = user.name;
+    document.getElementById('careChipName').textContent = user.name;
+    caretakerTab('requests');
+  } else {
+    document.getElementById('app-doctor').classList.add('active');
+    document.getElementById('docBcName').textContent = user.name;
+    document.getElementById('docChipName').textContent = user.name;
+    document.getElementById('docChipSpec').textContent = user.specialty || 'Doctor';
+    doctorTab('requests');
+  }
+}
+function logout(){
+  currentUser = null;
+  document.querySelectorAll('.app').forEach(a => a.classList.remove('active'));
+  document.getElementById('view-onboarding').style.display = 'none';
+  document.getElementById('view-auth').style.display = 'flex';
+  document.getElementById('authMsg').textContent = '';
+  setAuthTab('login');
+}
+
+/* ================= PATIENT VIEWS ================= */
+function patientTab(tab){
+  document.querySelectorAll('#app-patient nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  ['home','caretakers','doctors','appts'].forEach(t => document.getElementById('patient-'+t).style.display = t===tab ? 'block' : 'none');
+  if(tab==='home') renderPatientHome();
+  if(tab==='caretakers') renderPatientCaretakers();
+  if(tab==='doctors') renderPatientDoctors();
+  if(tab==='appts') renderPatientAppts();
+}
+function renderPatientHome(){
+  const me = findUser('patient', currentUser.id);
+  let careBlock;
+  if(me.caretakerId){
+    const c = findUser('caretaker', me.caretakerId);
+    careBlock = `<div class="my-caretaker-card"><div class="av">${ICON.heart}</div><div><div class="p-name" style="font-size:15px;">${c.name}</div><div class="req-sub">${c.experience} experience · ${c.area}</div></div></div>`;
+  } else {
+    const pending = db.careRequests.find(r => r.patientId===me.id && r.status==='pending');
+    if(pending){
+      const c = findUser('caretaker', pending.caretakerId);
+      careBlock = `<div class="empty-state">Request sent to <b>${c.name}</b> — waiting for them to accept.</div>`;
+    } else {
+      careBlock = `<div class="empty-state">You don't have a caretaker yet.<br><button class="bc-btn" style="margin-top:8px;max-width:200px;" onclick="patientTab('caretakers')">Find a caretaker</button></div>`;
+    }
+  }
+  document.getElementById('patient-home').innerHTML = `
+    <div class="stack">
+      <div class="profile-card">
+        <div class="profile-top">
+          <div class="profile-id"><div class="avatar-photo">${ICON.person}</div><div><div class="p-name">${me.name}</div><div class="p-condition">${me.condition || 'No condition on file'}</div></div></div>
+        </div>
+        <div class="p-meta">
+          <div><div class="k">Date of birth</div><div class="v">${me.dob||'—'}</div></div>
+          <div><div class="k">Address</div><div class="v">${me.address||'—'}</div></div>
+          <div><div class="k">Patient ID</div><div class="v mono">${me.id.toUpperCase()}</div></div>
+          <div><div class="k">Status</div><div class="v">Active</div></div>
+        </div>
+      </div>
+      <div class="section-card"><div class="section-head"><h2>My caretaker</h2></div>${careBlock}</div>
+    </div>`;
+}
+function renderPatientCaretakers(){
+  const me = findUser('patient', currentUser.id);
+  const list = allOfRole('caretaker').filter(c => c.active && c.complete);
+  document.getElementById('patient-caretakers').innerHTML = `
+    <div class="section-card">
+      <div class="section-head"><h2>Active caretakers</h2><span class="live-tag"><span class="dot"></span>${list.length} online now</span></div>
+      <div class="browse-grid">
+        ${list.map(c => {
+          const isMine = me.caretakerId === c.id;
+          const pending = db.careRequests.find(r => r.patientId===me.id && r.caretakerId===c.id && r.status==='pending');
+          let btn;
+          if(isMine) btn = `<button class="bc-btn" disabled>Your caretaker</button>`;
+          else if(pending) btn = `<button class="bc-btn" disabled>Requested — pending</button>`;
+          else if(me.caretakerId) btn = `<button class="bc-btn" disabled>You already have a caretaker</button>`;
+          else btn = `<button class="bc-btn" onclick="requestCaretaker('${c.id}')">Request as my caretaker</button>`;
+          return `<div class="browse-card">
+            <div class="bc-top"><div class="req-avatar">${ICON.heart}</div><div><div class="bc-name">${c.name}</div><div class="bc-role">Caretaker</div></div></div>
+            <div class="bc-meta">${c.experience} experience<br>${c.area}<br>${c.bio||''}</div>
+            ${btn}
+          </div>`;
+        }).join('') || '<div class="empty-note">No caretakers are online right now.</div>'}
+      </div>
+    </div>`;
+}
+function requestCaretaker(caretakerId){
+  const me = findUser('patient', currentUser.id);
+  db.careRequests.push({id: nextId(), patientId: me.id, caretakerId, status:'pending'});
+  patientTab('caretakers');
+}
+function renderPatientDoctors(){
+  const list = allOfRole('doctor').filter(d => d.active && d.complete);
+  document.getElementById('patient-doctors').innerHTML = `
+    <div class="section-card">
+      <div class="section-head"><h2>Active doctors</h2><span class="live-tag"><span class="dot"></span>${list.length} online now</span></div>
+      <div class="browse-grid">
+        ${list.map(d => `<div class="browse-card">
+          <div class="bc-top"><div class="req-avatar">${ICON.stetho}</div><div><div class="bc-name">${d.name}</div><div class="bc-role">${d.specialty}</div></div></div>
+          <div class="bc-meta">${d.clinic}<br>${d.fee} · ${d.hours}</div>
+          <button class="bc-btn secondary" disabled>Managed by your caretaker</button>
+        </div>`).join('') || '<div class="empty-note">No doctors are online right now.</div>'}
+      </div>
+      <p style="font-size:12px;color:var(--muted);margin-top:14px;">Once you have a caretaker, they'll book and manage appointments with these doctors on your behalf.</p>
+    </div>`;
+}
+function renderPatientAppts(){
+  const me = findUser('patient', currentUser.id);
+  const mine = db.apptRequests.filter(a => a.patientId === me.id);
+  document.getElementById('patient-appts').innerHTML = `
+    <div class="section-card"><div class="section-head"><h2>My appointments</h2></div>
+    ${mine.length ? mine.map(a => {
+      const d = findUser('doctor', a.doctorId);
+      return `<div class="req-card">
+        <div class="req-top"><div class="req-person"><div class="req-avatar">${ICON.stetho}</div><div><div class="req-name">${d.name}</div><div class="req-sub">${d.specialty}</div></div></div>
+        <span class="status-pill ${a.status==='confirmed'?'confirmed':'pending'}">${a.status==='confirmed'?'Confirmed':'Pending'}</span></div>
+        <div class="req-reason"><b>Reason:</b> ${a.reason}</div>
+        <div class="req-preferred">${a.status==='confirmed' ? `Confirmed for ${a.date} at ${a.time}` : `Preferred: ${a.preferred}`} · Booked by ${a.bookedByName}</div>
+      </div>`;
+    }).join('') : '<div class="empty-note">No appointments yet.</div>'}
+    </div>`;
+}
+
+/* ================= CARETAKER VIEWS ================= */
+function caretakerTab(tab){
+  document.querySelectorAll('#app-caretaker nav button').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  ['requests','patients','doctors'].forEach(t => document.getElementById('care-'+t).style.display = t===tab ? 'block' : 'none');
+  if(tab==='requests') renderCareRequests();
+  if(tab==='patients') renderCarePatients();
+  if(tab==='doctors') renderCareDoctorBooking();
+}
+function renderCareRequests(){
+  const me = findUser('caretaker', currentUser.id);
+  const list = db.careRequests.filter(r => r.caretakerId===me.id && r.status==='pending');
+  const badge = document.getElementById('careReqBadge');
+  if(list.length){ badge.style.display='flex'; badge.textContent = list.length; } else { badge.style.display='none'; }
+  document.getElementById('care-requests').innerHTML = `
+    <div class="section-card"><div class="section-head"><h2>Care requests</h2></div>
+    ${list.length ? list.map(r => {
+      const p = findUser('patient', r.patientId);
+      return `<div class="req-card">
+        <div class="req-top"><div class="req-person"><div class="req-avatar">${ICON.person}</div><div><div class="req-name">${p.name}</div><div class="req-sub">${p.condition||'No condition on file'}</div></div></div></div>
+        <div class="req-reason">${p.address||''} · DOB ${p.dob||'—'}</div>
+        <div class="req-actions">
+          <button class="btn-view" onclick="viewPatientModal('${p.id}')">View profile</button>
+          <button class="btn-accept" onclick="acceptCareRequest('${r.id}')">${ICON.check}Accept</button>
+          <button class="btn-decline" onclick="declineCareRequest('${r.id}')">Decline</button>
+        </div>
+      </div>`;
+    }).join('') : '<div class="empty-note">No pending requests right now.</div>'}
+    </div>`;
+}
+function acceptCareRequest(reqId){
+  const r = db.careRequests.find(x => x.id===reqId);
+  r.status='accepted';
+  const p = findUser('patient', r.patientId);
+  p.caretakerId = r.caretakerId;
+  closeModal();
+  caretakerTab('requests');
+}
+function declineCareRequest(reqId){
+  db.careRequests.find(x => x.id===reqId).status='declined';
+  caretakerTab('requests');
+}
+function renderCarePatients(){
+  const me = findUser('caretaker', currentUser.id);
+  const mine = allOfRole('patient').filter(p => p.caretakerId === me.id);
+  document.getElementById('care-patients').innerHTML = `
+    <div class="section-card"><div class="section-head"><h2>My patients</h2></div>
+    ${mine.length ? `<div class="browse-grid">` + mine.map(p => `
+      <div class="browse-card">
+        <div class="bc-top"><div class="req-avatar">${ICON.person}</div><div><div class="bc-name">${p.name}</div><div class="bc-role">${p.condition||'—'}</div></div></div>
+        <div class="bc-meta">${p.address||''}<br>DOB ${p.dob||'—'}</div>
+        <button class="bc-btn" onclick="viewPatientModal('${p.id}')">View chart</button>
+        <button class="bc-btn secondary" onclick="startBooking('${p.id}')">Book a doctor</button>
+      </div>`).join('') + `</div>` : '<div class="empty-note">No patients assigned yet — accept a request to get started.</div>'}
+    </div>`;
+}
+let bookingForPatientId = null;
+function startBooking(patientId){
+  bookingForPatientId = patientId;
+  caretakerTab('doctors');
+}
+function renderCareDoctorBooking(){
+  const me = findUser('caretaker', currentUser.id);
+  const myPatients = allOfRole('patient').filter(p => p.caretakerId === me.id);
+  if(!bookingForPatientId && myPatients.length) bookingForPatientId = myPatients[0].id;
+  const patientPicker = myPatients.length ? `
+    <div class="field" style="max-width:280px;"><label>Booking for</label>
+      <select id="bookingPatientSelect" onchange="bookingForPatientId=this.value">
+        ${myPatients.map(p => `<option value="${p.id}" ${p.id===bookingForPatientId?'selected':''}>${p.name}</option>`).join('')}
+      </select>
+    </div>` : '<div class="empty-note">You need an accepted patient before you can book a doctor.</div>';
+
+  const doctors = allOfRole('doctor').filter(d => d.active && d.complete);
+  document.getElementById('care-doctors').innerHTML = `
+    <div class="section-card">
+      <div class="section-head"><h2>Book a doctor</h2><span class="live-tag"><span class="dot"></span>${doctors.length} online now</span></div>
+      ${patientPicker}
+      <div class="browse-grid" style="margin-top:14px;">
+        ${doctors.map(d => `<div class="browse-card">
+          <div class="bc-top"><div class="req-avatar">${ICON.stetho}</div><div><div class="bc-name">${d.name}</div><div class="bc-role">${d.specialty}</div></div></div>
+          <div class="bc-meta">${d.clinic}<br>${d.fee} · ${d.hours}</div>
+          <button class="bc-btn" ${myPatients.length?'':'disabled'} onclick="openBookForm('${d.id}')">Request appointment</button>
+          <div id="bookform-${d.id}"></div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+}
+function openBookForm(doctorId){
+  const el = document.getElementById('bookform-'+doctorId);
+  if(el.innerHTML){ el.innerHTML=''; return; }
+  el.innerHTML = `
+    <div style="margin-top:10px;padding-top:10px;border-top:1px dashed var(--line);display:flex;flex-direction:column;gap:8px;">
+      <textarea id="reason-${doctorId}" placeholder="Reason for visit" style="border:1px solid var(--line);border-radius:8px;padding:8px;font-size:12px;min-height:50px;"></textarea>
+      <input id="preferred-${doctorId}" placeholder="Preferred day/time, e.g. Tue morning" style="border:1px solid var(--line);border-radius:8px;padding:8px;font-size:12px;">
+      <button class="confirm-slot" onclick="submitBooking('${doctorId}')">Send request</button>
+    </div>`;
+}
+function submitBooking(doctorId){
+  const me = findUser('caretaker', currentUser.id);
+  const reason = document.getElementById('reason-'+doctorId).value.trim() || 'General consultation';
+  const preferred = document.getElementById('preferred-'+doctorId).value.trim() || 'No preference given';
+  db.apptRequests.push({
+    id: nextId(), patientId: bookingForPatientId, doctorId, bookedBy:'caretaker', bookedByName: me.name,
+    reason, preferred, status:'pending', date:null, time:null
+  });
+  renderCareDoctorBooking();
+}
+
+/* ================= DOCTOR VIEWS ================= */
+function doctorTab(){
+  const me = findUser('doctor', currentUser.id);
+  document.getElementById('docProfileCard').innerHTML = `
+    <div class="profile-top">
+      <div class="profile-id"><div class="avatar-photo">${ICON.stetho}</div>
+        <div><div class="p-name">${me.name} <span class="verified">${ICON.check}</span></div><div class="p-condition">${me.specialty} · ${me.experience}</div></div>
+      </div>
+    </div>
+    <div class="p-meta">
+      <div><div class="k">License no.</div><div class="v mono">${me.license}</div></div>
+      <div><div class="k">Clinic</div><div class="v">${me.clinic}</div></div>
+      <div><div class="k">Consultation fee</div><div class="v">${me.fee}</div></div>
+      <div><div class="k">Available hours</div><div class="v">${me.hours}</div></div>
+    </div>`;
+  doctorSubTab('requests');
+  renderDoctorPatients();
+}
+function doctorSubTab(tab){
+  document.querySelectorAll('#app-doctor .tabs button').forEach(b => b.classList.toggle('active', b.textContent.toLowerCase().startsWith(tab.slice(0,3))));
+  document.getElementById('doc-requests').style.display = tab==='requests' ? 'block' : 'none';
+  document.getElementById('doc-confirmed').style.display = tab==='confirmed' ? 'block' : 'none';
+  if(tab==='requests') renderDoctorRequests();
+  if(tab==='confirmed') renderDoctorConfirmed();
+}
+function renderDoctorRequests(){
+  const me = findUser('doctor', currentUser.id);
+  const list = db.apptRequests.filter(a => a.doctorId===me.id && a.status==='pending');
+  document.getElementById('docReqCount').textContent = list.length;
+  const badge = document.getElementById('docReqBadge');
+  if(list.length){ badge.style.display='flex'; badge.textContent = list.length; } else { badge.style.display='none'; }
+  document.getElementById('doc-requests').innerHTML = list.length ? list.map(a => {
+    const p = findUser('patient', a.patientId);
+    return `<div class="req-card">
+      <div class="req-top"><div class="req-person"><div class="req-avatar">${ICON.person}</div><div><div class="req-name">${p.name}</div><div class="req-sub">${p.condition||'Patient'}</div></div></div>
+      <span class="booked-by ${a.bookedBy}">Booked by ${a.bookedBy}</span></div>
+      <div class="req-reason"><b>Reason:</b> ${a.reason}</div>
+      <div class="req-preferred">Requested by ${a.bookedByName} · Preferred: ${a.preferred}</div>
+      <div class="req-actions">
+        <button class="btn-accept" onclick="toggleAllocate('${a.id}')">${ICON.check}Accept & allocate</button>
+        <button class="btn-decline" onclick="declineAppt('${a.id}')">Decline</button>
+      </div>
+      <div class="allocate-row" id="alloc-${a.id}">
+        <label>Date<br><input type="date" id="date-${a.id}" value="2026-07-28"></label>
+        <label>Time<br><input type="time" id="time-${a.id}" value="09:00"></label>
+        <button class="confirm-slot" onclick="confirmAppt('${a.id}')">Confirm slot</button>
+      </div>
+    </div>`;
+  }).join('') : '<div class="empty-note">No pending requests.</div>';
+}
+function toggleAllocate(id){ document.getElementById('alloc-'+id).classList.toggle('open'); }
+function confirmAppt(id){
+  const a = db.apptRequests.find(x => x.id===id);
+  a.status = 'confirmed';
+  a.date = document.getElementById('date-'+id).value;
+  a.time = document.getElementById('time-'+id).value;
+  renderDoctorRequests();
+  renderDoctorPatients();
+}
+function declineAppt(id){
+  db.apptRequests.find(x => x.id===id).status='declined';
+  renderDoctorRequests();
+}
+function renderDoctorConfirmed(){
+  const me = findUser('doctor', currentUser.id);
+  const list = db.apptRequests.filter(a => a.doctorId===me.id && a.status==='confirmed');
+  document.getElementById('doc-confirmed').innerHTML = list.length ? `
+    <table class="appt-table"><thead><tr><th>Date</th><th>Patient</th><th>Reason</th><th>Booked by</th><th>Status</th></tr></thead>
+    <tbody>${list.map(a => {
+      const p = findUser('patient', a.patientId);
+      const [y,m,d] = (a.date||'').split('-');
+      const monthNames=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return `<tr><td><div class="date-badge"><span class="dot"></span><div><div class="day">${d||'—'}</div><div class="month">${m?monthNames[+m-1]:''}</div></div></div></td>
+      <td>${p.name}</td><td>${a.reason}</td><td style="text-transform:capitalize;">${a.bookedBy}</td><td><span class="status-pill confirmed">Confirmed</span></td></tr>`;
+    }).join('')}</tbody></table>` : '<div class="empty-note">No confirmed appointments yet.</div>';
+}
+function renderDoctorPatients(){
+  const me = findUser('doctor', currentUser.id);
+  const patientIds = [...new Set(db.apptRequests.filter(a => a.doctorId===me.id).map(a => a.patientId))];
+  document.getElementById('doc-patients').innerHTML = patientIds.length ? patientIds.map(pid => {
+    const p = findUser('patient', pid);
+    const care = p.caretakerId ? findUser('caretaker', p.caretakerId).name : 'Self-managed';
+    return `<div class="patient-row"><div class="pr-avatar">${ICON.person}</div><div><div class="pr-name">${p.name}</div><div class="pr-sub">${p.condition||'—'}</div></div><div class="pr-caretag">${care}</div></div>`;
+  }).join('') : '<div class="empty-note">No patients yet.</div>';
+}
+
+/* ================= MODAL: patient profile preview ================= */
+function viewPatientModal(patientId){
+  const p = findUser('patient', patientId);
+  document.getElementById('modalTitle').textContent = p.name;
+  document.getElementById('modalBody').innerHTML = `
+    <div class="p-meta" style="grid-template-columns:repeat(2,1fr);margin-top:0;border-top:none;padding-top:0;">
+      <div><div class="k">Date of birth</div><div class="v">${p.dob||'—'}</div></div>
+      <div><div class="k">Address</div><div class="v">${p.address||'—'}</div></div>
+      <div><div class="k">Condition</div><div class="v">${p.condition||'—'}</div></div>
+      <div><div class="k">Patient ID</div><div class="v mono">${p.id.toUpperCase()}</div></div>
+    </div>`;
+  document.getElementById('modalBackdrop').classList.add('open');
+}
+function closeModal(){ document.getElementById('modalBackdrop').classList.remove('open'); }
+
+/* ---------------- INIT ---------------- */
+pickRole('patient');
+setAuthTab('login');
+</script>
+</body>
+</html>

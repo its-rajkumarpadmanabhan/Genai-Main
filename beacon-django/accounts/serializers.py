@@ -1,0 +1,132 @@
+"""
+BEACON — Auth Serializers
+Validation rules are identical to auth.py (same regexes, same error messages).
+"""
+
+import re
+
+from rest_framework import serializers
+
+
+# ── Validation patterns (identical to auth.py) ────────────────────────────────
+USERNAME_RE = re.compile(r'^[a-zA-Z0-9_ .\'\-]{2,100}$')
+MOBILE_RE = re.compile(r'^\+?[0-9]{7,15}$')
+PASSWORD_RE = re.compile(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$')
+
+
+from .models import (
+    CustomUser, PatientProfile, DoctorProfile, CaretakerProfile,
+    MedicalDocument, CaretakerRequest, CaretakerEditRequest, Appointment
+)
+
+
+class SignupSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=100)
+    email = serializers.EmailField()
+    mobile_number = serializers.CharField(max_length=20)
+    password = serializers.CharField(write_only=True)
+    role = serializers.ChoiceField(choices=CustomUser.ROLE_CHOICES, default='patient')
+
+    def validate_role(self, value):
+        if value == 'admin':
+            raise serializers.ValidationError('Admin accounts cannot be created via signup.')
+        return value
+
+    def validate_username(self, value):
+        cleaned = value.strip()
+        if len(cleaned) < 2 or len(cleaned) > 100:
+            raise serializers.ValidationError('Name must be between 2 and 100 characters.')
+        return cleaned
+
+    def validate_mobile_number(self, value):
+        cleaned = value.strip().replace(' ', '').replace('-', '')
+        if not MOBILE_RE.match(cleaned):
+            raise serializers.ValidationError(
+                'Enter a valid mobile number (7-15 digits, optional leading +country code).'
+            )
+        return cleaned
+
+    def validate_password(self, value):
+        if not PASSWORD_RE.match(value):
+            raise serializers.ValidationError(
+                'Password needs 8+ characters with uppercase, lowercase, number, and special character.'
+            )
+        return value
+
+
+class LoginSerializer(serializers.Serializer):
+    identifier = serializers.CharField()
+    password = serializers.CharField(write_only=True)
+
+
+class ForgotPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    token = serializers.CharField()
+    new_password = serializers.CharField(write_only=True)
+
+    def validate_new_password(self, value):
+        if not PASSWORD_RE.match(value):
+            raise serializers.ValidationError(
+                'Password needs 8+ characters with uppercase, lowercase, number, and special character.'
+            )
+        return value
+
+
+class CustomUserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['id', 'username', 'email', 'mobile_number', 'role', 'is_active', 'created_at']
+
+
+class PatientProfileSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.CharField(source='user.email', read_only=True)
+
+    class Meta:
+        model = PatientProfile
+        fields = '__all__'
+
+
+class DoctorProfileSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.CharField(source='user.email', read_only=True)
+
+    class Meta:
+        model = DoctorProfile
+        fields = '__all__'
+
+
+class CaretakerProfileSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(source='user.username', read_only=True)
+    email = serializers.CharField(source='user.email', read_only=True)
+
+    class Meta:
+        model = CaretakerProfile
+        fields = '__all__'
+
+
+class MedicalDocumentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MedicalDocument
+        fields = '__all__'
+
+
+class CaretakerRequestSerializer(serializers.ModelSerializer):
+    patient_name = serializers.CharField(source='patient.username', read_only=True)
+    caretaker_name = serializers.CharField(source='caretaker.username', read_only=True)
+
+    class Meta:
+        model = CaretakerRequest
+        fields = '__all__'
+
+
+class AppointmentSerializer(serializers.ModelSerializer):
+    patient_name = serializers.CharField(source='patient.username', read_only=True)
+    doctor_name = serializers.CharField(source='doctor.username', read_only=True)
+
+    class Meta:
+        model = Appointment
+        fields = '__all__'

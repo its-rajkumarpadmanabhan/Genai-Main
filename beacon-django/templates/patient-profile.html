@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carewell — Patient Profile</title>
+<script>
+  (function(){
+    const token = localStorage.getItem('beacon_token') || localStorage.getItem('access_token');
+    const userRaw = localStorage.getItem('beacon_user');
+    if(!token || !userRaw){ window.location.href = '/login.html'; return; }
+    try {
+      const user = JSON.parse(userRaw);
+      if(user.role !== 'patient' && user.role !== 'admin'){
+        const target = user.role === 'doctor' ? '/doctor-profile.html' : '/caretaker-dashboard.html';
+        window.location.href = target;
+      }
+    } catch(e){ window.location.href = '/login.html'; }
+  })();
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1E2A22; --paper:#EAF0EC; --surface:#FFFFFF; --line:#D7DFD9;
+    --pine:#33604F; --pine-deep:#25473A; --brick:#AE4436; --brick-soft:#F3DFDA;
+    --slate:#4A6E8C; --slate-soft:#DCE7EF; --muted:#6E7D75; --amber:#B9873A; --amber-soft:#F1E3CB;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+
+  /* APP SHELL */
+  .app{display:grid;grid-template-columns:220px 1fr;max-width:1440px;margin:0 auto;min-height:100vh;}
+  .sidebar{background:var(--pine-deep);color:#EFF3F0;padding:28px 20px;display:flex;flex-direction:column;gap:26px;}
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand-mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(160deg,#4C8A72,#2C5344);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:600;font-size:17px;flex-shrink:0;}
+  .brand-name{font-family:'Fraunces',serif;font-size:17px;font-weight:600;}
+  .brand-sub{font-size:11px;color:#9FB6AB;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;}
+  nav{display:flex;flex-direction:column;gap:3px;}
+  nav a{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:9px;color:#D7E4DE;text-decoration:none;font-size:13.5px;font-weight:500;position:relative;}
+  nav a svg{width:16px;height:16px;flex-shrink:0;}
+  nav a.active{background:#EFF3F0;color:var(--pine-deep);}
+  nav a:not(.active):hover{background:rgba(255,255,255,.08);}
+  .sidebar-foot{margin-top:auto;}
+  .help-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:var(--radius);padding:14px;font-size:12.5px;color:#C7DACF;}
+  .help-card b{display:block;font-family:'Fraunces',serif;font-size:14px;color:#EFF3F0;margin-bottom:4px;}
+
+  /* MAIN */
+  main{padding:24px 26px;}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:14px;}
+  .breadcrumb{font-family:'Fraunces',serif;font-size:19px;font-weight:600;color:var(--muted);}
+  .breadcrumb span{color:var(--ink);}
+  .topbar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .btn-action{display:inline-flex;align-items:center;gap:7px;background:var(--pine-deep);color:#EFF3F0;border:none;border-radius:9px;padding:9px 14px;font-size:12.5px;font-weight:600;cursor:pointer;text-decoration:none;}
+  .btn-action.secondary{background:var(--surface);color:var(--ink);border:1px solid var(--line);}
+  .btn-action.danger{background:var(--brick);color:#fff;}
+  .btn-action svg{width:14px;height:14px;}
+
+  .grid-cols{display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start;}
+
+  /* Profile card */
+  .profile-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:22px;margin-bottom:20px;}
+  .profile-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;}
+  .profile-id{display:flex;gap:16px;align-items:center;}
+  .avatar-photo{width:66px;height:66px;border-radius:16px;background:var(--slate-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;}
+  .avatar-photo svg{width:34px;height:34px;color:var(--slate);}
+  .p-name{font-family:'Fraunces',serif;font-size:20px;font-weight:600;}
+  .p-code-badge{display:inline-block;background:var(--slate-soft);color:var(--slate);font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;margin-left:8px;}
+  .p-condition{font-size:12.5px;color:var(--pine);font-weight:600;margin-top:4px;}
+
+  .p-meta{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:20px;padding-top:18px;border-top:1px dashed var(--line);}
+  .p-meta .k{font-size:10.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-bottom:3px;}
+  .p-meta .v{font-size:13px;font-weight:500;}
+
+  /* Section */
+  .section-box{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:20px;margin-bottom:20px;}
+  .section-head{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px;}
+  .section-head h2{font-family:'Fraunces',serif;font-size:16.5px;font-weight:600;margin:0;}
+
+  .doc-row{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid var(--line);}
+  .doc-row:last-child{border-bottom:none;}
+  .file-icon{width:34px;height:34px;border-radius:9px;background:var(--slate-soft);color:var(--slate);display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .file-icon svg{width:16px;height:16px;}
+  .file-name{font-size:12.5px;font-weight:600;}
+  .file-sub{font-size:11px;color:var(--muted);margin-top:1px;}
+
+  .empty-box{padding:26px;text-align:center;color:var(--muted);font-size:13px;background:var(--paper);border-radius:12px;border:1px dashed var(--line);}
+
+  /* Modal */
+  .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(30,42,34,.5);align-items:center;justify-content:center;z-index:90;padding:20px;}
+  .modal-backdrop.open{display:flex;}
+  .modal{background:var(--surface);border-radius:18px;max-width:540px;width:100%;padding:24px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
+  .modal-head h3{font-family:'Fraunces',serif;font-size:18px;margin:0;}
+  .modal-close{border:none;background:var(--paper);width:30px;height:30px;border-radius:8px;cursor:pointer;color:var(--muted);font-size:16px;}
+  .form-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+  .field{margin-bottom:10px;}
+  .field.full{grid-column:span 2;}
+  .field label{display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;}
+  .field input,.field select,.field textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:13px;font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);}
+  .btn-submit{width:100%;background:var(--pine-deep);color:#EFF3F0;border:none;border-radius:10px;padding:12px;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:12px;}
+
+  @media (max-width:980px){ .app{grid-template-columns:1fr;} .sidebar{flex-direction:row;overflow-x:auto;align-items:center;gap:16px;} .sidebar nav{flex-direction:row;} .sidebar-foot,.brand-sub{display:none;} .grid-cols{grid-template-columns:1fr;} .p-meta{grid-template-columns:repeat(2,1fr);} }
+  @media (max-width:600px){ .p-meta{grid-template-columns:1fr;} .form-grid{grid-template-columns:1fr;} .field.full{grid-column:span 1;} .topbar-right{width:100%;flex-direction:column;align-items:stretch;} .btn-action{text-align:center;} }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">C</div>
+      <div><div class="brand-name">Carewell</div><div class="brand-sub">PATIENT PORTAL</div></div>
+    </div>
+    <nav>
+      <a href="/patient-profile.html" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>My Profile</span></a>
+      <a href="/doctor-caretaker-list.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Find Caretaker / Doctor</span></a>
+      <a href="/app.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Voice AI Engine</span></a>
+      <a href="#" onclick="localStorage.clear(); window.location.href='/login.html';"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="help-card"><b>Need help?</b>Reach patient support any time.</div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <main>
+    <div class="topbar">
+      <div class="breadcrumb">Patient Portal › <span id="bcPatientName">My Profile</span></div>
+      <div class="topbar-right">
+        <button class="btn-action secondary" onclick="openEditModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit Profile</button>
+        <a href="/doctor-caretaker-list.html" class="btn-action">Find Caretaker / Doctor</a>
+        <button class="btn-action danger" onclick="deleteMyProfile()">Delete Profile</button>
+      </div>
+    </div>
+
+    <div class="grid-cols">
+      <div>
+        <!-- Profile Card -->
+        <div class="profile-card">
+          <div class="profile-top">
+            <div class="profile-id">
+              <div class="avatar-photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7"/></svg></div>
+              <div>
+                <div class="p-name"><span id="pName">Loading profile...</span> <span class="p-code-badge" id="pCode">PAT-000000</span></div>
+                <div class="p-condition" id="pNotes">No medical condition specified yet</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="p-meta">
+            <div><div class="k">Date of Birth</div><div class="v" id="pDob">Not provided</div></div>
+            <div><div class="k">Gender</div><div class="v" id="pGender">Not provided</div></div>
+            <div><div class="k">Marital Status</div><div class="v" id="pMarital">Not provided</div></div>
+            <div><div class="k">Location</div><div class="v" id="pLocation">Not provided</div></div>
+            <div><div class="k">Languages</div><div class="v" id="pLang">Not provided</div></div>
+            <div><div class="k">Phone Number</div><div class="v" id="pPhone">Not provided</div></div>
+            <div><div class="k">Insurance</div><div class="v" id="pInsurance">Not provided</div></div>
+            <div><div class="k">Emergency Contact</div><div class="v" id="pEmergency">Not provided</div></div>
+          </div>
+        </div>
+
+        <!-- Appointments Section -->
+        <div class="section-box">
+          <div class="section-head">
+            <h2>My Appointments</h2>
+            <a href="/doctor-caretaker-list.html" class="btn-action" style="padding:6px 11px;font-size:11.5px;">Book Appointment</a>
+          </div>
+          <div id="apptContainer">
+            <div class="empty-box">No appointments scheduled yet. Browse the Directory to book a consultation with a doctor or caretaker.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Documents -->
+      <div>
+        <div class="section-box">
+          <div class="section-head">
+            <h2>Medical Documents</h2>
+            <button class="btn-action secondary" onclick="openDocModal()" style="padding:6px 11px;font-size:11.5px;">+ Add Files</button>
+          </div>
+          <div id="docContainer">
+            <div class="empty-box">No medical records uploaded yet. Click "+ Add Files" to upload prescriptions, lab reports, or records.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- EDIT PROFILE MODAL -->
+<div class="modal-backdrop" id="editModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>Edit Patient Profile</h3>
+      <button class="modal-close" onclick="closeEditModal()">✕</button>
+    </div>
+    <form id="editForm" onsubmit="saveProfile(event)">
+      <div class="form-grid">
+        <div class="field full"><label>Full Name</label><input id="inputName" type="text" placeholder="Enter your full name" required></div>
+        <div class="field"><label>Date of Birth</label><input id="inputDob" type="date"></div>
+        <div class="field"><label>Gender</label>
+          <select id="inputGender">
+            <option value="">Select Gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="field"><label>Marital Status</label>
+          <select id="inputMarital">
+            <option value="">Select Status</option>
+            <option value="Single">Single</option>
+            <option value="Married">Married</option>
+            <option value="Widowed">Widowed</option>
+            <option value="Divorced">Divorced</option>
+          </select>
+        </div>
+        <div class="field"><label>Phone Number</label><input id="inputPhone" type="tel" placeholder="+91 98470 xxxxx"></div>
+        <div class="field full"><label>Location / Address</label><input id="inputLocation" type="text" placeholder="City, State"></div>
+        <div class="field full"><label>Languages Spoken</label><input id="inputLang" type="text" placeholder="e.g. English, Malayalam, Hindi"></div>
+        <div class="field full"><label>Insurance Details</label><input id="inputInsurance" type="text" placeholder="e.g. Star Health Senior / Policy #"></div>
+        <div class="field"><label>Emergency Contact Name</label><input id="inputEmName" type="text" placeholder="Contact person name"></div>
+        <div class="field"><label>Emergency Contact Phone</label><input id="inputEmPhone" type="tel" placeholder="Contact phone number"></div>
+        <div class="field full"><label>Medical History / Notes</label><textarea id="inputHistory" rows="2" placeholder="List any chronic conditions, allergies, or health notes"></textarea></div>
+      </div>
+      <button class="btn-submit" type="submit">Save Profile Details</button>
+    </form>
+  </div>
+</div>
+
+<!-- UPLOAD DOCUMENT MODAL -->
+<div class="modal-backdrop" id="docModal">
+  <div class="modal" style="max-width:440px;">
+    <div class="modal-head">
+      <h3>Upload Medical Document</h3>
+      <button class="modal-close" onclick="closeDocModal()">✕</button>
+    </div>
+    <form id="docForm" onsubmit="uploadDocument(event)">
+      <div class="field"><label>Document Title</label><input id="docTitle" type="text" placeholder="e.g. Blood Test Report, Prescription" required></div>
+      <div class="field"><label>Notes / Category</label><input id="docNotes" type="text" placeholder="e.g. Lab Report, Cardiology"></div>
+      <div class="field"><label>Select File</label><input id="docFile" type="file" required></div>
+      <button class="btn-submit" type="submit">Upload Document</button>
+    </form>
+  </div>
+</div>
+
+<script>
+function getAuthHeader(){
+  const token = localStorage.getItem('access_token') || localStorage.getItem('beacon_token');
+  return token ? { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+}
+
+let profileData = {};
+
+async function loadPatientProfile(){
+  try {
+    const res = await fetch('/api/auth/patient/profile', { headers: getAuthHeader() });
+    if(res.ok){
+      profileData = await res.json();
+      document.getElementById('pName').textContent = profileData.full_name || profileData.username || 'Patient';
+      document.getElementById('bcPatientName').textContent = profileData.full_name || profileData.username || 'Patient';
+      document.getElementById('pCode').textContent = profileData.patient_code || 'PAT-NEW';
+      document.getElementById('pNotes').textContent = profileData.medical_history_notes || 'No medical condition specified yet';
+      document.getElementById('pDob').textContent = profileData.dob || 'Not provided';
+      document.getElementById('pGender').textContent = profileData.gender || 'Not provided';
+      document.getElementById('pMarital').textContent = profileData.marital_status || 'Not provided';
+      document.getElementById('pLocation').textContent = profileData.location || 'Not provided';
+      document.getElementById('pLang').textContent = profileData.languages || 'Not provided';
+      document.getElementById('pPhone').textContent = profileData.phone_number || profileData.mobile_number || 'Not provided';
+      document.getElementById('pInsurance').textContent = profileData.insurance_details || 'Not provided';
+      
+      const em = (profileData.emergency_contact_name || '') + (profileData.emergency_contact_phone ? ' (' + profileData.emergency_contact_phone + ')' : '');
+      document.getElementById('pEmergency').textContent = em || 'Not provided';
+    } else {
+      localStorage.clear();
+      alert('Your account no longer exists or has been deleted by Admin. Please sign up to create a new profile.');
+      window.location.href = '/login.html';
+    }
+  } catch(e){ console.log(e); }
+}
+
+async function loadMedicalDocuments(){
+  try {
+    const res = await fetch('/api/auth/patient/documents', { headers: getAuthHeader() });
+    if(res.ok){
+      const docs = await res.json();
+      const container = document.getElementById('docContainer');
+      if(!docs || docs.length === 0){
+        container.innerHTML = '<div class="empty-box">No medical records uploaded yet. Click "+ Add Files" to upload prescriptions, lab reports, or records.</div>';
+      } else {
+        container.innerHTML = docs.map(d => `
+          <div class="doc-row">
+            <div class="file-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M13 2v7h7"/></svg></div>
+            <div>
+              <div class="file-name">${d.title}</div>
+              <div class="file-sub">${d.notes || d.file_name} · ${new Date(d.uploaded_at).toLocaleDateString()}</div>
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+  } catch(e){ console.log(e); }
+}
+
+function openEditModal(){
+  document.getElementById('inputName').value = profileData.full_name || '';
+  document.getElementById('inputDob').value = profileData.dob || '';
+  document.getElementById('inputGender').value = profileData.gender || '';
+  document.getElementById('inputMarital').value = profileData.marital_status || '';
+  document.getElementById('inputPhone').value = profileData.phone_number || '';
+  document.getElementById('inputLocation').value = profileData.location || '';
+  document.getElementById('inputLang').value = profileData.languages || '';
+  document.getElementById('inputInsurance').value = profileData.insurance_details || '';
+  document.getElementById('inputEmName').value = profileData.emergency_contact_name || '';
+  document.getElementById('inputEmPhone').value = profileData.emergency_contact_phone || '';
+  document.getElementById('inputHistory').value = profileData.medical_history_notes || '';
+  document.getElementById('editModal').classList.add('open');
+}
+function closeEditModal(){ document.getElementById('editModal').classList.remove('open'); }
+
+async function saveProfile(e){
+  e.preventDefault();
+  const payload = {
+    full_name: document.getElementById('inputName').value,
+    dob: document.getElementById('inputDob').value || null,
+    gender: document.getElementById('inputGender').value,
+    marital_status: document.getElementById('inputMarital').value,
+    phone_number: document.getElementById('inputPhone').value,
+    location: document.getElementById('inputLocation').value,
+    languages: document.getElementById('inputLang').value,
+    insurance_details: document.getElementById('inputInsurance').value,
+    emergency_contact_name: document.getElementById('inputEmName').value,
+    emergency_contact_phone: document.getElementById('inputEmPhone').value,
+    medical_history_notes: document.getElementById('inputHistory').value,
+  };
+  try {
+    const res = await fetch('/api/auth/patient/profile', {
+      method: 'PUT',
+      headers: getAuthHeader(),
+      body: JSON.stringify(payload)
+    });
+    if(res.ok){
+      closeEditModal();
+      loadPatientProfile();
+    } else {
+      alert('Failed to save profile.');
+    }
+  } catch(err){ alert(err.message); }
+}
+
+function openDocModal(){ document.getElementById('docModal').classList.add('open'); }
+function closeDocModal(){ document.getElementById('docModal').classList.remove('open'); }
+
+async function uploadDocument(e){
+  e.preventDefault();
+  const title = document.getElementById('docTitle').value;
+  const notes = document.getElementById('docNotes').value;
+  const fileInput = document.getElementById('docFile');
+  const file = fileInput.files[0];
+
+  const payload = {
+    title: title,
+    notes: notes,
+    file_name: file ? file.name : 'document.pdf',
+    file_data: 'uploaded_file_data'
+  };
+
+  try {
+    const res = await fetch('/api/auth/patient/documents', {
+      method: 'POST',
+      headers: getAuthHeader(),
+      body: JSON.stringify(payload)
+    });
+    if(res.ok){
+      closeDocModal();
+      loadMedicalDocuments();
+    }
+  } catch(err){ alert(err.message); }
+}
+
+async function deleteMyProfile(){
+  if(!confirm('Are you sure you want to delete your profile and account? This cannot be undone.')) return;
+  try {
+    const res = await fetch('/api/auth/profile/delete', { method: 'DELETE', headers: getAuthHeader() });
+    if(res.ok){
+      localStorage.clear();
+      alert('Your account has been deleted.');
+      window.location.href = '/signup.html';
+    }
+  } catch(e){ alert(e.message); }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadPatientProfile();
+  loadMedicalDocuments();
+});
+</script>
+</body>
+</html>ript>
+</body>
+</html>
