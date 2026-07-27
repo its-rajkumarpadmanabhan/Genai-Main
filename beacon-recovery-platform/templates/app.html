@@ -203,6 +203,93 @@
     font-size:13px;
     color:var(--ink-mid);
   }
+
+  /* ---------- Hospital Radar (compact, live-location) ---------- */
+  .hradar-stage{
+    display:flex; align-items:center; justify-content:center;
+    padding:8px 0 32px;
+  }
+  .hradar{ position:relative; width:220px; height:220px; }
+  .hring{
+    position:absolute; border-radius:50%;
+    border:1px solid rgba(91,143,255,0.35);
+    top:50%; left:50%; transform:translate(-50%,-50%);
+  }
+  .hring.r1{ width:100%; height:100%; }
+  .hring.r2{ width:74%; height:74%; }
+  .hring.r3{ width:48%; height:48%; }
+  .hpulse{
+    position:absolute; top:50%; left:50%;
+    width:30%; height:30%; border-radius:50%;
+    transform:translate(-50%,-50%);
+    background:radial-gradient(circle, rgba(91,143,255,0.28) 0%, rgba(91,143,255,0) 70%);
+    animation:hpulse-out 3.2s ease-out infinite;
+  }
+  .hpulse.p2{ animation-delay:1.6s; }
+  @keyframes hpulse-out{
+    0%{ width:30%; height:30%; opacity:0.55; }
+    100%{ width:100%; height:100%; opacity:0; }
+  }
+  .hsweep{
+    position:absolute; top:50%; left:50%;
+    width:50%; height:2px; transform-origin:0 50%;
+    background:linear-gradient(90deg, rgba(91,143,255,0.9), rgba(91,143,255,0));
+    animation:hspin 6s linear infinite;
+  }
+  @keyframes hspin{ from{ transform:translate(0,-50%) rotate(0deg); } to{ transform:translate(0,-50%) rotate(360deg); } }
+  .hcenter-avatar{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:92px; height:92px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #5b8fff, #1c3a8a 70%);
+    box-shadow:0 0 0 5px rgba(91,143,255,0.15), 0 0 32px 6px rgba(47,107,255,0.55);
+    display:flex; align-items:center; justify-content:center;
+    z-index:5; cursor:pointer; animation:hbreathe 4s ease-in-out infinite;
+    transition:transform .15s ease; color:#eaf0ff; font-size:22px;
+  }
+  .hcenter-avatar:hover{ transform:translate(-50%,-50%) scale(1.05); }
+  .hcenter-avatar.locating{ animation:hlocating 1.1s ease-in-out infinite !important; }
+  @keyframes hbreathe{
+    0%,100%{ box-shadow:0 0 0 5px rgba(91,143,255,0.15), 0 0 32px 6px rgba(47,107,255,0.55); }
+    50%{ box-shadow:0 0 0 8px rgba(91,143,255,0.22), 0 0 44px 10px rgba(47,107,255,0.75); }
+  }
+  @keyframes hlocating{
+    0%,100%{ box-shadow:0 0 0 5px rgba(62,242,160,0.2), 0 0 32px 8px rgba(62,242,160,0.5); }
+    50%{ box-shadow:0 0 0 9px rgba(62,242,160,0.3), 0 0 46px 12px rgba(62,242,160,0.75); }
+  }
+  .htap-hint{
+    position:absolute; bottom:-22px; left:50%; transform:translateX(-50%);
+    font-size:9.5px; letter-spacing:0.6px; color:var(--ink-mid);
+    white-space:nowrap; text-transform:uppercase; opacity:0.85;
+    animation:hhint-fade 2.4s ease-in-out infinite;
+  }
+  @keyframes hhint-fade{ 0%,100%{ opacity:0.4; } 50%{ opacity:0.9; } }
+  .hspot{
+    position:absolute; display:flex; flex-direction:column; align-items:center; gap:4px;
+    z-index:6; animation:hfloat 5s ease-in-out infinite; cursor:pointer;
+  }
+  .hspot .hbubble{
+    width:42px; height:42px; border-radius:50%;
+    background:linear-gradient(160deg,#1c3a8a,#0c1836);
+    border:2px solid rgba(91,143,255,0.55);
+    box-shadow:0 4px 14px rgba(0,0,0,0.45), 0 0 14px rgba(47,107,255,0.35);
+    display:flex; align-items:center; justify-content:center; position:relative;
+    color:#c9d8ff; font-size:14px;
+  }
+  .hspot .hdist{
+    font-size:9.5px; font-weight:600; color:#aab3cf; white-space:nowrap; order:-1; margin-bottom:2px;
+  }
+  .hspot .hlive-dot{
+    position:absolute; top:-2px; right:-2px; width:11px; height:11px; border-radius:50%;
+    background:#3ef2a0; box-shadow:0 0 8px 2px #3ef2a0; border:2px solid #070b18;
+  }
+  .hspot.s1{ top:2%; left:0%; animation-delay:0s; }
+  .hspot.s2{ top:-4%; right:0%; animation-delay:1.1s; }
+  .hspot.s3{ bottom:4%; left:2%; animation-delay:0.6s; }
+  .hspot.s4{ bottom:-2%; right:2%; animation-delay:1.7s; }
+  @keyframes hfloat{ 0%,100%{ transform:translateY(0px); } 50%{ transform:translateY(-6px); } }
+  @media (prefers-reduced-motion: reduce){
+    .hpulse, .hsweep, .hcenter-avatar, .hspot{ animation:none !important; }
+  }
 </style>
 </head>
 <body>
@@ -281,6 +368,28 @@
           Real-time hospital proximity & operating status scanner.
       </p>
 
+      <!-- Live-location radar: tap the center to re-locate, bubbles show the 4 nearest facilities -->
+      <div class="hradar-stage">
+        <div class="hradar">
+          <div class="hpulse"></div>
+          <div class="hpulse p2"></div>
+          <div class="hring r1"></div>
+          <div class="hring r2"></div>
+          <div class="hring r3"></div>
+          <div class="hsweep"></div>
+          <div class="hcenter-avatar" id="hCenterAvatar" title="Tap to refresh your location" onclick="detectLocationAndScan(true)">
+            <i class="fa-solid fa-location-crosshairs"></i>
+            <span class="htap-hint" id="hTapHint">Tap to locate</span>
+          </div>
+          <div class="hspot s1" id="hSpot0" style="display:none;"></div>
+          <div class="hspot s2" id="hSpot1" style="display:none;"></div>
+          <div class="hspot s3" id="hSpot2" style="display:none;"></div>
+          <div class="hspot s4" id="hSpot3" style="display:none;"></div>
+        </div>
+      </div>
+
+      <div id="location-status" class="text-xs text-amber-300 hidden text-center"></div>
+
       <div class="flex gap-2">
           <input type="text" id="hospital-search-input" placeholder="Type city, town, or landmark..." 
                  class="flex-1 bg-slate-950 border border-slate-800 text-xs text-slate-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-teal-500">
@@ -288,8 +397,6 @@
               Search
           </button>
       </div>
-
-      <div id="location-status" class="text-xs text-amber-300 hidden"></div>
 
       <div id="hospitals-list" class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           <div class="col-span-full text-center py-4 text-xs text-slate-500">
@@ -399,11 +506,51 @@
       window.location.replace('/login.html');
   }
 
+  // Radar visual state helpers
+  function setRadarLocating(active) {
+      const avatar = document.getElementById('hCenterAvatar');
+      const hint = document.getElementById('hTapHint');
+      if (!avatar) return;
+      if (active) {
+          avatar.classList.add('locating');
+          if (hint) hint.style.display = 'none';
+      } else {
+          avatar.classList.remove('locating');
+      }
+  }
+
+  function renderRadarSpots(hospitals) {
+      const spotEls = [0, 1, 2, 3].map(i => document.getElementById('hSpot' + i));
+      spotEls.forEach((el, i) => {
+          if (!el) return;
+          const h = hospitals[i];
+          if (!h) { el.style.display = 'none'; return; }
+          el.style.display = 'flex';
+          const isLive = h.status && h.status.toLowerCase().includes('24/7');
+          el.innerHTML = `
+              <span class="hdist">${h.distance_km != null ? h.distance_km + ' km' : ''}</span>
+              <div class="hbubble">
+                  ${isLive ? '<span class="hlive-dot"></span>' : ''}
+                  <i class="fa-solid fa-hospital"></i>
+              </div>
+          `;
+          el.title = h.name || 'Medical facility';
+          el.onclick = () => {
+              if (h.maps_url) {
+                  window.open(h.maps_url, '_blank');
+              } else if (currentLat && currentLon && h.lat && h.lon) {
+                  window.open(`https://www.google.com/maps/dir/?api=1&origin=${currentLat},${currentLon}&destination=${h.lat},${h.lon}`, '_blank');
+              }
+          };
+      });
+  }
+
   // Location Scanner
   function detectLocationAndScan() {
       const status = document.getElementById('location-status');
       status.classList.remove('hidden');
       status.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Detecting position...`;
+      setRadarLocating(true);
 
       if (!navigator.geolocation) {
           fallbackToIpLocation();
@@ -452,6 +599,7 @@
 
       status.classList.remove('hidden');
       status.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Searching hospitals near "${query}"...`;
+      setRadarLocating(true);
       await fetchHospitals(`/api/nearest-hospitals?location_query=${encodeURIComponent(query)}`);
   }
 
@@ -464,10 +612,14 @@
           renderHospitalsList(data.hospitals || []);
       } catch (err) {
           list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-red-400">Could not fetch hospitals. Check network connection.</div>`;
+          renderRadarSpots([]);
+      } finally {
+          setRadarLocating(false);
       }
   }
 
   function renderHospitalsList(hospitals) {
+      renderRadarSpots(hospitals || []);
       const list = document.getElementById('hospitals-list');
       if (!hospitals || hospitals.length === 0) {
           list.innerHTML = `<div class="col-span-full text-center py-4 text-xs text-slate-400">No medical facilities found in current view.</div>`;
