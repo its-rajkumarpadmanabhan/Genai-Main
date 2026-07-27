@@ -545,8 +545,107 @@
       });
   }
 
-  // Location Scanner
-  function detectLocationAndScan() {
+  // ---------- Location Scanner (ported from the "loco" reference radar) ----------
+  // Adds: a fast high-accuracy attempt that falls back to a relaxed network/wifi
+  // fix on timeout, continuous background tracking via watchPosition, a
+  // move-threshold so we don't re-query the backend on every tiny GPS jitter,
+  // and IP-based geolocation only as a last resort if the browser has none.
+  let watchId = null;
+  let tracking = false;
+  let lastFetchLoc = null; // {lat, lon}
+  const REFETCH_THRESHOLD_KM = 0.5; // re-query only after moving ~500m
+
+  function haversineKm(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  // Try a fast, high-accuracy GPS fix first. If that alone times out (very
+  // common indoors / on laptops with no GPS chip), fall back to a relaxed,
+  // network/wifi-based fix instead of just failing with a timeout error.
+  function getPositionWithFallback(successCb, errorCb) {
+      if (!navigator.geolocation) {
+          errorCb({ code: 0, message: 'unsupported' });
+          return;
+      }
+      navigator.geolocation.getCurrentPosition(
+          successCb,
+          (err) => {
+              if (err && err.code === err.TIMEOUT) {
+                  const status = document.getElementById('location-status');
+                  status.classList.remove('hidden');
+                  status.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Still locating… trying a faster method.`;
+                  navigator.geolocation.getCurrentPosition(
+                      successCb,
+                      errorCb,
+                      { enableHighAccuracy: false, maximumAge: 60000, timeout: 25000 }
+                  );
+              } else {
+                  errorCb(err);
+              }
+          },
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 12000 }
+      );
+  }
+
+  async function onPositionUpdate(position) {
+      const lat = position.coords.latitude;
+      const lon = position.coords.longitude;
+      if (lastFetchLoc && haversineKm(lastFetchLoc.lat, lastFetchLoc.lon, lat, lon) < REFETCH_THRESHOLD_KM) {
+          setRadarLocating(false);
+          return; // hasn't moved enough to justify hitting the backend again
+      }
+      currentLat = lat;
+      currentLon = lon;
+      lastFetchLoc = { lat, lon };
+      const status = document.getElementById('location-status');
+      status.classList.remove('hidden');
+      status.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> ${tracking ? 'Live GPS' : 'GPS'} acquired (${lat.toFixed(3)}, ${lon.toFixed(3)})`;
+      await fetchHospitals(`/api/nearest-hospitals?lat=${lat}&lon=${lon}${position.coords.accuracy ? '&accuracy=' + position.coords.accuracy : ''}`);
+  }
+
+  function onPositionError(err) {
+      setRadarLocating(false);
+      const status = document.getElementById('location-status');
+      status.classList.remove('hidden');
+      if (err && err.code === 1 /* PERMISSION_DENIED */) {
+          status.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-400"></i> Location permission denied — allow location access, or type a location above.`;
+      } else if (err && err.message === 'unsupported') {
+          status.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-400"></i> Geolocation isn't supported in this browser — use search instead.`;
+      } else {
+          fallbackToIpLocation();
+      }
+  }
+
+  // Begins (or resumes) continuous location tracking: an immediate fast fix,
+  // then a background watch that quietly refreshes results as the user moves.
+  function startLiveTracking() {
+      if (!navigator.geolocation) {
+          fallbackToIpLocation();
+          return;
+      }
+      tracking = true;
+      getPositionWithFallback(onPositionUpdate, onPositionError);
+      watchId = navigator.geolocation.watchPosition(onPositionUpdate, (err) => {
+          // Don't hard-fail live tracking on a single timed-out tick — keep the
+          // last good result on screen and retry quietly on the next tick.
+          if (err && err.code === err.TIMEOUT) return;
+          onPositionError(err);
+      }, {
+          enableHighAccuracy: true,
+          maximumAge: 15000,
+          timeout: 25000
+      });
+  }
+
+  // Entry point used both by the initial page load and by "Refresh GPS" / the
+  // radar tap. `force=true` bypasses the move-threshold for an explicit re-check.
+  function detectLocationAndScan(force) {
       const status = document.getElementById('location-status');
       status.classList.remove('hidden');
       status.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Detecting position...`;
@@ -557,28 +656,28 @@
           return;
       }
 
-      navigator.geolocation.getCurrentPosition(
-          async (position) => {
-              currentLat = position.coords.latitude;
-              currentLon = position.coords.longitude;
-              status.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400"></i> Live GPS acquired (${currentLat.toFixed(3)}, ${currentLon.toFixed(3)})`;
-              await fetchHospitals(`/api/nearest-hospitals?lat=${currentLat}&lon=${currentLon}`);
-          },
-          async () => {
-              await fallbackToIpLocation();
-          },
-          { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-      );
+      if (!tracking) {
+          startLiveTracking();
+      } else if (force) {
+          lastFetchLoc = null;
+          getPositionWithFallback(onPositionUpdate, onPositionError);
+      } else {
+          setRadarLocating(false);
+      }
   }
 
   async function fallbackToIpLocation() {
       const status = document.getElementById('location-status');
+      status.classList.remove('hidden');
+      status.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> GPS unavailable — trying network location...`;
+      setRadarLocating(true);
       try {
           const resp = await fetch('https://ipapi.co/json/');
           const data = await resp.json();
           if (data.latitude && data.longitude) {
               currentLat = data.latitude;
               currentLon = data.longitude;
+              lastFetchLoc = { lat: data.latitude, lon: data.longitude };
               status.innerHTML = `<i class="fa-solid fa-network-wired text-teal-400"></i> Network position detected (${data.city || 'Approximate'})`;
               await fetchHospitals(`/api/nearest-hospitals?lat=${currentLat}&lon=${currentLon}`);
           } else if (data.city) {
@@ -588,7 +687,8 @@
               throw new Error("No network coordinates");
           }
       } catch (e) {
-          status.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-400"></i> Location access unavailable. Type city above.`;
+          setRadarLocating(false);
+          status.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-amber-400"></i> Location access unavailable. Type a city, town, or landmark above.`;
       }
   }
 
@@ -597,10 +697,17 @@
       const status = document.getElementById('location-status');
       if (!query) return;
 
+      stopLiveTracking(); // a manual search overrides live GPS tracking
       status.classList.remove('hidden');
       status.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> Searching hospitals near "${query}"...`;
       setRadarLocating(true);
       await fetchHospitals(`/api/nearest-hospitals?location_query=${encodeURIComponent(query)}`);
+  }
+
+  function stopLiveTracking() {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      tracking = false;
   }
 
   async function fetchHospitals(endpoint) {

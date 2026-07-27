@@ -128,62 +128,82 @@ def determine_open_status(tags: dict) -> str:
 
 
 def fetch_hospitals_data(lat: float, lon: float, specialty_keyword: Optional[str] = None, accuracy_m: Optional[float] = None) -> List[dict]:
-    """Uses the same robust query logic that worked in index.html to guarantee data delivery."""
+    """Uses the same robust query logic that worked in index.html (loco) to guarantee
+    data delivery: node/way/relation coverage, healthcare-tag fallback, cascading
+    radius, and two mirrored Overpass endpoints."""
     headers = {"User-Agent": "BeaconEngine/1.0"}
     endpoints = [
         "https://overpass-api.de/api/interpreter",
         "https://overpass.kumi.systems/api/interpreter"
     ]
-    
+
     # We use a 15km default, but will cascade if empty
     radiuses = [15000, 30000, 50000]
-    
+
     for radius in radiuses:
-        # This query is expanded to include 'healthcare' tags, which is why your index.html worked
+        # Anchored amenity/healthcare regex + relation coverage, matching the
+        # query shape that reliably found results in the loco reference page.
         overpass_query = f"""
         [out:json][timeout:25];(
-          node["amenity"~"hospital|clinic|doctors"](around:{radius},{lat},{lon});
-          way["amenity"~"hospital|clinic|doctors"](around:{radius},{lat},{lon});
-          node["healthcare"~"hospital|clinic|doctor"](around:{radius},{lat},{lon});
-          way["healthcare"~"hospital|clinic|doctor"](around:{radius},{lat},{lon});
+          node["amenity"~"^(hospital|clinic|doctors)$"](around:{radius},{lat},{lon});
+          way["amenity"~"^(hospital|clinic|doctors)$"](around:{radius},{lat},{lon});
+          relation["amenity"~"^(hospital|clinic|doctors)$"](around:{radius},{lat},{lon});
+          node["healthcare"~"^(hospital|clinic|doctor)$"](around:{radius},{lat},{lon});
+          way["healthcare"~"^(hospital|clinic|doctor)$"](around:{radius},{lat},{lon});
+          relation["healthcare"~"^(hospital|clinic|doctor)$"](around:{radius},{lat},{lon});
         );out center tags;
         """
         data_bytes = urllib.parse.urlencode({"data": overpass_query}).encode("utf-8")
-        
+
         for endpoint in endpoints:
             try:
                 req = urllib.request.Request(endpoint, data=data_bytes, headers=headers)
-                with urllib.request.urlopen(req, timeout=10) as resp:
+                with urllib.request.urlopen(req, timeout=18) as resp:
                     result = json.loads(resp.read().decode())
                     elements = result.get("elements", [])
-                    
+
                     if elements:
                         hospitals = []
                         for el in elements:
                             tags = el.get("tags", {})
                             lat_val = el.get("lat") or el.get("center", {}).get("lat")
                             lon_val = el.get("lon") or el.get("center", {}).get("lon")
-                            
-                            if not lat_val or not lon_val: continue
-                            
+
+                            if not lat_val or not lon_val:
+                                continue
+
                             dist, time = calculate_distance_and_time(lat, lon, lat_val, lon_val)
-                            
+                            facility_type = tags.get("amenity") or tags.get("healthcare") or "clinic"
+                            status = determine_open_status(tags)
+                            address_parts = [
+                                tags.get("addr:housenumber"),
+                                tags.get("addr:street"),
+                                tags.get("addr:city"),
+                            ]
+                            address = ", ".join(p for p in address_parts if p)
+
                             hospitals.append({
                                 "name": tags.get("name") or "Medical Facility",
-                                "ownership": tags.get("amenity") or tags.get("healthcare") or "Clinic",
+                                "type": facility_type,
+                                "ownership": tags.get("operator:type") or tags.get("operator") or facility_type.title(),
                                 "distance_km": dist,
                                 "reach_time_mins": time,
-                                "status": determine_open_status(tags),
+                                "status": status,
+                                "is_open": "closed" not in status.lower(),
+                                "address": address or None,
+                                "phone": tags.get("phone") or tags.get("contact:phone"),
+                                "doctor": tags.get("operator") if facility_type == "doctors" else None,
                                 "lat": lat_val,
-                                "lon": lon_val
+                                "lon": lon_val,
+                                "maps_url": f"https://www.google.com/maps/dir/?api=1&origin={lat},{lon}&destination={lat_val},{lon_val}",
                             })
-                        
+
                         # Return sorted by distance
                         return sorted(hospitals, key=lambda x: x["distance_km"])
             except Exception as e:
                 print(f"[FETCH ERROR] {e}")
                 continue
-                
+
     return []
 
 async def generate_free_neural_speech(text: str, target_language: str) -> Optional[str]:
@@ -652,7 +672,7 @@ async def get_nearest_hospitals(
             encoded_q = urllib.parse.quote(location_query)
             geo_url = f"https://nominatim.openstreetmap.org/search?q={encoded_q}&format=json&limit=1"
             req = urllib.request.Request(geo_url, headers=headers)
-            with urllib.request.urlopen(req, timeout=4) as resp:
+            with urllib.request.urlopen(req, timeout=8) as resp:
                 geo_data = json.loads(resp.read().decode())
                 if geo_data:
                     lat = float(geo_data[0]["lat"])
@@ -963,18 +983,24 @@ AUTH_PAGE_HTML = """<!DOCTYPE html>
 
 @app.get("/", response_class=HTMLResponse)
 async def serve_home():
-    """Serves the auto-geolocation hospital-finder page (built into this file — no
-    external template needed for it to work). Uses the same locate-then-track
-    architecture that already works in the reference index.html, wired to this
-    file's own /api/nearest-hospitals endpoint."""
+    """Serves the real app UI (templates/app.html — the radar + login flow that
+    uses the 'beacon_token' localStorage key throughout login.html/signup.html/
+    app.html). Falls back to the inline HOME_PAGE_HTML only if that template is
+    missing, so a fresh checkout without the templates folder still boots."""
+    app_html_path = os.path.join("templates", "app.html")
+    if os.path.isfile(app_html_path):
+        return FileResponse(app_html_path, media_type="text/html")
     return HTMLResponse(content=HOME_PAGE_HTML)
 
 
 @app.get("/login", response_class=HTMLResponse)
 async def serve_login():
-    """Combined login/signup page. On success it stores the returned access_token
-    and redirects straight to '/' — the hospital-finder page — so the user lands
-    there automatically after logging in or signing up."""
+    """Serves the real login/signup page (templates/login.html), which stores
+    'beacon_token' and redirects to '/app.html' — the same flow app.html expects.
+    Falls back to the inline AUTH_PAGE_HTML only if that template is missing."""
+    login_html_path = os.path.join("templates", "login.html")
+    if os.path.isfile(login_html_path):
+        return FileResponse(login_html_path, media_type="text/html")
     return HTMLResponse(content=AUTH_PAGE_HTML)
 
 
