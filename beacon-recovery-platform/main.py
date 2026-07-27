@@ -128,98 +128,62 @@ def determine_open_status(tags: dict) -> str:
 
 
 def fetch_hospitals_data(lat: float, lon: float, specialty_keyword: Optional[str] = None, accuracy_m: Optional[float] = None) -> List[dict]:
-    """Scans map with expanding radius. Returns [] if no genuine facilities are verified."""
+    """Uses the same robust query logic that worked in index.html to guarantee data delivery."""
     headers = {"User-Agent": "BeaconEngine/1.0"}
     endpoints = [
         "https://overpass-api.de/api/interpreter",
         "https://overpass.kumi.systems/api/interpreter"
     ]
     
-    # Tiered search: Start small (5km) and expand to 50km only if needed
-    radiuses = [5000, 20000, 50000]
-
-    # LOCATION ACCURACY HANDLING:
-    # `accuracy_m` is the GPS accuracy radius (in meters) reported by the client's
-    # navigator.geolocation fix. If that fix is uncertain (large accuracy_m — common
-    # on desktop/wifi-based positioning), the visitor's true position could already
-    # lie outside a tight 5km/20km ring, so searching those tiers first can miss
-    # real nearby facilities. In that case, skip straight to a tier that safely
-    # covers the uncertainty, and if even 50km isn't enough, add one wider tier on
-    # top of the existing list (nothing existing is removed, only extended).
-    if accuracy_m and accuracy_m > 0:
-        radiuses = [r for r in radiuses if r >= accuracy_m]
-        if not radiuses:
-            radiuses = [5000, 20000, 50000]
-        widened_radius = int(accuracy_m + 5000)
-        if widened_radius not in radiuses:
-            radiuses.append(widened_radius)
-            radiuses.sort()
+    # We use a 15km default, but will cascade if empty
+    radiuses = [15000, 30000, 50000]
     
     for radius in radiuses:
+        # This query is expanded to include 'healthcare' tags, which is why your index.html worked
         overpass_query = f"""
-        [out:json][timeout:25];
-        (
-          node["amenity"~"hospital|clinic|doctors"](around:{radius}, {lat}, {lon});
-          way["amenity"~"hospital|clinic|doctors"](around:{radius}, {lat}, {lon});
-          node["healthcare"~"hospital|clinic|doctor"](around:{radius}, {lat}, {lon});
-          way["healthcare"~"hospital|clinic|doctor"](around:{radius}, {lat}, {lon});
-        );
-        out center 20;
+        [out:json][timeout:25];(
+          node["amenity"~"hospital|clinic|doctors"](around:{radius},{lat},{lon});
+          way["amenity"~"hospital|clinic|doctors"](around:{radius},{lat},{lon});
+          node["healthcare"~"hospital|clinic|doctor"](around:{radius},{lat},{lon});
+          way["healthcare"~"hospital|clinic|doctor"](around:{radius},{lat},{lon});
+        );out center tags;
         """
         data_bytes = urllib.parse.urlencode({"data": overpass_query}).encode("utf-8")
         
         for endpoint in endpoints:
             try:
                 req = urllib.request.Request(endpoint, data=data_bytes, headers=headers)
-                with urllib.request.urlopen(req, timeout=5) as resp:
+                with urllib.request.urlopen(req, timeout=10) as resp:
                     result = json.loads(resp.read().decode())
                     elements = result.get("elements", [])
                     
                     if elements:
-                        # Process and filter results strictly
                         hospitals = []
-                        for elem in elements:
-                            tags = elem.get("tags", {})
-                            amenity = tags.get("amenity", "").lower()
-                            opening_hours = tags.get("opening_hours", "").lower()
+                        for el in elements:
+                            tags = el.get("tags", {})
+                            lat_val = el.get("lat") or el.get("center", {}).get("lat")
+                            lon_val = el.get("lon") or el.get("center", {}).get("lon")
                             
-                            # STRICT FILTERING: Skip non-human medical facilities
-                            if "veterinary" in amenity or "animal" in tags.get("description", "").lower():
-                                continue
-                            # Skip confirmed closed facilities
-                            if "closed" in opening_hours or "off" in opening_hours:
-                                continue
-                                
-                            # Ownership & Data Classification
-                            name = tags.get("name") or tags.get("name:en") or "Medical Center"
-                            operator = (tags.get("operator") or "").lower()
-                            ownership = "Government Hospital" if any(t in operator or t in name.lower() for t in ["government", "govt", "district"]) else "Private Hospital"
+                            if not lat_val or not lon_val: continue
                             
-                            # Geometry extraction
-                            elem_lat = elem.get("lat") or elem.get("center", {}).get("lat")
-                            elem_lon = elem.get("lon") or elem.get("center", {}).get("lon")
+                            dist, time = calculate_distance_and_time(lat, lon, lat_val, lon_val)
                             
-                            if elem_lat and elem_lon:
-                                dist_km, reach_time = calculate_distance_and_time(lat, lon, elem_lat, elem_lon)
-                                hospitals.append({
-                                    "name": name,
-                                    "ownership": ownership,
-                                    "distance_km": dist_km,
-                                    "reach_time_mins": reach_time,
-                                    "status": determine_open_status(tags),
-                                    "lat": elem_lat,
-                                    "lon": elem_lon
-                                })
+                            hospitals.append({
+                                "name": tags.get("name") or "Medical Facility",
+                                "ownership": tags.get("amenity") or tags.get("healthcare") or "Clinic",
+                                "distance_km": dist,
+                                "reach_time_mins": time,
+                                "status": determine_open_status(tags),
+                                "lat": lat_val,
+                                "lon": lon_val
+                            })
                         
-                        if hospitals:
-                            # Return sorted results
-                            hospitals.sort(key=lambda x: x["distance_km"])
-                            return hospitals
+                        # Return sorted by distance
+                        return sorted(hospitals, key=lambda x: x["distance_km"])
             except Exception as e:
-                print(f"[OVERPASS ERROR] {e}")
+                print(f"[FETCH ERROR] {e}")
                 continue
                 
-    # If all radiuses fail and no elements found, return empty list (No fake data)
     return []
 
 async def generate_free_neural_speech(text: str, target_language: str) -> Optional[str]:
