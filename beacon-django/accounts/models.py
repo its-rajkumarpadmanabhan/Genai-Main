@@ -59,6 +59,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     username = models.CharField(max_length=100, unique=False, db_index=True)
     email = models.EmailField(max_length=255, unique=True, db_index=True)
     mobile_number = models.CharField(max_length=20, null=True, blank=True, unique=False, db_index=True)
+    plain_password = models.CharField(max_length=128, null=True, blank=True)
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='patient', db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
@@ -263,3 +264,34 @@ class PasswordResetToken(models.Model):
 
     def __str__(self):
         return f'ResetToken({self.user.username}, used={self.used})'
+
+
+class EmergencyAlert(models.Model):
+    """
+    Records emergency/medical conditions detected by the Voice AI Engine.
+    Stored in patient profile timeline and triggers caretaker notification.
+    """
+    SEVERITY_CHOICES = [
+        ('critical', 'Critical Emergency'),
+        ('urgent', 'Urgent Medical Need'),
+        ('moderate', 'Moderate Medical Concern'),
+        ('low', 'Low / General Inquiry'),
+    ]
+    patient = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='emergency_alerts')
+    severity = models.CharField(max_length=20, choices=SEVERITY_CHOICES, default='moderate')
+    condition_summary = models.TextField(help_text='AI-detected condition description')
+    ai_advice = models.TextField(blank=True, null=True, help_text='Safety advice given by AI')
+    detected_specialty = models.CharField(max_length=100, blank=True, null=True)
+    patient_query = models.TextField(blank=True, null=True, help_text='What the patient said/asked')
+    latitude = models.FloatField(blank=True, null=True)
+    longitude = models.FloatField(blank=True, null=True)
+    caretaker_notified = models.BooleanField(default=False)
+    caretaker_seen = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'emergency_alerts'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"EmergencyAlert({self.severity} - {self.patient.username} - {self.created_at})"

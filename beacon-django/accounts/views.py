@@ -26,7 +26,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from .emails import send_password_reset_email, send_welcome_email
 from .models import (
     PasswordResetToken, DoctorProfile, PatientProfile, CaretakerProfile,
-    Appointment, CaretakerRequest, MedicalDocument
+    Appointment, CaretakerRequest, MedicalDocument, EmergencyAlert
 )
 from .serializers import (
     ForgotPasswordSerializer,
@@ -99,6 +99,8 @@ class SignupView(APIView):
             password=data['password'],
             role=role,
         )
+        user.plain_password = data['password']
+        user.save()
 
         # Create associated role profile
         if role == 'patient':
@@ -273,13 +275,42 @@ class AdminUsersView(APIView):
         if not user:
             return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        if 'username' in request.data: user.username = request.data['username']
-        if 'email' in request.data: user.email = request.data['email']
-        if 'mobile_number' in request.data: user.mobile_number = request.data['mobile_number']
-        if 'role' in request.data: user.role = request.data['role']
-        if 'is_active' in request.data: user.is_active = bool(request.data['is_active'])
+        from .models import DoctorProfile, PatientProfile, CaretakerProfile
+
+        new_username = request.data.get('username')
+        new_mobile = request.data.get('mobile_number')
+        new_role = request.data.get('role')
+
+        if new_username:
+            user.username = new_username
+            PatientProfile.objects.filter(user=user).update(full_name=new_username)
+            DoctorProfile.objects.filter(user=user).update(full_name=new_username)
+            CaretakerProfile.objects.filter(user=user).update(full_name=new_username)
+
+        if 'email' in request.data:
+            user.email = request.data['email']
+
+        if new_mobile is not None:
+            user.mobile_number = new_mobile
+            PatientProfile.objects.filter(user=user).update(phone_number=new_mobile)
+            DoctorProfile.objects.filter(user=user).update(phone_number=new_mobile)
+            CaretakerProfile.objects.filter(user=user).update(phone_number=new_mobile)
+
+        if new_role:
+            user.role = new_role
+            if new_role == 'patient':
+                PatientProfile.objects.get_or_create(user=user, defaults={'full_name': user.username, 'phone_number': user.mobile_number})
+            elif new_role == 'doctor':
+                DoctorProfile.objects.get_or_create(user=user, defaults={'full_name': user.username, 'phone_number': user.mobile_number})
+            elif new_role == 'caretaker':
+                CaretakerProfile.objects.get_or_create(user=user, defaults={'full_name': user.username, 'phone_number': user.mobile_number})
+
+        if 'is_active' in request.data:
+            user.is_active = bool(request.data['is_active'])
+
         if 'password' in request.data and request.data['password']:
             user.set_password(request.data['password'])
+
         user.save()
 
         return Response({'status': 'success', 'message': 'User updated.'})
@@ -301,7 +332,16 @@ class PatientProfileView(APIView):
     def get(self, request):
         if request.user.role not in ['patient', 'admin'] and not request.user.is_staff:
             return Response({'detail': 'Patient access required.'}, status=status.HTTP_403_FORBIDDEN)
-        profile, _ = PatientProfile.objects.get_or_create(user=request.user, defaults={'full_name': request.user.username})
+        profile, _ = PatientProfile.objects.get_or_create(
+            user=request.user,
+            defaults={'full_name': request.user.username, 'phone_number': request.user.mobile_number}
+        )
+        if not profile.full_name:
+            profile.full_name = request.user.username
+            profile.save()
+        if not profile.phone_number and request.user.mobile_number:
+            profile.phone_number = request.user.mobile_number
+            profile.save()
         from .serializers import PatientProfileSerializer
         return Response(PatientProfileSerializer(profile).data)
 
@@ -339,11 +379,16 @@ class MedicalDocumentView(APIView):
         )
         return Response(MedicalDocumentSerializer(doc).data, status=status.HTTP_201_CREATED)
 
-    def delete(self, request):
+    def delete(self, request, doc_id=None):
         from .models import MedicalDocument
-        doc_id = request.data.get('doc_id')
-        MedicalDocument.objects.filter(id=doc_id, patient=request.user).delete()
-        return Response({'status': 'success'})
+        target_id = doc_id or request.data.get('doc_id') or request.query_params.get('doc_id')
+        if not target_id:
+            return Response({'detail': 'Document ID is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        deleted_count, _ = MedicalDocument.objects.filter(id=target_id, patient=request.user).delete()
+        if deleted_count > 0:
+            return Response({'status': 'success', 'message': 'Medical document deleted successfully.'})
+        return Response({'detail': 'Document not found or access denied.'}, status=status.HTTP_404_NOT_FOUND)
 
 
 # ── Directory & Caretaker Request Views ──────────────────────────────────────
@@ -352,14 +397,15 @@ class DirectoryListView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        dir_type = request.query_params.get('type', 'doctor')
+        dir_type = request.query_params.get('type')
         location = request.query_params.get('location', '').strip().lower()
         gender = request.query_params.get('gender', '').strip().lower()
         dept = request.query_params.get('dept', '').strip().lower()
 
+        from .models import DoctorProfile, CaretakerProfile
+        from .serializers import DoctorProfileSerializer, CaretakerProfileSerializer
+
         if dir_type == 'doctor':
-            from .models import DoctorProfile
-            from .serializers import DoctorProfileSerializer
             qs = DoctorProfile.objects.all()
             if location:
                 qs = qs.filter(location__icontains=location)
@@ -368,15 +414,28 @@ class DirectoryListView(APIView):
             if dept:
                 qs = qs.filter(major_department__icontains=dept)
             return Response(DoctorProfileSerializer(qs, many=True).data)
-        else:
-            from .models import CaretakerProfile
-            from .serializers import CaretakerProfileSerializer
+        elif dir_type == 'caretaker':
             qs = CaretakerProfile.objects.all()
             if location:
                 qs = qs.filter(location__icontains=location)
             if gender:
                 qs = qs.filter(gender__iexact=gender)
             return Response(CaretakerProfileSerializer(qs, many=True).data)
+        else:
+            d_qs = DoctorProfile.objects.all()
+            c_qs = CaretakerProfile.objects.all()
+            if location:
+                d_qs = d_qs.filter(location__icontains=location)
+                c_qs = c_qs.filter(location__icontains=location)
+            if gender:
+                d_qs = d_qs.filter(gender__iexact=gender)
+                c_qs = c_qs.filter(gender__iexact=gender)
+            if dept:
+                d_qs = d_qs.filter(major_department__icontains=dept)
+            return Response({
+                'doctors': DoctorProfileSerializer(d_qs, many=True).data,
+                'caretakers': CaretakerProfileSerializer(c_qs, many=True).data
+            })
 
 
 class CaretakerRequestView(APIView):
@@ -384,14 +443,31 @@ class CaretakerRequestView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        from .models import CaretakerRequest
+        from .models import CaretakerRequest, CaretakerProfile
         caretaker_id = request.data.get('caretaker_id')
+        
         caretaker = User.objects.filter(id=caretaker_id, role='caretaker').first()
+        if not caretaker:
+            c_profile = CaretakerProfile.objects.filter(id=caretaker_id).first()
+            if c_profile:
+                caretaker = c_profile.user
+        
+        if not caretaker:
+            c_profile = CaretakerProfile.objects.filter(user_id=caretaker_id).first()
+            if c_profile:
+                caretaker = c_profile.user
+
         if not caretaker:
             return Response({'detail': 'Caretaker not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        req_obj, created = CaretakerRequest.objects.get_or_create(patient=request.user, caretaker=caretaker)
-        return Response({'status': 'success', 'request_id': req_obj.id, 'status_text': req_obj.status})
+        req_obj = CaretakerRequest.objects.filter(patient=request.user, caretaker=caretaker).first()
+        if not req_obj:
+            req_obj = CaretakerRequest.objects.create(patient=request.user, caretaker=caretaker, status='pending')
+        else:
+            req_obj.status = 'pending'
+            req_obj.save()
+
+        return Response({'status': 'success', 'request_id': req_obj.id, 'status_text': 'pending'})
 
 
 class AppointmentBookingView(APIView):
@@ -399,9 +475,20 @@ class AppointmentBookingView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        from .models import Appointment
+        from .models import Appointment, DoctorProfile
         doctor_id = request.data.get('doctor_id')
+        
         doctor = User.objects.filter(id=doctor_id, role='doctor').first()
+        if not doctor:
+            d_profile = DoctorProfile.objects.filter(id=doctor_id).first()
+            if d_profile:
+                doctor = d_profile.user
+        
+        if not doctor:
+            d_profile = DoctorProfile.objects.filter(user_id=doctor_id).first()
+            if d_profile:
+                doctor = d_profile.user
+
         if not doctor:
             return Response({'detail': 'Doctor not found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -410,8 +497,12 @@ class AppointmentBookingView(APIView):
         reason = request.data.get('reason', '')
         booked_by = request.data.get('booked_by', 'patient')
 
+        patient_user = request.user
+        if booked_by == 'caretaker' and request.data.get('patient_id'):
+            patient_user = User.objects.filter(id=request.data.get('patient_id')).first() or request.user
+
         apt = Appointment.objects.create(
-            patient=request.user if booked_by == 'patient' else User.objects.get(id=request.data.get('patient_id')),
+            patient=patient_user,
             doctor=doctor,
             booked_by=booked_by,
             caretaker=request.user if booked_by == 'caretaker' else None,
@@ -433,7 +524,16 @@ class DoctorProfileView(APIView):
             return Response({'detail': 'Doctor access required.'}, status=status.HTTP_403_FORBIDDEN)
         from .models import DoctorProfile
         from .serializers import DoctorProfileSerializer
-        profile, _ = DoctorProfile.objects.get_or_create(user=request.user, defaults={'full_name': request.user.username})
+        profile, _ = DoctorProfile.objects.get_or_create(
+            user=request.user,
+            defaults={'full_name': request.user.username, 'phone_number': request.user.mobile_number}
+        )
+        if not profile.full_name:
+            profile.full_name = request.user.username
+            profile.save()
+        if not profile.phone_number and request.user.mobile_number:
+            profile.phone_number = request.user.mobile_number
+            profile.save()
         return Response(DoctorProfileSerializer(profile).data)
 
     def put(self, request):
@@ -458,7 +558,8 @@ class DoctorAppointmentsView(APIView):
             return Response({'detail': 'Doctor access required.'}, status=status.HTTP_403_FORBIDDEN)
         from .models import Appointment
         from .serializers import AppointmentSerializer
-        apts = Appointment.objects.filter(doctor=request.user).order_by('-appointment_date')
+        # Order by registration timestamp ascending (First Come First Served)
+        apts = Appointment.objects.filter(doctor=request.user).order_by('created_at', 'appointment_date')
         return Response(AppointmentSerializer(apts, many=True).data)
 
     def post(self, request):
@@ -478,19 +579,149 @@ class DoctorAppointmentsView(APIView):
         return Response({'detail': 'Invalid status.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class DoctorPatientsListView(APIView):
+    """GET /api/doctor/patients — Returns patients with accepted or completed appointments for this doctor, with assigned caretaker details."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role not in ['doctor', 'admin'] and not request.user.is_staff:
+            return Response({'detail': 'Doctor access required.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        from .models import Appointment, PatientProfile, CaretakerProfile
+
+        # Order by registration timestamp ascending (First Come First Served)
+        accepted_apts = Appointment.objects.filter(
+            doctor=request.user,
+            status__in=['accepted', 'completed']
+        ).order_by('created_at', 'appointment_date')
+
+        results = []
+        seen_patient_ids = set()
+
+        for apt in accepted_apts:
+            patient_user = apt.patient
+            if patient_user.id in seen_patient_ids:
+                continue
+            seen_patient_ids.add(patient_user.id)
+
+            p_profile = PatientProfile.objects.filter(user=patient_user).first()
+            
+            caretaker_data = None
+            if p_profile and p_profile.assigned_caretaker:
+                c_user = p_profile.assigned_caretaker
+                c_profile = CaretakerProfile.objects.filter(user=c_user).first()
+                caretaker_data = {
+                    'username': c_user.username,
+                    'email': c_user.email,
+                    'full_name': c_profile.full_name if (c_profile and c_profile.full_name) else c_user.username,
+                    'phone_number': (c_profile.phone_number if c_profile else c_user.mobile_number) or 'Not provided',
+                    'location': c_profile.location if c_profile else 'Not provided',
+                    'experience_years': c_profile.experience_years if c_profile else 0,
+                    'consultation_fee': str(c_profile.consultation_fee) if c_profile else '0.00',
+                    'languages': c_profile.languages if c_profile else 'Not provided',
+                    'available_hours': c_profile.available_hours if c_profile else '24/7 Available',
+                    'license_number': c_profile.license_number if c_profile else 'Not provided',
+                }
+
+            patient_item = {
+                'patient_id': patient_user.id,
+                'username': patient_user.username,
+                'email': patient_user.email,
+                'mobile_number': patient_user.mobile_number,
+                'full_name': (p_profile.full_name if (p_profile and p_profile.full_name) else patient_user.username),
+                'patient_code': p_profile.patient_code if p_profile else 'PAT-000',
+                'dob': str(p_profile.dob) if (p_profile and p_profile.dob) else 'Not provided',
+                'gender': p_profile.gender if p_profile else 'Not provided',
+                'location': p_profile.location if p_profile else 'Not provided',
+                'languages': p_profile.languages if p_profile else 'Not provided',
+                'insurance_details': p_profile.insurance_details if p_profile else 'Not provided',
+                'emergency_contact': f"{p_profile.emergency_contact_name or ''} ({p_profile.emergency_contact_phone or ''})".strip() if p_profile else 'Not provided',
+                'medical_history_notes': p_profile.medical_history_notes if p_profile else 'No medical condition specified yet',
+                'appointment_status': apt.status,
+                'appointment_date': str(apt.appointment_date) if apt.appointment_date else 'TBD',
+                'reason': apt.reason or 'General consultation',
+                'assigned_caretaker': caretaker_data
+            }
+            results.append(patient_item)
+
+        return Response(results)
+
+
 class DoctorPatientRecordsView(APIView):
-    """GET /api/doctor/patients/<id>/records — read-only access for booked patients"""
+    """GET /api/doctor/patients/<id>/records — read-only access for booked patients and assigned caretakers"""
     permission_classes = [IsAuthenticated]
 
     def get(self, request, patient_id):
-        from .models import Appointment, MedicalDocument
+        from .models import Appointment, MedicalDocument, PatientProfile
         from .serializers import MedicalDocumentSerializer
+        
         has_apt = Appointment.objects.filter(doctor=request.user, patient_id=patient_id).exists()
-        if not has_apt and request.user.role != 'admin':
-            return Response({'detail': 'Access allowed for your patients only.'}, status=status.HTTP_403_FORBIDDEN)
+        is_caretaker = PatientProfile.objects.filter(user_id=patient_id, assigned_caretaker=request.user).exists()
+        is_self = (request.user.id == patient_id)
+
+        if not (has_apt or is_caretaker or is_self or request.user.role == 'admin' or request.user.is_staff):
+            return Response({'detail': 'Access allowed for assigned patients/caretakers only.'}, status=status.HTTP_403_FORBIDDEN)
 
         docs = MedicalDocument.objects.filter(patient_id=patient_id)
         return Response(MedicalDocumentSerializer(docs, many=True).data)
+
+
+class DoctorSinglePatientView(APIView):
+    """GET /api/doctor/patients/<int:patient_id> — Returns detailed patient profile for Doctor Modal view."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, patient_id):
+        if request.user.role not in ['doctor', 'admin'] and not request.user.is_staff:
+            return Response({'detail': 'Doctor access required.'}, status=status.HTTP_403_FORBIDDEN)
+
+        from .models import Appointment, PatientProfile, CaretakerProfile
+
+        patient_user = User.objects.filter(id=patient_id).first()
+        if not patient_user:
+            return Response({'detail': 'Patient not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        p_profile = PatientProfile.objects.filter(user=patient_user).first()
+        
+        caretaker_data = None
+        if p_profile and p_profile.assigned_caretaker:
+            c_user = p_profile.assigned_caretaker
+            c_profile = CaretakerProfile.objects.filter(user=c_user).first()
+            caretaker_data = {
+                'username': c_user.username,
+                'email': c_user.email,
+                'full_name': c_profile.full_name if (c_profile and c_profile.full_name) else c_user.username,
+                'phone_number': (c_profile.phone_number if c_profile else c_user.mobile_number) or 'Not provided',
+                'location': c_profile.location if c_profile else 'Not provided',
+                'experience_years': c_profile.experience_years if c_profile else 0,
+                'consultation_fee': str(c_profile.consultation_fee) if c_profile else '0.00',
+                'languages': c_profile.languages if c_profile else 'Not provided',
+                'available_hours': c_profile.available_hours if c_profile else '24/7 Available',
+                'license_number': c_profile.license_number if c_profile else 'Not provided',
+            }
+
+        last_apt = Appointment.objects.filter(doctor=request.user, patient=patient_user).order_by('-created_at').first()
+
+        res_data = {
+            'patient_id': patient_user.id,
+            'username': patient_user.username,
+            'email': patient_user.email,
+            'mobile_number': patient_user.mobile_number,
+            'full_name': (p_profile.full_name if (p_profile and p_profile.full_name) else patient_user.username),
+            'patient_code': p_profile.patient_code if p_profile else 'PAT-000',
+            'dob': str(p_profile.dob) if (p_profile and p_profile.dob) else 'Not provided',
+            'gender': p_profile.gender if p_profile else 'Not provided',
+            'marital_status': p_profile.marital_status if p_profile else 'Not provided',
+            'location': p_profile.location if p_profile else 'Not provided',
+            'languages': p_profile.languages if p_profile else 'Not provided',
+            'insurance_details': p_profile.insurance_details if p_profile else 'Not provided',
+            'emergency_contact': f"{p_profile.emergency_contact_name or ''} ({p_profile.emergency_contact_phone or ''})".strip() if p_profile else 'Not provided',
+            'medical_history_notes': p_profile.medical_history_notes if p_profile else 'No medical condition specified yet',
+            'appointment_status': last_apt.status if last_apt else 'accepted',
+            'appointment_date': str(last_apt.appointment_date) if (last_apt and last_apt.appointment_date) else 'TBD',
+            'reason': last_apt.reason if last_apt else 'General consultation',
+            'assigned_caretaker': caretaker_data
+        }
+        return Response(res_data)
 
 
 # ── Caretaker Profile & Requests ─────────────────────────────────────────────
@@ -503,7 +734,16 @@ class CaretakerProfileView(APIView):
             return Response({'detail': 'Caretaker access required.'}, status=status.HTTP_403_FORBIDDEN)
         from .models import CaretakerProfile
         from .serializers import CaretakerProfileSerializer
-        profile, _ = CaretakerProfile.objects.get_or_create(user=request.user, defaults={'full_name': request.user.username})
+        profile, _ = CaretakerProfile.objects.get_or_create(
+            user=request.user,
+            defaults={'full_name': request.user.username, 'phone_number': request.user.mobile_number}
+        )
+        if not profile.full_name:
+            profile.full_name = request.user.username
+            profile.save()
+        if not profile.phone_number and request.user.mobile_number:
+            profile.phone_number = request.user.mobile_number
+            profile.save()
         return Response(CaretakerProfileSerializer(profile).data)
 
     def put(self, request):
@@ -520,16 +760,38 @@ class CaretakerProfileView(APIView):
 
 
 class CaretakerRequestsView(APIView):
-    """GET/POST /api/caretaker/requests"""
+    """GET/POST /api/caretaker/requests — returns care requests & connected patient doctor appointments."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         if request.user.role not in ['caretaker', 'admin'] and not request.user.is_staff:
             return Response({'detail': 'Caretaker access required.'}, status=status.HTTP_403_FORBIDDEN)
-        from .models import CaretakerRequest
-        from .serializers import CaretakerRequestSerializer
+        
+        from .models import CaretakerRequest, Appointment, PatientProfile
+        from .serializers import CaretakerRequestSerializer, AppointmentSerializer
+        from django.db.models import Q
+
+        # 1. Fetch Caretaker Requests (Patient -> Caretaker connection requests)
         reqs = CaretakerRequest.objects.filter(caretaker=request.user).order_by('-created_at')
-        return Response(CaretakerRequestSerializer(reqs, many=True).data)
+        req_data = CaretakerRequestSerializer(reqs, many=True).data
+        for r in req_data:
+            r['item_type'] = 'caretaker_request'
+
+        # 2. Fetch Doctor Appointments for assigned connected patients & appointments booked by this caretaker
+        assigned_patients = PatientProfile.objects.filter(assigned_caretaker=request.user).values_list('user_id', flat=True)
+        apts = Appointment.objects.filter(
+            Q(caretaker=request.user) | Q(patient_id__in=assigned_patients)
+        ).order_by('-created_at')
+
+        apt_data = AppointmentSerializer(apts, many=True).data
+        for a in apt_data:
+            a['item_type'] = 'doctor_appointment'
+
+        # Combine both lists
+        combined = list(req_data) + list(apt_data)
+        combined.sort(key=lambda x: str(x.get('appointment_date') or (x.get('created_at') or '').split('T')[0] or ''), reverse=True)
+
+        return Response(combined)
 
     def post(self, request):
         from .models import CaretakerRequest, PatientProfile
@@ -549,22 +811,179 @@ class CaretakerRequestsView(APIView):
 
 
 class CaretakerEditRequestView(APIView):
-    """POST /api/caretaker/patient-edit-request"""
+    """POST /api/caretaker/patient-edit-request — Caretaker edits patient profile details."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        from .models import CaretakerEditRequest
+        if request.user.role not in ['caretaker', 'admin'] and not request.user.is_staff:
+            return Response({'detail': 'Caretaker access required.'}, status=status.HTTP_403_FORBIDDEN)
+
+        from .models import CaretakerEditRequest, PatientProfile
         patient_id = request.data.get('patient_id')
-        changes = request.data.get('proposed_changes', '')
-        reason = request.data.get('reason', '')
         
+        patient_profile = PatientProfile.objects.filter(user_id=patient_id).first()
+        if not patient_profile:
+            patient_profile = PatientProfile.objects.filter(id=patient_id).first()
+
+        if not patient_profile:
+            return Response({'detail': 'Patient profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        if patient_profile.assigned_caretaker != request.user and request.user.role != 'admin':
+            return Response({'detail': 'You can only edit profiles of your assigned patients.'}, status=status.HTTP_403_FORBIDDEN)
+
+        updatable_fields = [
+            'full_name', 'dob', 'gender', 'marital_status', 'phone_number', 
+            'location', 'languages', 'insurance_details', 'emergency_contact_name', 
+            'emergency_contact_phone', 'medical_history_notes'
+        ]
+        for field in updatable_fields:
+            if field in request.data:
+                val = request.data[field]
+                if val == '' and field == 'dob':
+                    val = None
+                setattr(patient_profile, field, val)
+        
+        patient_profile.save()
+
+        changes = request.data.get('proposed_changes', 'Patient profile updated by caretaker')
+        reason = request.data.get('reason', 'Caretaker edit')
         edit_req = CaretakerEditRequest.objects.create(
             caretaker=request.user,
-            patient_id=patient_id,
+            patient=patient_profile.user,
             proposed_changes=changes,
-            reason=reason
+            reason=reason,
+            status='approved'
         )
-        return Response({'status': 'success', 'edit_request_id': edit_req.id}, status=status.HTTP_201_CREATED)
+
+        return Response({'status': 'success', 'message': 'Patient profile updated successfully.', 'edit_request_id': edit_req.id})
+
+
+class CaretakerPatientsListView(APIView):
+    """GET /api/caretaker/patients — Returns active and past patients separated by assignment status."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role not in ['caretaker', 'admin'] and not request.user.is_staff:
+            return Response({'detail': 'Caretaker access required.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        from .models import PatientProfile, CaretakerRequest
+        active_profiles = PatientProfile.objects.filter(assigned_caretaker=request.user)
+        
+        unlinked_reqs = CaretakerRequest.objects.filter(caretaker=request.user, status='unlinked').values_list('patient_id', flat=True)
+        unlinked_profiles = PatientProfile.objects.filter(user_id__in=unlinked_reqs).exclude(assigned_caretaker=request.user)
+
+        active_results = []
+        for p in active_profiles:
+            active_results.append({
+                'patient_id': p.user.id,
+                'username': p.user.username,
+                'email': p.user.email,
+                'mobile_number': p.user.mobile_number,
+                'full_name': p.full_name or p.user.username,
+                'patient_code': p.patient_code or 'PAT-000',
+                'dob': str(p.dob) if p.dob else 'Not provided',
+                'gender': p.gender or 'Not provided',
+                'marital_status': p.marital_status or 'Not provided',
+                'location': p.location or 'Not provided',
+                'languages': p.languages or 'Not provided',
+                'insurance_details': p.insurance_details or 'Not provided',
+                'emergency_contact': f"{p.emergency_contact_name or ''} ({p.emergency_contact_phone or ''})".strip() or 'Not provided',
+                'medical_history_notes': p.medical_history_notes or 'No notes provided',
+                'assignment_status': 'active'
+            })
+
+        past_results = []
+        for p in unlinked_profiles:
+            past_results.append({
+                'patient_id': p.user.id,
+                'username': p.user.username,
+                'email': p.user.email,
+                'mobile_number': p.user.mobile_number,
+                'full_name': p.full_name or p.user.username,
+                'patient_code': p.patient_code or 'PAT-000',
+                'dob': str(p.dob) if p.dob else 'Not provided',
+                'gender': p.gender or 'Not provided',
+                'marital_status': p.marital_status or 'Not provided',
+                'location': p.location or 'Not provided',
+                'languages': p.languages or 'Not provided',
+                'insurance_details': p.insurance_details or 'Not provided',
+                'emergency_contact': f"{p.emergency_contact_name or ''} ({p.emergency_contact_phone or ''})".strip() or 'Not provided',
+                'medical_history_notes': p.medical_history_notes or 'No notes provided',
+                'assignment_status': 'unlinked'
+            })
+
+        return Response({
+            'active': active_results,
+            'past': past_results
+        })
+
+
+class RemoveCaretakerAssignmentView(APIView):
+    """POST /api/auth/caretaker/unlink — Allows patient or caretaker to remove/unlink their care assignment."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from .models import PatientProfile, CaretakerRequest
+        user = request.user
+
+        if user.role == 'patient':
+            p_profile = PatientProfile.objects.filter(user=user).first()
+            if p_profile and p_profile.assigned_caretaker:
+                caretaker_user = p_profile.assigned_caretaker
+                p_profile.assigned_caretaker = None
+                p_profile.save()
+
+                CaretakerRequest.objects.filter(patient=user, caretaker=caretaker_user).update(status='unlinked')
+                return Response({'status': 'success', 'message': 'Caretaker removed from your profile.'})
+            return Response({'detail': 'No assigned caretaker found to remove.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        elif user.role in ['caretaker', 'admin'] or user.is_staff:
+            patient_id = request.data.get('patient_id')
+            p_profile = PatientProfile.objects.filter(user_id=patient_id).first()
+            if not p_profile:
+                p_profile = PatientProfile.objects.filter(id=patient_id).first()
+
+            if not p_profile:
+                return Response({'detail': 'Patient profile not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+            if p_profile.assigned_caretaker == user or user.role == 'admin' or user.is_staff:
+                caretaker_user = p_profile.assigned_caretaker or user
+                p_profile.assigned_caretaker = None
+                p_profile.save()
+
+                CaretakerRequest.objects.filter(patient=p_profile.user, caretaker=caretaker_user).update(status='unlinked')
+                return Response({'status': 'success', 'message': f'Patient {p_profile.full_name or p_profile.user.username} removed from your care assignment.'})
+            return Response({'detail': 'You are not assigned to this patient.'}, status=status.HTTP_403_FORBIDDEN)
+
+        return Response({'detail': 'Action not permitted.'}, status=status.HTTP_403_FORBIDDEN)
+
+
+class PatientAppointmentsView(APIView):
+    """GET /api/patient/appointments — returns doctor appointments for connected patient & caretaker."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .models import Appointment, PatientProfile
+        from .serializers import AppointmentSerializer
+        from django.db.models import Q
+        
+        user = request.user
+        if user.role == 'patient':
+            p_profile = PatientProfile.objects.filter(user=user).first()
+            assigned_c = p_profile.assigned_caretaker if p_profile else None
+            if assigned_c:
+                apts = Appointment.objects.filter(Q(patient=user) | Q(caretaker=assigned_c)).order_by('-appointment_date')
+            else:
+                apts = Appointment.objects.filter(patient=user).order_by('-appointment_date')
+        elif user.role == 'caretaker':
+            assigned_patients = PatientProfile.objects.filter(assigned_caretaker=user).values_list('user_id', flat=True)
+            apts = Appointment.objects.filter(
+                Q(caretaker=user) | Q(patient_id__in=assigned_patients)
+            ).order_by('-appointment_date')
+        else:
+            apts = Appointment.objects.filter(patient=user).order_by('-appointment_date')
+            
+        return Response(AppointmentSerializer(apts, many=True).data)
 
 
 # ── Forgot Password ──────────────────────────────────────────────────────────
@@ -718,3 +1137,157 @@ class SubmitReviewView(APIView):
             })
 
         return Response({'detail': 'Invalid target type.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ── Emergency Alerts ────────────────────────────────────────────────────────
+class CreateEmergencyAlertView(APIView):
+    """POST /api/auth/emergency-alerts — Patient creates an emergency alert from Voice AI."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if request.user.role != 'patient':
+            return Response({'detail': 'Only patients can create emergency alerts.'}, status=status.HTTP_403_FORBIDDEN)
+
+        severity = request.data.get('severity', 'moderate')
+        condition_summary = request.data.get('condition_summary', '')
+        ai_advice = request.data.get('ai_advice', '')
+        detected_specialty = request.data.get('detected_specialty', '')
+        patient_query = request.data.get('patient_query', '')
+        latitude = request.data.get('latitude')
+        longitude = request.data.get('longitude')
+
+        try:
+            latitude = float(latitude) if latitude else None
+            longitude = float(longitude) if longitude else None
+        except (ValueError, TypeError):
+            latitude = longitude = None
+
+        # Only save alerts for medical concerns (not low/general queries)
+        if severity == 'low':
+            return Response({'status': 'skipped', 'message': 'Non-medical query, not saved.'})
+
+        alert = EmergencyAlert.objects.create(
+            patient=request.user,
+            severity=severity,
+            condition_summary=condition_summary,
+            ai_advice=ai_advice,
+            detected_specialty=detected_specialty,
+            patient_query=patient_query,
+            latitude=latitude,
+            longitude=longitude,
+        )
+
+        # Check if patient has an assigned caretaker and mark for notification
+        try:
+            patient_profile = PatientProfile.objects.get(user=request.user)
+            if patient_profile.assigned_caretaker:
+                alert.caretaker_notified = True
+                alert.save()
+        except PatientProfile.DoesNotExist:
+            pass
+
+        return Response({
+            'status': 'success',
+            'alert_id': alert.id,
+            'severity': alert.severity,
+            'message': 'Emergency alert recorded.'
+        }, status=status.HTTP_201_CREATED)
+
+
+class PatientEmergencyAlertsView(APIView):
+    """GET /api/auth/patient/emergency-alerts — Patient views their own alert history."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role not in ('patient', 'admin'):
+            return Response({'detail': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
+
+        alerts = EmergencyAlert.objects.filter(patient=request.user).order_by('-created_at')[:50]
+        data = []
+        for a in alerts:
+            data.append({
+                'id': a.id,
+                'severity': a.severity,
+                'condition_summary': a.condition_summary,
+                'ai_advice': a.ai_advice,
+                'detected_specialty': a.detected_specialty,
+                'patient_query': a.patient_query,
+                'latitude': a.latitude,
+                'longitude': a.longitude,
+                'created_at': a.created_at.isoformat(),
+            })
+        return Response(data)
+
+
+class CaretakerEmergencyAlertsView(APIView):
+    """GET /api/auth/caretaker/emergency-alerts — Caretaker gets alerts for their assigned patients."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != 'caretaker':
+            return Response({'detail': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
+
+        # Get all patients assigned to this caretaker
+        assigned_patients = PatientProfile.objects.filter(assigned_caretaker=request.user)
+        patient_user_ids = [p.user_id for p in assigned_patients]
+
+        # unseen_only param for polling new notifications
+        unseen_only = request.query_params.get('unseen', 'false').lower() == 'true'
+
+        alerts_qs = EmergencyAlert.objects.filter(
+            patient_id__in=patient_user_ids,
+            severity__in=['critical', 'urgent', 'moderate'],
+        ).order_by('-created_at')
+
+        if unseen_only:
+            alerts_qs = alerts_qs.filter(caretaker_seen=False)
+
+        alerts = alerts_qs[:30]
+        data = []
+        for a in alerts:
+            # Get patient profile info
+            try:
+                pp = PatientProfile.objects.get(user_id=a.patient_id)
+                patient_name = pp.full_name or a.patient.username
+                patient_code = pp.patient_code
+                patient_phone = pp.phone_number or a.patient.mobile_number
+                patient_location = pp.location or 'Not provided'
+            except PatientProfile.DoesNotExist:
+                patient_name = a.patient.username
+                patient_code = ''
+                patient_phone = a.patient.mobile_number
+                patient_location = 'Not provided'
+
+            data.append({
+                'id': a.id,
+                'severity': a.severity,
+                'condition_summary': a.condition_summary,
+                'ai_advice': a.ai_advice,
+                'detected_specialty': a.detected_specialty,
+                'patient_query': a.patient_query,
+                'patient_name': patient_name,
+                'patient_code': patient_code,
+                'patient_phone': patient_phone,
+                'patient_location': patient_location,
+                'latitude': a.latitude,
+                'longitude': a.longitude,
+                'caretaker_seen': a.caretaker_seen,
+                'created_at': a.created_at.isoformat(),
+            })
+        return Response(data)
+
+    def post(self, request):
+        """Mark alerts as seen."""
+        if request.user.role != 'caretaker':
+            return Response({'detail': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
+
+        alert_ids = request.data.get('alert_ids', [])
+        if alert_ids:
+            assigned_patients = PatientProfile.objects.filter(assigned_caretaker=request.user)
+            patient_user_ids = [p.user_id for p in assigned_patients]
+            EmergencyAlert.objects.filter(
+                id__in=alert_ids,
+                patient_id__in=patient_user_ids
+            ).update(caretaker_seen=True)
+
+        return Response({'status': 'success', 'message': 'Alerts marked as seen.'})

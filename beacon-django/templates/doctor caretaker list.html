@@ -133,10 +133,31 @@
     </div>
 
     <!-- FILTER BAR -->
-    <div class="filter-bar">
-      <div class="filter-field grow">
-        <label>Search</label>
-        <input type="text" id="searchInput" placeholder="Search by name, code or location..." oninput="renderList()">
+    <div class="filter-bar" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:20px;">
+      <div class="filter-field grow" style="flex:1;min-width:200px;">
+        <label>Search Name / Details</label>
+        <input type="text" id="searchInput" placeholder="Search by name, code or department..." oninput="renderList()">
+      </div>
+      <div class="filter-field" style="width:140px;">
+        <label>Gender</label>
+        <select id="filterGender" onchange="renderList()" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:var(--paper);color:var(--ink);">
+          <option value="">All Genders</option>
+          <option value="male">Male</option>
+          <option value="female">Female</option>
+        </select>
+      </div>
+      <div class="filter-field" style="width:160px;">
+        <label>Experience / Age</label>
+        <select id="filterExp" onchange="renderList()" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:var(--paper);color:var(--ink);">
+          <option value="">Any Experience</option>
+          <option value="1-3">1 - 3 Years</option>
+          <option value="4-6">4 - 6 Years</option>
+          <option value="7+">7+ Years</option>
+        </select>
+      </div>
+      <div class="filter-field" style="width:160px;">
+        <label>Location</label>
+        <input type="text" id="filterLocation" placeholder="City / Area..." oninput="renderList()" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:var(--paper);color:var(--ink);">
       </div>
     </div>
 
@@ -213,14 +234,30 @@ function switchTab(tab){
 
 function renderList(){
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const filterG = document.getElementById('filterGender').value.toLowerCase();
+  const filterLoc = document.getElementById('filterLocation').value.trim().toLowerCase();
+  const filterE = document.getElementById('filterExp').value;
+
   const container = document.getElementById('cardGrid');
   const items = currentTab === 'doctors' ? doctorsList : caretakersList;
 
   const filtered = items.filter(item => {
-    const name = item.full_name || item.username || '';
-    const code = item.doctor_code || item.caretaker_code || '';
-    const loc = item.location || '';
-    return !q || name.toLowerCase().includes(q) || code.toLowerCase().includes(q) || loc.toLowerCase().includes(q);
+    const name = (item.full_name || item.username || '').toLowerCase();
+    const code = (item.doctor_code || item.caretaker_code || '').toLowerCase();
+    const loc = (item.location || '').toLowerCase();
+    const gender = (item.gender || '').toLowerCase();
+    const expYears = parseInt(item.experience_years || 0);
+
+    const matchesQ = !q || name.includes(q) || code.includes(q) || loc.includes(q) || (item.major_department||'').toLowerCase().includes(q);
+    const matchesGender = !filterG || gender === filterG;
+    const matchesLoc = !filterLoc || loc.includes(filterLoc);
+
+    let matchesExp = true;
+    if(filterE === '1-3') matchesExp = expYears >= 1 && expYears <= 3;
+    else if(filterE === '4-6') matchesExp = expYears >= 4 && expYears <= 6;
+    else if(filterE === '7+') matchesExp = expYears >= 7;
+
+    return matchesQ && matchesGender && matchesLoc && matchesExp;
   });
 
   document.getElementById('resultsCount').textContent = `${filtered.length} of ${items.length} ${currentTab}`;
@@ -231,7 +268,8 @@ function renderList(){
   }
 
   container.innerHTML = filtered.map(item => {
-    const name = item.full_name || item.username || 'Provider';
+    const rawName = item.full_name || item.username || 'Provider';
+    const name = (currentTab === 'doctors' && !rawName.startsWith('Dr.')) ? 'Dr. ' + rawName : rawName;
     const code = item.doctor_code || item.caretaker_code || (currentTab==='doctors'?'DOC-000':'CAR-000');
     const dept = item.major_department || (currentTab==='doctors'?'General Medicine':'Caregiver');
     const fee = '₹' + (item.consultation_fee || 0);
@@ -329,16 +367,59 @@ async function submitReview(e){
 }
 
 async function bookDoctor(docUserId){
+  const userRaw = localStorage.getItem('beacon_user');
+  let userRole = 'patient';
+  if(userRaw){
+    try { userRole = JSON.parse(userRaw).role || 'patient'; } catch(e){}
+  }
+
+  let selectedPatientId = null;
+  if(userRole === 'caretaker'){
+    try {
+      const pRes = await fetch('/api/auth/caretaker/patients', { headers: getAuthHeader() });
+      if(pRes.ok){
+        const assignedPatients = await pRes.json();
+        if(!assignedPatients || assignedPatients.length === 0){
+          alert('You have no assigned patients under your care. Accept a patient care request first before booking a doctor appointment.');
+          return;
+        }
+        let patMsg = 'Select Patient to book appointment for:\n\n';
+        assignedPatients.forEach((p, idx) => {
+          patMsg += `${idx + 1}. ${p.full_name} (${p.patient_code}) — Enter ID: ${p.patient_id}\n`;
+        });
+        const chosenIdStr = prompt(patMsg + '\nEnter Patient ID:');
+        if(!chosenIdStr) return;
+        selectedPatientId = parseInt(chosenIdStr.trim());
+        const validPat = assignedPatients.find(p => p.patient_id == selectedPatientId);
+        if(!validPat){
+          alert('Invalid Patient ID selected. Please select a valid patient under your care.');
+          return;
+        }
+      }
+    } catch(err){ alert(err.message); return; }
+  }
+
   const appDate = prompt('Enter appointment date (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
   if(!appDate) return;
   const reason = prompt('Enter reason for appointment:');
+
+  const payload = {
+    doctor_id: docUserId,
+    appointment_date: appDate,
+    reason: reason || '',
+    booked_by: (userRole === 'caretaker' ? 'caretaker' : 'patient')
+  };
+  if(selectedPatientId){
+    payload.patient_id = selectedPatientId;
+  }
+
   try {
     const res = await fetch('/api/auth/appointments/book', {
       method: 'POST',
       headers: getAuthHeader(),
-      body: JSON.stringify({ doctor_id: docUserId, appointment_date: appDate, reason: reason || '' })
+      body: JSON.stringify(payload)
     });
-    if(res.ok){ alert('Appointment request sent to doctor!'); }
+    if(res.ok){ alert('Appointment request sent to doctor! Status: Waiting for confirmation.'); }
     else { const d = await res.json(); alert(d.detail || 'Booking failed.'); }
   } catch(e){ alert(e.message); }
 }
@@ -366,7 +447,20 @@ function goToMyDashboard(){
   window.location.href = targetPage;
 }
 
-document.addEventListener('DOMContentLoaded', fetchDirectory);
+document.addEventListener('DOMContentLoaded', () => {
+  const userRaw = localStorage.getItem('beacon_user');
+  if(userRaw){
+    try {
+      const u = JSON.parse(userRaw);
+      if(u.role === 'caretaker'){
+        const tabC = document.getElementById('tabCaretakers');
+        if(tabC) tabC.style.display = 'none';
+        switchTab('doctors');
+      }
+    } catch(e){}
+  }
+  fetchDirectory();
+});
 </script>
 </body>
 </html>

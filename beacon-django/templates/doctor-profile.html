@@ -127,6 +127,11 @@
 
   <!-- MAIN -->
   <main>
+    <div id="roleWarningBanner" style="display:none;background:#FEF2F2;border:1px solid #FCA5A5;color:#991B1B;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:13px;align-items:center;justify-content:space-between;box-shadow:0 2px 6px rgba(0,0,0,0.02);">
+      <div>⚠️ <span id="roleWarningText">Doctor Portal access requires a Doctor account. You are currently logged in as a non-doctor user.</span></div>
+      <a href="/login.html" onclick="localStorage.clear()" style="background:#991B1B;color:#fff;padding:6px 14px;border-radius:6px;text-decoration:none;font-weight:600;font-size:12px;white-space:nowrap;">Log in as Doctor</a>
+    </div>
+
     <div class="topbar">
       <div class="breadcrumb">Doctor Portal › <span id="bcDocName">My Profile</span></div>
       <div class="topbar-right">
@@ -172,9 +177,33 @@
 
         <!-- Appointments Section -->
         <div class="section-box">
-          <div class="section-head">
-            <h2>Patient Appointment Requests</h2>
+          <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+            <h2 style="margin:0;">Patient Appointments</h2>
+            <span style="font-size:11.5px;color:var(--pine-deep);background:var(--pine-soft);padding:3px 10px;border-radius:12px;font-weight:600;">First Come First Served</span>
           </div>
+
+          <!-- Category Tabs -->
+          <div style="display:flex;gap:8px;margin-top:14px;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:10px;">
+            <button id="tabToday" class="apt-tab active" onclick="switchAptCategory('today')" style="padding:7px 14px;border-radius:20px;border:1px solid var(--line);background:var(--pine);color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;">Today (<span id="cntToday">0</span>)</button>
+            <button id="tabUpcoming" class="apt-tab" onclick="switchAptCategory('upcoming')" style="padding:7px 14px;border-radius:20px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:12.5px;font-weight:600;cursor:pointer;">Upcoming (<span id="cntUpcoming">0</span>)</button>
+            <button id="tabPast" class="apt-tab" onclick="switchAptCategory('past')" style="padding:7px 14px;border-radius:20px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:12.5px;font-weight:600;cursor:pointer;">Past (<span id="cntPast">0</span>)</button>
+          </div>
+
+          <!-- Search & Status Filter -->
+          <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+            <div style="flex:1;min-width:200px;position:relative;">
+              <input id="aptSearchInput" type="text" placeholder="🔍 Search by patient name or patient ID..." oninput="renderDoctorAppointments()" style="width:100%;padding:9px 14px 9px 14px;border:1px solid var(--line);border-radius:10px;font-size:12.5px;background:var(--paper);color:var(--ink);font-family:inherit;outline:none;" />
+            </div>
+            <select id="aptStatusFilter" onchange="renderDoctorAppointments()" style="padding:9px 14px;border:1px solid var(--line);border-radius:10px;font-size:12.5px;background:var(--paper);color:var(--ink);font-family:inherit;cursor:pointer;min-width:160px;">
+              <option value="all">All Statuses</option>
+              <option value="pending">⏳ Pending / Waiting</option>
+              <option value="accepted">✅ Accepted</option>
+              <option value="completed">✓ Completed</option>
+              <option value="rejected">❌ Rejected</option>
+              <option value="missed">⚠ Missed</option>
+            </select>
+          </div>
+
           <div id="apptContainer">
             <div class="empty-box">No patient appointment requests received yet.</div>
           </div>
@@ -205,7 +234,7 @@
     </div>
     <form id="editForm" onsubmit="saveProfile(event)">
       <div class="form-grid">
-        <div class="field full"><label>Full Name</label><input id="inputName" type="text" placeholder="Dr. Full Name" required></div>
+        <div class="field full"><label>Full Name</label><input id="inputName" type="text" placeholder="Full Name" required></div>
         <div class="field full"><label>Today's Availability Status</label>
           <select id="inputAvailability">
             <option value="Active Today">🟢 Active / Working Today</option>
@@ -229,6 +258,32 @@
   </div>
 </div>
 
+<!-- PATIENT FULL PROFILE MODAL (FOR DOCTOR) -->
+<div class="modal-backdrop" id="patientFullProfileModal">
+  <div class="modal" style="max-width:620px;">
+    <div class="modal-head">
+      <h3 id="modalPatientTitle">Patient Profile Details</h3>
+      <button class="modal-close" onclick="closePatientProfileModal()">✕</button>
+    </div>
+    <div id="patientFullModalBody" style="margin-top:14px;max-height:75vh;overflow-y:auto;">
+      <div class="empty-box">Loading patient profile details...</div>
+    </div>
+  </div>
+</div>
+
+<!-- DOCUMENT PREVIEW MODAL (FOR DOCTOR) -->
+<div class="modal-backdrop" id="documentViewerModal">
+  <div class="modal" style="max-width:92vw;width:960px;">
+    <div class="modal-head">
+      <h3 id="docPreviewTitle">Medical Document Preview</h3>
+      <button class="modal-close" onclick="closeDocumentPreviewModal()">✕</button>
+    </div>
+    <div id="docPreviewBody" style="margin-top:14px;max-height:80vh;overflow-y:auto;">
+      <div class="empty-box">Select a document to preview...</div>
+    </div>
+  </div>
+</div>
+
 <script>
 function getAuthHeader(){
   const token = localStorage.getItem('access_token') || localStorage.getItem('beacon_token');
@@ -241,9 +296,13 @@ async function loadDoctorProfile(){
   try {
     const res = await fetch('/api/auth/doctor/profile', { headers: getAuthHeader() });
     if(res.ok){
+      const banner = document.getElementById('roleWarningBanner');
+      if(banner) banner.style.display = 'none';
       profileData = await res.json();
-      document.getElementById('dName').textContent = (profileData.full_name ? 'Dr. ' + profileData.full_name : profileData.username);
-      document.getElementById('bcDocName').textContent = (profileData.full_name ? 'Dr. ' + profileData.full_name : profileData.username);
+      const rawName = profileData.full_name || profileData.username || 'Doctor';
+      const docName = rawName.startsWith('Dr.') ? rawName : 'Dr. ' + rawName;
+      document.getElementById('dName').textContent = docName;
+      document.getElementById('bcDocName').textContent = docName;
       document.getElementById('dCode').textContent = profileData.doctor_code || 'DOC-NEW';
       document.getElementById('dDept').textContent = profileData.major_department || 'General Practitioner';
       document.getElementById('dLicense').textContent = profileData.license_number || 'Not provided';
@@ -257,12 +316,35 @@ async function loadDoctorProfile(){
       if(profileData.availability_status){
         document.getElementById('quickAvailability').value = profileData.availability_status;
       }
-    } else {
+
+      const beaconUserRaw = localStorage.getItem('beacon_user');
+      if (beaconUserRaw) {
+        try {
+          const bu = JSON.parse(beaconUserRaw);
+          bu.username = profileData.full_name || profileData.username || bu.username;
+          bu.mobile_number = profileData.phone_number || profileData.mobile_number || bu.mobile_number;
+          if (profileData.email) bu.email = profileData.email;
+          localStorage.setItem('beacon_user', JSON.stringify(bu));
+        } catch(e){}
+      }
+    } else if(res.status === 401){
       localStorage.clear();
-      alert('Your account no longer exists or has been deleted by Admin. Please sign up to create a new profile.');
+      alert('Your login session has expired. Please log in again.');
       window.location.href = '/login.html';
+    } else {
+      const err = await res.json().catch(() => ({}));
+      const banner = document.getElementById('roleWarningBanner');
+      const text = document.getElementById('roleWarningText');
+      if (banner && text) {
+        text.textContent = err.detail || 'Doctor portal access requires a Doctor account. Please log in with your Doctor credentials.';
+        banner.style.display = 'flex';
+      }
+      document.getElementById('dName').textContent = 'Doctor Account Required';
     }
-  } catch(e){ console.log(e); }
+  } catch(e){
+    console.log(e);
+    document.getElementById('dName').textContent = 'Doctor Account Required';
+  }
 }
 
 async function updateQuickAvailability(){
@@ -280,33 +362,397 @@ async function updateQuickAvailability(){
   } catch(e){ console.log(e); }
 }
 
+let allDoctorAppointments = [];
+let activeAptCategory = 'today';
+
 async function loadDoctorAppointments(){
   try {
     const res = await fetch('/api/auth/doctor/appointments', { headers: getAuthHeader() });
     if(res.ok){
-      const apts = await res.json();
-      const container = document.getElementById('apptContainer');
-      if(!apts || apts.length === 0){
-        container.innerHTML = '<div class="empty-box">No patient appointment requests received yet.</div>';
-      } else {
-        container.innerHTML = apts.map(a => `
-          <div class="req-card">
-            <div class="req-top">
-              <div>
-                <div class="req-name">${a.patient_name || 'Patient'}</div>
-                <div class="req-sub">Status: <b>${a.status}</b> · Date: ${a.appointment_date || 'TBD'}</div>
-              </div>
-            </div>
-            <div class="req-reason"><b>Reason:</b> ${a.reason || 'General consultation'}</div>
-            <div class="req-actions">
-              <button class="btn-sm accept" onclick="updateStatus(${a.id}, 'accepted')">Accept</button>
-              <button class="btn-sm decline" onclick="updateStatus(${a.id}, 'rejected')">Reject</button>
-            </div>
-          </div>
-        `).join('');
-      }
+      allDoctorAppointments = await res.json();
+      renderDoctorAppointments();
     }
   } catch(e){ console.log(e); }
+}
+
+function getStatusBadgeHtml(st){
+  st = (st || 'pending').toLowerCase();
+  let bg = '#FEF3C7', fg = '#92400E', border = '#FDE68A';
+  if (st === 'accepted') { bg = '#D1FAE5'; fg = '#065F46'; border = '#A7F3D0'; }
+  else if (st === 'completed') { bg = '#DBEAFE'; fg = '#1E40AF'; border = '#BFDBFE'; }
+  else if (st === 'rejected') { bg = '#FEE2E2'; fg = '#991B1B'; border = '#FCA5A5'; }
+  else if (st === 'missed') { bg = '#FFEDD5'; fg = '#9A3412'; border = '#FED7AA'; }
+  return `<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:12px;background:${bg};color:${fg};border:1px solid ${border};text-transform:uppercase;">${st}</span>`;
+}
+
+function switchAptCategory(cat){
+  activeAptCategory = cat;
+  const tabs = ['today', 'upcoming', 'past'];
+  tabs.forEach(t => {
+    const el = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+    if(el){
+      if(t === cat){
+        el.style.background = 'var(--pine)';
+        el.style.color = '#fff';
+      } else {
+        el.style.background = 'var(--paper)';
+        el.style.color = 'var(--ink)';
+      }
+    }
+  });
+  renderDoctorAppointments();
+}
+
+function renderDoctorAppointments(){
+  const todayStr = new Date().toISOString().split('T')[0];
+  const searchQuery = (document.getElementById('aptSearchInput')?.value || '').trim().toLowerCase();
+  const statusFilter = document.getElementById('aptStatusFilter')?.value || 'all';
+
+  const todayList = [];
+  const upcomingList = [];
+  const pastList = [];
+
+  allDoctorAppointments.forEach((a, idx) => {
+    const aDate = a.appointment_date || '';
+    const st = (a.status || '').toLowerCase();
+    
+    // First Come First Served queue number based on registration timestamp
+    a.queue_number = idx + 1;
+
+    if (st === 'completed' || st === 'missed' || st === 'rejected' || (aDate && aDate < todayStr)) {
+      pastList.push(a);
+    } else if (aDate === todayStr || (!aDate && st === 'pending')) {
+      todayList.push(a);
+    } else {
+      upcomingList.push(a);
+    }
+  });
+
+  document.getElementById('cntToday').textContent = todayList.length;
+  document.getElementById('cntUpcoming').textContent = upcomingList.length;
+  document.getElementById('cntPast').textContent = pastList.length;
+
+  let activeList = [];
+  if (activeAptCategory === 'today') activeList = todayList;
+  else if (activeAptCategory === 'upcoming') activeList = upcomingList;
+  else if (activeAptCategory === 'past') activeList = pastList;
+
+  // Apply search filter (patient name or patient ID/code)
+  if (searchQuery) {
+    activeList = activeList.filter(a => {
+      const pName = (a.patient_name || '').toLowerCase();
+      const pId = String(a.patient || a.patient_id || '').toLowerCase();
+      const pCode = (a.patient_code || '').toLowerCase();
+      return pName.includes(searchQuery) || pId.includes(searchQuery) || pCode.includes(searchQuery);
+    });
+  }
+
+  // Apply status filter
+  if (statusFilter !== 'all') {
+    activeList = activeList.filter(a => (a.status || 'pending').toLowerCase() === statusFilter);
+  }
+
+  const container = document.getElementById('apptContainer');
+  if(!activeList || activeList.length === 0){
+    const filterInfo = searchQuery ? ` matching "${searchQuery}"` : '';
+    const statusInfo = statusFilter !== 'all' ? ` with status "${statusFilter}"` : '';
+    container.innerHTML = `<div class="empty-box">No ${activeAptCategory} appointments${filterInfo}${statusInfo} found.</div>`;
+    return;
+  }
+
+  container.innerHTML = activeList.map(a => `
+    <div class="req-card" style="background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,0.02);">
+      <div class="req-top" style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="background:var(--pine-soft);color:var(--pine-deep);font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;">Reg #${a.queue_number}</span>
+            <div class="req-name" style="font-weight:700;font-size:15px;color:var(--ink);">${a.patient_name || 'Patient'}</div>
+          </div>
+          <div class="req-sub" style="font-size:12px;color:var(--muted);margin-top:4px;">Date: <b>${a.appointment_date || 'TBD'}</b> · Time Slot: <b>${a.time_slot || '10:00 AM'}</b></div>
+        </div>
+        ${getStatusBadgeHtml(a.status)}
+      </div>
+      <div class="req-reason" style="font-size:12.5px;margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);"><b>Reason:</b> ${a.reason || 'General consultation'}</div>
+      
+      <div class="req-actions" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-sm" style="background:#0D9488;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="openFullPatientModal(${a.patient}, '${(a.patient_name||'Patient').replace(/'/g, "\\'")}')">👤 View Patient Profile</button>
+
+        ${a.status === 'pending' ? `
+          <button class="btn-sm accept" style="background:var(--pine);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="updateStatus(${a.id}, 'accepted')">Accept</button>
+          <button class="btn-sm decline" style="background:var(--brick);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="updateStatus(${a.id}, 'rejected')">Reject</button>
+        ` : ''}
+
+        ${a.status === 'accepted' ? `
+          <button class="btn-sm" style="background:var(--pine-deep);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="viewPatientRecords(${a.patient}, '${(a.patient_name||'Patient').replace(/'/g, "\\'")}')">📁 View Medical Records (Read-Only)</button>
+          <button class="btn-sm" style="background:#2563EB;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="updateStatus(${a.id}, 'completed')">✓ Mark Checkup Completed</button>
+          <button class="btn-sm" style="background:#D97706;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="updateStatus(${a.id}, 'missed')">⚠ Mark Missed</button>
+        ` : ''}
+
+        ${(a.status === 'completed' || a.status === 'missed') ? `
+          <button class="btn-sm" style="background:var(--pine-deep);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="viewPatientRecords(${a.patient}, '${(a.patient_name||'Patient').replace(/'/g, "\\'")}')">📁 View Medical Records (Read-Only)</button>
+        ` : ''}
+      </div>
+    </div>
+  `).join('');
+}
+
+async function openFullPatientModal(patientId, patientName){
+  let modal = document.getElementById('patientFullProfileModal');
+  const body = document.getElementById('patientFullModalBody');
+  document.getElementById('modalPatientTitle').textContent = `Patient Profile: ${patientName}`;
+  body.innerHTML = '<div class="empty-box">Loading patient profile details...</div>';
+  modal.classList.add('open');
+
+  try {
+    const res = await fetch(`/api/auth/doctor/patients/${patientId}`, { headers: getAuthHeader() });
+    if(res.ok){
+      const p = await res.json();
+      body.innerHTML = `
+        <div style="background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;">
+          <!-- Basic Info -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:14px;">
+            <div>
+              <div style="font-weight:700;font-size:17px;color:var(--ink);">${p.full_name} <span class="mono" style="font-size:12px;color:var(--muted);font-weight:normal;">(${p.patient_code})</span></div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px;">Registered Mobile: <b>${p.mobile_number}</b> · Email: <b>${p.email}</b></div>
+            </div>
+            <span class="status-pill active" style="font-size:11px;padding:4px 10px;text-transform:uppercase;">${p.appointment_status}</span>
+          </div>
+
+          <!-- Key Details Grid -->
+          <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:12px;font-size:13px;background:var(--paper);padding:14px;border-radius:10px;border:1px solid var(--line);">
+            <div><span style="color:var(--muted);">Date of Birth:</span> <b style="color:var(--ink);">${p.dob}</b></div>
+            <div><span style="color:var(--muted);">Gender:</span> <b style="color:var(--ink);">${p.gender}</b></div>
+            <div><span style="color:var(--muted);">Marital Status:</span> <b style="color:var(--ink);">${p.marital_status || 'Not provided'}</b></div>
+            <div><span style="color:var(--muted);">Location:</span> <b style="color:var(--ink);">${p.location}</b></div>
+            <div style="grid-column:span 2;"><span style="color:var(--muted);">Languages:</span> <b style="color:var(--ink);">${p.languages}</b></div>
+            <div style="grid-column:span 2;word-break:break-all;"><span style="color:var(--muted);">Insurance Details:</span> <b style="color:var(--ink);">${p.insurance_details}</b></div>
+            <div style="grid-column:span 2;"><span style="color:var(--muted);">Nearest Emergency Contact:</span> <b style="color:var(--ink);">${p.emergency_contact}</b></div>
+          </div>
+
+          <!-- Medical History -->
+          <div style="margin-top:14px;padding:12px;background:var(--paper);border-radius:10px;border:1px solid var(--line);font-size:13px;">
+            <b style="color:var(--pine-deep);display:block;margin-bottom:4px;">📋 Medical History & Doctor Notes:</b>
+            <div style="color:var(--ink);line-height:1.5;">${p.medical_history_notes}</div>
+          </div>
+
+          <!-- Patient Medical Documents -->
+          <div style="margin-top:14px;padding:12px;background:var(--paper);border-radius:10px;border:1px solid var(--line);font-size:13px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <b style="color:var(--pine-deep);">📁 Uploaded Medical Documents:</b>
+              <button class="btn-sm" style="background:var(--pine-deep);color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11.5px;cursor:pointer;" onclick="viewPatientRecords(${p.patient_id}, '${p.full_name.replace(/'/g, "\\'")}')">View All Records</button>
+            </div>
+            <div id="modalDocContainer_${p.patient_id}">
+              <div class="empty-box" style="font-size:12px;">Loading medical documents...</div>
+            </div>
+          </div>
+
+          <!-- Caretaker Details -->
+          ${p.assigned_caretaker ? `
+            <div style="margin-top:14px;padding:14px;background:#EBF3EF;border:1px solid #D1E4DA;border-radius:10px;font-size:12.5px;">
+              <div style="font-weight:700;color:var(--pine-deep);margin-bottom:8px;font-size:13.5px;">🩺 Assigned Caretaker Details:</div>
+              <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px 14px;">
+                <div><b>Full Name:</b> ${p.assigned_caretaker.full_name}</div>
+                <div><b>Mobile Phone:</b> ${p.assigned_caretaker.phone_number}</div>
+                <div><b>Experience:</b> ${p.assigned_caretaker.experience_years} Years</div>
+                <div><b>Daily Fee:</b> ₹${p.assigned_caretaker.consultation_fee}</div>
+                <div style="grid-column:span 2;"><b>Location:</b> ${p.assigned_caretaker.location}</div>
+                <div style="grid-column:span 2;"><b>Languages Spoken:</b> ${p.assigned_caretaker.languages}</div>
+              </div>
+            </div>
+          ` : `
+            <div style="margin-top:14px;font-size:12px;color:var(--muted);font-style:italic;">No caretaker currently assigned to this patient.</div>
+          `}
+        </div>
+      `;
+
+      loadModalPatientDocs(p.patient_id);
+    } else {
+      body.innerHTML = '<div class="empty-box">Could not load patient profile details.</div>';
+    }
+  } catch(e){
+    body.innerHTML = `<div class="empty-box">${e.message}</div>`;
+  }
+}
+
+async function loadModalPatientDocs(patientId){
+  const container = document.getElementById(`modalDocContainer_${patientId}`);
+  if(!container) return;
+  try {
+    const res = await fetch(`/api/auth/doctor/patients/${patientId}/records`, { headers: getAuthHeader() });
+    if(res.ok){
+      const docs = await res.json();
+      if(!docs || docs.length === 0){
+        container.innerHTML = '<div class="empty-box" style="font-size:12px;">No medical documents uploaded by this patient yet.</div>';
+      } else {
+        container.innerHTML = docs.map(d => {
+          const fileSource = d.file_data || d.file_url || d.file_path || '#';
+          const fName = d.file_name || d.title || 'Document';
+          const isImg = (fileSource && fileSource.startsWith('data:image')) || /\.(jpg|jpeg|png|webp|gif)$/i.test(fName) || /\.(jpg|jpeg|png|webp|gif)$/i.test(fileSource);
+          const isPdf = (fileSource && fileSource.startsWith('data:application/pdf')) || /\.pdf$/i.test(fName) || /\.pdf$/i.test(fileSource);
+
+          return `
+            <div style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;background:var(--surface);display:flex;justify-content:space-between;align-items:center;font-size:12px;">
+              <div>
+                <b>${d.title}</b>
+                <div style="color:var(--muted);font-size:11px;">${d.notes || d.file_name} · ${new Date(d.uploaded_at).toLocaleDateString()}</div>
+              </div>
+              <button class="btn-sm" style="background:#0D9488;color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11.5px;font-weight:600;cursor:pointer;" onclick="previewMedicalDocument('${d.title.replace(/'/g, "\\'")}', '${fileSource.replace(/'/g, "\\'")}', ${isImg}, ${isPdf}, '${(d.notes||'').replace(/'/g, "\\'")}')">👁 Preview File</button>
+            </div>
+          `;
+        }).join('');
+      }
+    } else {
+      container.innerHTML = '<div class="empty-box" style="font-size:12px;">Could not load medical documents.</div>';
+    }
+  } catch(e){
+    container.innerHTML = `<div class="empty-box" style="font-size:12px;">${e.message}</div>`;
+  }
+}
+
+function closePatientProfileModal(){
+  document.getElementById('patientFullProfileModal').classList.remove('open');
+}
+
+async function viewPatientRecords(patientId, patientName){
+  try {
+    const res = await fetch(`/api/auth/doctor/patients/${patientId}/records`, { headers: getAuthHeader() });
+    if(res.ok){
+      const docs = await res.json();
+      let modal = document.getElementById('recordsModal');
+      if(!modal){
+        modal = document.createElement('div');
+        modal.id = 'recordsModal';
+        modal.className = 'modal-backdrop';
+        document.body.appendChild(modal);
+      }
+      
+      const docsHtml = (!docs || docs.length === 0) ? '<div class="empty-box">No medical documents uploaded by this patient yet.</div>' : docs.map(d => {
+        const fileSource = d.file_data || d.file_url || d.file_path || '#';
+        const fName = d.file_name || d.title || 'Document';
+        const isImg = (fileSource && fileSource.startsWith('data:image')) || /\.(jpg|jpeg|png|webp|gif)$/i.test(fName) || /\.(jpg|jpeg|png|webp|gif)$/i.test(fileSource);
+        const isPdf = (fileSource && fileSource.startsWith('data:application/pdf')) || /\.pdf$/i.test(fName) || /\.pdf$/i.test(fileSource);
+
+        return `
+          <div style="padding:12px 14px;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;background:var(--paper);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div>
+              <div style="font-weight:700;font-size:13.5px;color:var(--ink);">${d.title}</div>
+              <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">${d.notes || d.file_name} · Uploaded: ${new Date(d.uploaded_at).toLocaleDateString()}</div>
+            </div>
+            <div style="display:flex;gap:6px;">
+              <button class="btn-sm" style="background:var(--pine-deep);color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;" onclick="previewMedicalDocument('${d.title.replace(/'/g, "\\'")}', '${fileSource.replace(/'/g, "\\'")}', ${isImg}, ${isPdf}, '${(d.notes||'').replace(/'/g, "\\'")}')">👁 Preview File</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      modal.innerHTML = `
+        <div class="modal" style="max-width:560px;">
+          <div class="modal-head">
+            <h3>Medical Records: ${patientName} (Read-Only)</h3>
+            <button class="modal-close" onclick="document.getElementById('recordsModal').classList.remove('open')">✕</button>
+          </div>
+          <div style="margin-top:14px;max-height:65vh;overflow-y:auto;">
+            ${docsHtml}
+          </div>
+        </div>
+      `;
+      modal.classList.add('open');
+    } else {
+      alert('Access allowed for your accepted or completed patients only.');
+    }
+  } catch(e){ alert(e.message); }
+}
+
+function openFullWindowDoc(fileSource, title){
+  if(!fileSource || fileSource === '#') return;
+  if(fileSource.startsWith('data:')){
+    const win = window.open();
+    if(win){
+      win.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>${title} - Full Screen Document View</title></head>
+        <body style="margin:0;padding:0;background:#1e1e1e;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;">
+          <iframe src="${fileSource}#toolbar=1&navpanes=0&scrollbar=1&view=FitH" style="width:100vw;height:100vh;border:none;"></iframe>
+        </body>
+        </html>
+      `);
+    }
+  } else {
+    window.open(fileSource, '_blank');
+  }
+}
+
+function previewMedicalDocument(title, fileSource, isImg, isPdf, notes){
+  let modal = document.getElementById('documentViewerModal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'documentViewerModal';
+    modal.className = 'modal-backdrop';
+    document.body.appendChild(modal);
+  }
+
+  const titleEl = document.getElementById('docPreviewTitle');
+  if(titleEl) titleEl.textContent = `Document Preview: ${title}`;
+
+  let body = document.getElementById('docPreviewBody');
+  if(!body){
+    modal.innerHTML = `
+      <div class="modal" style="max-width:92vw;width:960px;">
+        <div class="modal-head">
+          <h3 id="docPreviewTitle">Document Preview: ${title}</h3>
+          <button class="modal-close" onclick="closeDocumentPreviewModal()">✕</button>
+        </div>
+        <div id="docPreviewBody" style="margin-top:14px;max-height:80vh;overflow-y:auto;">
+        </div>
+      </div>
+    `;
+    body = document.getElementById('docPreviewBody');
+  }
+
+  const pdfUrl = (fileSource && fileSource.startsWith('data:application/pdf')) ? `${fileSource}#toolbar=1&navpanes=0&scrollbar=1&view=FitH` : fileSource;
+
+  let toolbarHtml = `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--paper);border:1px solid var(--line);border-radius:10px;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:12.5px;color:var(--muted);">${notes || 'Medical report document preview'}</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-sm" style="background:#2563EB;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;" onclick="openFullWindowDoc('${fileSource.replace(/'/g, "\\'")}', '${title.replace(/'/g, "\\'")}')">🔍 Open Full Screen / New Tab</button>
+        ${fileSource && fileSource !== '#' ? `<a href="${fileSource}" download="${title}.pdf" style="background:var(--pine);color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">📥 Download File</a>` : ''}
+      </div>
+    </div>
+  `;
+
+  let contentHtml = '';
+  if (isImg && fileSource && fileSource !== '#') {
+    contentHtml = `
+      ${toolbarHtml}
+      <div style="text-align:center;background:#1e1e1e;padding:16px;border-radius:10px;border:1px solid var(--line);">
+        <img src="${fileSource}" alt="${title}" style="max-width:100%;max-height:650px;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,0.2);" onerror="this.onerror=null; this.src='https://placehold.co/600x400?text=Document+Preview+Image';"/>
+      </div>
+    `;
+  } else if (isPdf && fileSource && fileSource !== '#') {
+    contentHtml = `
+      ${toolbarHtml}
+      <div style="position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#525659;">
+        <iframe src="${pdfUrl}" style="width:100%;height:650px;border:none;" title="${title}"></iframe>
+      </div>
+    `;
+  } else {
+    contentHtml = `
+      ${toolbarHtml}
+      <div style="text-align:left;background:var(--surface);padding:20px;border-radius:10px;border:1px solid var(--line);">
+        <h4 style="margin-top:0;color:var(--pine-deep);">${title}</h4>
+        <div style="font-size:14px;line-height:1.6;color:var(--ink);background:var(--paper);padding:16px;border-radius:8px;border:1px solid var(--line);">${notes || 'Medical report document content ready for review.'}</div>
+      </div>
+    `;
+  }
+
+  body.innerHTML = contentHtml;
+  modal.classList.add('open');
+}
+
+function closeDocumentPreviewModal(){
+  document.getElementById('documentViewerModal').classList.remove('open');
 }
 
 function openEditModal(){
@@ -360,8 +806,51 @@ async function updateStatus(aptId, st){
       headers: getAuthHeader(),
       body: JSON.stringify({ appointment_id: aptId, status: st })
     });
-    if(res.ok){ loadDoctorAppointments(); }
+    if(res.ok){
+      loadDoctorAppointments();
+      loadDoctorPatients();
+    }
   } catch(e){ alert(e.message); }
+}
+
+async function loadDoctorPatients(){
+  try {
+    const res = await fetch('/api/auth/doctor/patients', { headers: getAuthHeader() });
+    if(res.ok){
+      const patients = await res.json();
+      const container = document.getElementById('patientsContainer');
+      if(!patients || patients.length === 0){
+        container.innerHTML = '<div class="empty-box">No accepted or consulted patient profiles available currently.</div>';
+      } else {
+        container.innerHTML = patients.map((p, idx) => `
+          <div class="patient-card" style="background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 2px 6px rgba(0,0,0,0.02);">
+            <!-- Header -->
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;">
+              <div>
+                <div style="font-weight:700;font-size:14.5px;color:var(--ink);display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                  <span style="background:var(--pine-soft);color:var(--pine-deep);font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:12px;">Reg #${idx + 1}</span>
+                  ${p.full_name}
+                </div>
+                <div class="mono" style="font-size:11px;color:var(--muted);margin-top:2px;">(${p.patient_code})</div>
+              </div>
+              <span class="status-pill active" style="font-size:10.5px;padding:3px 8px;text-transform:uppercase;">${p.appointment_status}</span>
+            </div>
+
+            <!-- Compact Preview -->
+            <div style="font-size:12px;color:var(--muted);background:var(--surface);padding:10px 12px;border-radius:8px;border:1px solid var(--line);margin-bottom:12px;">
+              <div><b>DOB:</b> ${p.dob} · <b>Gender:</b> ${p.gender}</div>
+              <div style="margin-top:3px;"><b>Location:</b> ${p.location}</div>
+            </div>
+
+            <!-- Action Button to View Full Profile Modal -->
+            <button class="btn-sm" style="width:100%;background:#0D9488;color:#fff;border:none;padding:7px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;" onclick="openFullPatientModal(${p.patient_id}, '${p.full_name.replace(/'/g, "\\'")}')">
+              👤 View Full Profile & Details
+            </button>
+          </div>
+        `).join('');
+      }
+    }
+  } catch(e){ console.log(e); }
 }
 
 async function deleteMyProfile(){
@@ -376,12 +865,17 @@ async function deleteMyProfile(){
   } catch(e){ alert(e.message); }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initDoctorPage(){
   loadDoctorProfile();
   loadDoctorAppointments();
-});
+  loadDoctorPatients();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initDoctorPage);
+} else {
+  initDoctorPage();
+}
 </script>
-</body>
-</html>v>
 </body>
 </html>

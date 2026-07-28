@@ -922,7 +922,32 @@
           renderHospitalsList(res.hospitals || []);
 
           spinner.classList.add('hidden');
+
+          // Detect severity level from AI response
+          const severityLevel = (parsed.severity_level || 'low').toLowerCase();
+          const isMedicalEmergency = severityLevel === 'critical' || severityLevel === 'urgent' || severityLevel === 'moderate';
+
+          // Emergency severity badge
+          let severityBadge = '';
+          if (severityLevel === 'critical') {
+              severityBadge = `<div class="p-3 bg-red-950/60 border-2 border-red-500/60 rounded-xl animate-pulse">
+                  <span class="text-xs font-mono text-red-400 font-bold block mb-1">🚨 CRITICAL EMERGENCY DETECTED</span>
+                  <p class="text-xs text-red-200">${parsed.detected_specialty} — Immediate medical attention required. Your caretaker has been notified.</p>
+              </div>`;
+          } else if (severityLevel === 'urgent') {
+              severityBadge = `<div class="p-3 bg-amber-950/60 border-2 border-amber-500/60 rounded-xl">
+                  <span class="text-xs font-mono text-amber-400 font-bold block mb-1">⚠️ URGENT MEDICAL NEED</span>
+                  <p class="text-xs text-amber-200">${parsed.detected_specialty} — Prompt medical attention recommended. Your caretaker has been notified.</p>
+              </div>`;
+          } else if (severityLevel === 'moderate') {
+              severityBadge = `<div class="p-3 bg-blue-950/40 border border-blue-500/40 rounded-xl">
+                  <span class="text-xs font-mono text-blue-400 font-bold block mb-1">ℹ️ MEDICAL CONCERN LOGGED</span>
+                  <p class="text-xs text-blue-200">${parsed.detected_specialty} — This concern has been recorded to your health timeline.</p>
+              </div>`;
+          }
+
           results.innerHTML = `
+            ${severityBadge}
             <div class="p-3 bg-teal-950/40 border border-teal-500/40 rounded-xl">
               <span class="text-xs font-mono text-teal-400 font-bold block mb-1">WHAT WE HEARD</span>
               <p class="text-xs text-slate-200">${parsed.vocal_risk_analysis}</p>
@@ -936,6 +961,27 @@
               <p class="text-xs text-slate-300">${parsed.immediate_safety_steps}</p>
             </div>
           `;
+
+          // Save emergency alert to patient timeline (only for medical concerns)
+          if (isMedicalEmergency) {
+              try {
+                  await authFetch('/api/auth/emergency-alerts', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getToken()}` },
+                      body: JSON.stringify({
+                          severity: severityLevel,
+                          condition_summary: parsed.vocal_risk_analysis,
+                          ai_advice: parsed.immediate_safety_steps,
+                          detected_specialty: parsed.detected_specialty,
+                          patient_query: parsed.deescalation_script?.substring(0, 500) || '',
+                          latitude: currentLat,
+                          longitude: currentLon,
+                      })
+                  });
+              } catch(alertErr) {
+                  console.log('Emergency alert save error:', alertErr);
+              }
+          }
 
           if (res.audio_base64) {
               const src = `data:${res.audio_mime || 'audio/wav'};base64,${res.audio_base64}`;

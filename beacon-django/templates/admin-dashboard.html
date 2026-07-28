@@ -280,7 +280,7 @@
           <button class="btn-add" onclick="openModal('patient')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Add patient</button>
         </div>
         <table class="admin-table">
-          <thead><tr><th>Name</th><th>Email ID</th><th>Mobile Number</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Name</th><th>Email ID</th><th>Mobile Number</th><th>Password</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody id="tbodyPatients"></tbody>
         </table>
       </div>
@@ -294,7 +294,7 @@
           <button class="btn-add" onclick="openModal('doctor')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Add doctor</button>
         </div>
         <table class="admin-table">
-          <thead><tr><th>Name</th><th>Email ID</th><th>Mobile Number</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Name</th><th>Email ID</th><th>Mobile Number</th><th>Password</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody id="tbodyDoctors"></tbody>
         </table>
       </div>
@@ -308,7 +308,7 @@
           <button class="btn-add" onclick="openModal('caretaker')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Add caretaker</button>
         </div>
         <table class="admin-table">
-          <thead><tr><th>Name</th><th>Email ID</th><th>Mobile Number</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Name</th><th>Email ID</th><th>Mobile Number</th><th>Password</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody id="tbodyCaretakers"></tbody>
         </table>
       </div>
@@ -542,6 +542,7 @@ function renderPatients(){
       <td><div class="name-cell"><div class="t-avatar">${ICON.person}</div><div><div class="t-name">${u.username}</div><div class="t-sub mono">ID: #${u.id}</div></div></div></td>
       <td>${u.email}</td>
       <td>${u.mobile_number || 'Not provided'}</td>
+      <td><code class="mono" style="background:var(--paper);padding:3px 7px;border-radius:6px;font-size:12px;color:var(--pine-deep);">${u.password || '••••••••'}</code></td>
       <td>Patient</td>
       <td><span class="status-pill ${u.is_active?'active':'inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
       <td><div class="row-actions">
@@ -549,7 +550,7 @@ function renderPatients(){
         <button class="icon-action danger" onclick="deleteRecord('patient', ${u.id})">${ICON.trash}</button>
       </div></td>
     </tr>
-  `).join('') : '<tr><td colspan="6"><div class="empty-note">No patients found.</div></td></tr>';
+  `).join('') : '<tr><td colspan="7"><div class="empty-note">No patients found.</div></td></tr>';
 }
 
 function renderDoctors(){
@@ -558,9 +559,10 @@ function renderDoctors(){
 
   document.getElementById('tbodyDoctors').innerHTML = doctors.length ? doctors.map(u => `
     <tr>
-      <td><div class="name-cell"><div class="t-avatar brick">${ICON.stetho}</div><div><div class="t-name">${u.username}</div><div class="t-sub mono">ID: #${u.id}</div></div></div></td>
+      <td><div class="name-cell"><div class="t-avatar brick">${ICON.stetho}</div><div><div class="t-name">${u.username.startsWith('Dr.') ? u.username : 'Dr. ' + u.username}</div><div class="t-sub mono">ID: #${u.id}</div></div></div></td>
       <td>${u.email}</td>
       <td>${u.mobile_number || 'Not provided'}</td>
+      <td><code class="mono" style="background:var(--paper);padding:3px 7px;border-radius:6px;font-size:12px;color:var(--pine-deep);">${u.password || '••••••••'}</code></td>
       <td>Doctor</td>
       <td><span class="status-pill ${u.is_active?'active':'inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
       <td><div class="row-actions">
@@ -568,7 +570,7 @@ function renderDoctors(){
         <button class="icon-action danger" onclick="deleteRecord('doctor', ${u.id})">${ICON.trash}</button>
       </div></td>
     </tr>
-  `).join('') : '<tr><td colspan="6"><div class="empty-note">No doctors found.</div></td></tr>';
+  `).join('') : '<tr><td colspan="7"><div class="empty-note">No doctors found.</div></td></tr>';
 }
 
 function renderCaretakers(){
@@ -580,6 +582,7 @@ function renderCaretakers(){
       <td><div class="name-cell"><div class="t-avatar amber">${ICON.heart}</div><div><div class="t-name">${u.username}</div><div class="t-sub mono">ID: #${u.id}</div></div></div></td>
       <td>${u.email}</td>
       <td>${u.mobile_number || 'Not provided'}</td>
+      <td><code class="mono" style="background:var(--paper);padding:3px 7px;border-radius:6px;font-size:12px;color:var(--pine-deep);">${u.password || '••••••••'}</code></td>
       <td>Caretaker</td>
       <td><span class="status-pill ${u.is_active?'active':'inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
       <td><div class="row-actions">
@@ -587,7 +590,7 @@ function renderCaretakers(){
         <button class="icon-action danger" onclick="deleteRecord('caretaker', ${u.id})">${ICON.trash}</button>
       </div></td>
     </tr>
-  `).join('') : '<tr><td colspan="6"><div class="empty-note">No caretakers found.</div></td></tr>';
+  `).join('') : '<tr><td colspan="7"><div class="empty-note">No caretakers found.</div></td></tr>';
 }
 
 function openModal(roleType, userId){

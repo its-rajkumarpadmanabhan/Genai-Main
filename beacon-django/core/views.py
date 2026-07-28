@@ -50,6 +50,18 @@ class VoiceInterventionResponse(BaseModel):
             '2. Hospital Referral (Name, Ownership, Distance, Time).'
         )
     )
+    severity_level: str = Field(
+        description=(
+            'Classify the medical severity of this query. MUST be one of: '
+            '"critical" (life-threatening emergency like heart attack, stroke, severe bleeding, '
+            'breathing difficulty, unconsciousness, poisoning, severe allergic reaction), '
+            '"urgent" (needs prompt medical attention like chest pain, high fever, fracture, '
+            'severe pain, infection, burns), '
+            '"moderate" (medical concern that needs care like headache, mild pain, cold/flu, '
+            'skin issues, digestive problems), '
+            '"low" (general health inquiry, non-medical question, greetings, or casual conversation).'
+        )
+    )
 
 
 def _get_gemini_client():

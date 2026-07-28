@@ -82,17 +82,58 @@ class CustomUserSerializer(serializers.ModelSerializer):
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
     username = serializers.CharField(source='user.username', read_only=True)
     email = serializers.CharField(source='user.email', read_only=True)
+    mobile_number = serializers.CharField(source='user.mobile_number', read_only=True)
+    assigned_caretaker_details = serializers.SerializerMethodField()
+    past_caretakers_history = serializers.SerializerMethodField()
 
     class Meta:
         model = PatientProfile
         fields = '__all__'
 
+    def get_assigned_caretaker_details(self, obj):
+        if not obj.assigned_caretaker:
+            return None
+        c_user = obj.assigned_caretaker
+        c_profile = getattr(c_user, 'caretaker_profile', None)
+        return {
+            'caretaker_id': c_user.id,
+            'username': c_user.username,
+            'email': c_user.email,
+            'full_name': c_profile.full_name if (c_profile and c_profile.full_name) else c_user.username,
+            'phone_number': (c_profile.phone_number if c_profile else c_user.mobile_number) or 'Not provided',
+            'location': c_profile.location if c_profile else 'Not provided',
+            'experience_years': c_profile.experience_years if c_profile else 0,
+            'consultation_fee': str(c_profile.consultation_fee) if c_profile else '0.00',
+            'languages': c_profile.languages if c_profile else 'Not provided',
+            'available_hours': c_profile.available_hours if c_profile else '24/7 Available',
+            'license_number': c_profile.license_number if c_profile else 'Not provided',
+        }
+
+    def get_past_caretakers_history(self, obj):
+        from .models import CaretakerRequest, CaretakerProfile
+        past_reqs = CaretakerRequest.objects.filter(patient=obj.user, status='unlinked').order_by('-created_at')
+        past_list = []
+        for r in past_reqs:
+            c_user = r.caretaker
+            c_profile = CaretakerProfile.objects.filter(user=c_user).first()
+            past_list.append({
+                'caretaker_id': c_user.id,
+                'full_name': c_profile.full_name if (c_profile and c_profile.full_name) else c_user.username,
+                'phone_number': (c_profile.phone_number if c_profile else c_user.mobile_number) or 'Not provided',
+                'location': c_profile.location if c_profile else 'Not provided',
+                'unlinked_at': str(r.created_at).split(' ')[0]
+            })
+        return past_list
+
 
 class DoctorProfileSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
     username = serializers.CharField(source='user.username', read_only=True)
     email = serializers.CharField(source='user.email', read_only=True)
+    mobile_number = serializers.CharField(source='user.mobile_number', read_only=True)
 
     class Meta:
         model = DoctorProfile
@@ -100,8 +141,10 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
 
 
 class CaretakerProfileSerializer(serializers.ModelSerializer):
+    user_id = serializers.IntegerField(source='user.id', read_only=True)
     username = serializers.CharField(source='user.username', read_only=True)
     email = serializers.CharField(source='user.email', read_only=True)
+    mobile_number = serializers.CharField(source='user.mobile_number', read_only=True)
 
     class Meta:
         model = CaretakerProfile
@@ -126,7 +169,15 @@ class CaretakerRequestSerializer(serializers.ModelSerializer):
 class AppointmentSerializer(serializers.ModelSerializer):
     patient_name = serializers.CharField(source='patient.username', read_only=True)
     doctor_name = serializers.CharField(source='doctor.username', read_only=True)
+    caretaker_name = serializers.SerializerMethodField()
 
     class Meta:
         model = Appointment
         fields = '__all__'
+
+    def get_caretaker_name(self, obj):
+        if obj.caretaker:
+            from .models import CaretakerProfile
+            c_prof = CaretakerProfile.objects.filter(user=obj.caretaker).first()
+            return c_prof.full_name if (c_prof and c_prof.full_name) else obj.caretaker.username
+        return None

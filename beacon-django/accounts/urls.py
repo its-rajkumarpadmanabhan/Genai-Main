@@ -17,11 +17,19 @@ from .views import (
     AppointmentBookingView,
     DoctorProfileView,
     DoctorAppointmentsView,
+    DoctorPatientsListView,
     DoctorPatientRecordsView,
+    DoctorSinglePatientView,
     CaretakerProfileView,
     CaretakerRequestsView,
     CaretakerEditRequestView,
+    CaretakerPatientsListView,
+    RemoveCaretakerAssignmentView,
+    PatientAppointmentsView,
     SubmitReviewView,
+    CreateEmergencyAlertView,
+    PatientEmergencyAlertsView,
+    CaretakerEmergencyAlertsView,
 )
 
 urlpatterns = [
@@ -41,20 +49,31 @@ urlpatterns = [
     # Patient
     path('patient/profile', PatientProfileView.as_view(), name='patient-profile-api'),
     path('patient/documents', MedicalDocumentView.as_view(), name='patient-documents-api'),
+    path('patient/documents/<int:doc_id>', MedicalDocumentView.as_view(), name='patient-document-delete'),
+    path('patient/appointments', PatientAppointmentsView.as_view(), name='patient-appointments-api'),
     path('patient/caretaker-request', CaretakerRequestView.as_view(), name='patient-caretaker-request'),
 
     # Doctor
     path('doctor/profile', DoctorProfileView.as_view(), name='doctor-profile-api'),
     path('doctor/appointments', DoctorAppointmentsView.as_view(), name='doctor-appointments-api'),
+    path('doctor/patients', DoctorPatientsListView.as_view(), name='doctor-patients-list'),
+    path('doctor/patients/<int:patient_id>', DoctorSinglePatientView.as_view(), name='doctor-single-patient'),
     path('doctor/patients/<int:patient_id>/records', DoctorPatientRecordsView.as_view(), name='doctor-patient-records'),
 
     # Caretaker
     path('caretaker/profile', CaretakerProfileView.as_view(), name='caretaker-profile-api'),
     path('caretaker/requests', CaretakerRequestsView.as_view(), name='caretaker-requests-api'),
+    path('caretaker/patients', CaretakerPatientsListView.as_view(), name='caretaker-patients-list'),
     path('caretaker/patient-edit-request', CaretakerEditRequestView.as_view(), name='caretaker-patient-edit-request'),
+    path('caretaker/unlink', RemoveCaretakerAssignmentView.as_view(), name='caretaker-unlink'),
 
     # Shared / Directory / Appointments / Reviews
     path('directory/search', DirectoryListView.as_view(), name='directory-search'),
     path('appointments/book', AppointmentBookingView.as_view(), name='appointments-book'),
     path('review', SubmitReviewView.as_view(), name='submit-review'),
+
+    # Emergency Alerts
+    path('emergency-alerts', CreateEmergencyAlertView.as_view(), name='create-emergency-alert'),
+    path('patient/emergency-alerts', PatientEmergencyAlertsView.as_view(), name='patient-emergency-alerts'),
+    path('caretaker/emergency-alerts', CaretakerEmergencyAlertsView.as_view(), name='caretaker-emergency-alerts'),
 ]

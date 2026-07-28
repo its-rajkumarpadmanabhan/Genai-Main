@@ -162,8 +162,16 @@
         <!-- Care Requests Section -->
         <div class="section-box">
           <div class="section-head">
-            <h2>Patient Care Requests</h2>
+            <h2>Patient Care Requests & Appointments</h2>
           </div>
+
+          <!-- Category Tabs (Today, Upcoming, Past) -->
+          <div style="display:flex;gap:10px;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:12px;">
+            <button id="ctTabToday" onclick="switchCtCategory('today')" style="background:var(--pine);color:#fff;border:none;padding:5px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;">Today (0)</button>
+            <button id="ctTabUpcoming" onclick="switchCtCategory('upcoming')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;">Upcoming (0)</button>
+            <button id="ctTabPast" onclick="switchCtCategory('past')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;">Past (0)</button>
+          </div>
+
           <div id="reqContainer">
             <div class="empty-box">No active patient care requests assigned yet.</div>
           </div>
@@ -173,8 +181,9 @@
       <!-- Right Column: Assigned Patients -->
       <div>
         <div class="section-box">
-          <div class="section-head">
+          <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;">
             <h2>My Patients</h2>
+            <button id="btnPastPatients" class="btn-action secondary" style="padding:4px 10px;font-size:11.5px;display:none;" onclick="openPastPatientsModal()">📜 Past Connections</button>
           </div>
           <div id="patientsContainer">
             <div class="empty-box">No patients currently under your care.</div>
@@ -208,6 +217,61 @@
   </div>
 </div>
 
+<!-- EDIT PATIENT PROFILE MODAL (FOR CARETAKER) -->
+<div class="modal-backdrop" id="editPatientModal">
+  <div class="modal" style="max-width:540px;">
+    <div class="modal-head">
+      <h3 id="editPatModalTitle">Edit Patient Profile</h3>
+      <button class="modal-close" onclick="closeEditPatientModal()">✕</button>
+    </div>
+    <form id="editPatientForm" onsubmit="savePatientProfileEdit(event)">
+      <input type="hidden" id="editPatientId">
+      <div class="form-grid">
+        <div class="field full"><label>Full Name</label><input id="editPatName" type="text" placeholder="Full Name" required></div>
+        <div class="field"><label>Date of Birth</label><input id="editPatDob" type="date"></div>
+        <div class="field"><label>Gender</label>
+          <select id="editPatGender">
+            <option value="">Select Gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="field"><label>Marital Status</label>
+          <select id="editPatMarital">
+            <option value="">Select Status</option>
+            <option value="Single">Single</option>
+            <option value="Married">Married</option>
+            <option value="Widowed">Widowed</option>
+            <option value="Divorced">Divorced</option>
+          </select>
+        </div>
+        <div class="field"><label>Phone Number</label><input id="editPatPhone" type="tel" placeholder="+91 98470 xxxxx"></div>
+        <div class="field full"><label>Location / Address</label><input id="editPatLocation" type="text" placeholder="City, State"></div>
+        <div class="field full"><label>Languages Spoken</label><input id="editPatLang" type="text" placeholder="e.g. English, Malayalam"></div>
+        <div class="field full"><label>Insurance Details</label><input id="editPatInsurance" type="text" placeholder="Policy # / Provider"></div>
+        <div class="field"><label>Emergency Contact Name</label><input id="editPatEmName" type="text" placeholder="Contact Name"></div>
+        <div class="field"><label>Emergency Contact Phone</label><input id="editPatEmPhone" type="tel" placeholder="Contact Phone"></div>
+        <div class="field full"><label>Medical History / Notes</label><textarea id="editPatHistory" rows="2" placeholder="Chronic conditions, allergies, or health notes"></textarea></div>
+      </div>
+      <button class="btn-submit" type="submit">Update Patient Profile</button>
+    </form>
+  </div>
+</div>
+
+<!-- DOCUMENT PREVIEW MODAL (FOR CARETAKER) -->
+<div class="modal-backdrop" id="documentViewerModal">
+  <div class="modal" style="max-width:92vw;width:960px;">
+    <div class="modal-head">
+      <h3 id="docPreviewTitle">Medical Document Preview</h3>
+      <button class="modal-close" onclick="closeDocumentPreviewModal()">✕</button>
+    </div>
+    <div id="docPreviewBody" style="margin-top:14px;max-height:80vh;overflow-y:auto;">
+      <div class="empty-box">Select a document to preview...</div>
+    </div>
+  </div>
+</div>
+
 <script>
 function getAuthHeader(){
   const token = localStorage.getItem('access_token') || localStorage.getItem('beacon_token');
@@ -215,6 +279,7 @@ function getAuthHeader(){
 }
 
 let profileData = {};
+let currentAssignedPatients = [];
 
 async function loadCaretakerProfile(){
   try {
@@ -233,6 +298,17 @@ async function loadCaretakerProfile(){
       document.getElementById('cAvailableHours').textContent = profileData.available_hours || '08:00 AM - 08:00 PM';
       document.getElementById('cHours').textContent = profileData.available_hours || '08:00 AM - 08:00 PM';
       document.getElementById('cGender').textContent = profileData.gender || 'Not provided';
+
+      const beaconUserRaw = localStorage.getItem('beacon_user');
+      if (beaconUserRaw) {
+        try {
+          const bu = JSON.parse(beaconUserRaw);
+          bu.username = profileData.full_name || profileData.username || bu.username;
+          bu.mobile_number = profileData.phone_number || profileData.mobile_number || bu.mobile_number;
+          if (profileData.email) bu.email = profileData.email;
+          localStorage.setItem('beacon_user', JSON.stringify(bu));
+        } catch(e){}
+      }
     } else {
       localStorage.clear();
       alert('Your account no longer exists or has been deleted by Admin. Please sign up to create a new profile.');
@@ -241,24 +317,599 @@ async function loadCaretakerProfile(){
   } catch(e){ console.log(e); }
 }
 
+let ctAllRequests = [];
+let ctActiveCategory = 'today';
+
+function getTodayString(){
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function getStatusBadgeHtml(st){
+  st = (st || 'pending').toLowerCase();
+  let bg = '#FEF3C7', fg = '#92400E', border = '#FDE68A', label = '⏳ Wait for Confirmation';
+  if (st === 'accepted') { bg = '#D1FAE5'; fg = '#065F46'; border = '#A7F3D0'; label = '✓ ACCEPTED'; }
+  else if (st === 'completed') { bg = '#DBEAFE'; fg = '#1E40AF'; border = '#BFDBFE'; label = '✓ COMPLETED'; }
+  else if (st === 'rejected') { bg = '#FEE2E2'; fg = '#991B1B'; border = '#FCA5A5'; label = '✕ REJECTED'; }
+  else if (st === 'missed') { bg = '#FFEDD5'; fg = '#9A3412'; border = '#FED7AA'; label = '⚠ MISSED'; }
+  return `<span style="font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:12px;background:${bg};color:${fg};border:1px solid ${border};">${label}</span>`;
+}
+
+async function loadCaretakerPatientApts(patientId){
+  const container = document.getElementById(`ctPatAptsContainer_${patientId}`);
+  if(!container) return;
+  try {
+    const res = await fetch('/api/auth/patient/appointments', { headers: getAuthHeader() });
+    if(res.ok){
+      const apts = await res.json();
+      const patApts = (apts || []).filter(a => a.patient == patientId || a.patient_id == patientId);
+      if(!patApts || patApts.length === 0){
+        container.innerHTML = '<div class="empty-box" style="font-size:12px;">No doctor appointments booked yet.</div>';
+      } else {
+        container.innerHTML = patApts.map(a => {
+          return `
+            <div style="padding:10px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;background:var(--paper);display:flex;justify-content:space-between;align-items:center;font-size:12px;flex-wrap:wrap;gap:8px;">
+              <div>
+                <b>Dr. ${a.doctor_name || 'Doctor'}</b>
+                <div style="color:var(--muted);font-size:11px;margin-top:2px;">Date: <b>${a.appointment_date}</b> · Slot: <b>${a.time_slot}</b></div>
+                <div style="color:var(--ink);font-size:11.5px;margin-top:2px;"><b>Reason:</b> ${a.reason || 'Consultation'}</div>
+                ${(a.booked_by === 'caretaker' || a.caretaker_name) ? `<div style="color:var(--pine-deep);font-size:11px;font-weight:600;margin-top:3px;">🩺 Booked by Caretaker: ${a.caretaker_name || 'Assigned Caretaker'}</div>` : ''}
+              </div>
+              ${getStatusBadgeHtml(a.status)}
+            </div>
+          `;
+        }).join('');
+      }
+    }
+  } catch(e){
+    container.innerHTML = `<div class="empty-box" style="font-size:12px;">${e.message}</div>`;
+  }
+}
+
+function switchCtCategory(cat){
+  ctActiveCategory = cat;
+  ['today', 'upcoming', 'past'].forEach(t => {
+    const el = document.getElementById('ctTab' + t.charAt(0).toUpperCase() + t.slice(1));
+    if(el){
+      if(t === cat){
+        el.style.background = 'var(--pine)';
+        el.style.color = '#fff';
+        el.style.border = 'none';
+      } else {
+        el.style.background = 'var(--paper)';
+        el.style.color = 'var(--ink)';
+        el.style.border = '1px solid var(--line)';
+      }
+    }
+  });
+  renderCaretakerRequests();
+}
+
 async function loadCaretakerRequests(){
   try {
     const res = await fetch('/api/auth/caretaker/requests', { headers: getAuthHeader() });
     if(res.ok){
-      const reqs = await res.json();
-      const container = document.getElementById('reqContainer');
-      if(!reqs || reqs.length === 0){
-        container.innerHTML = '<div class="empty-box">No active patient care requests assigned yet.</div>';
+      ctAllRequests = await res.json();
+      renderCaretakerRequests();
+    }
+  } catch(e){ console.log(e); }
+}
+
+function renderCaretakerRequests(){
+  const todayStr = getTodayString();
+  const todayList = [];
+  const upcomingList = [];
+  const pastList = [];
+
+  (ctAllRequests || []).forEach(r => {
+    const reqDate = r.appointment_date || (r.created_at || '').split('T')[0];
+    if(!reqDate || reqDate === todayStr){
+      todayList.push(r);
+    } else if(reqDate > todayStr){
+      upcomingList.push(r);
+    } else {
+      pastList.push(r);
+    }
+  });
+
+  const btnToday = document.getElementById('ctTabToday');
+  const btnUpcoming = document.getElementById('ctTabUpcoming');
+  const btnPast = document.getElementById('ctTabPast');
+  if(btnToday) btnToday.textContent = `Today (${todayList.length})`;
+  if(btnUpcoming) btnUpcoming.textContent = `Upcoming (${upcomingList.length})`;
+  if(btnPast) btnPast.textContent = `Past (${pastList.length})`;
+
+  let activeList = todayList;
+  if(ctActiveCategory === 'upcoming') activeList = upcomingList;
+  if(ctActiveCategory === 'past') activeList = pastList;
+
+  const container = document.getElementById('reqContainer');
+  if(!activeList || activeList.length === 0){
+    container.innerHTML = `<div class="empty-box">No ${ctActiveCategory} care requests or appointments.</div>`;
+    return;
+  }
+
+  container.innerHTML = activeList.map(r => {
+    if(r.item_type === 'doctor_appointment'){
+      return `
+        <div style="border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;background:var(--paper);">
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap;">
+            <div>
+              <div style="font-weight:700;font-size:14.5px;color:var(--ink);">${r.patient_name || 'Patient'} → <span style="color:var(--pine-deep);">Dr. ${r.doctor_name || 'Doctor'}</span></div>
+              <div style="font-size:12px;color:var(--muted);margin-top:3px;">Date: <b>${r.appointment_date}</b> · Time Slot: <b>${r.time_slot || '10:00 AM'}</b></div>
+              <div style="font-size:12px;color:var(--ink);margin-top:3px;"><b>Reason:</b> ${r.reason || 'General Consultation'}</div>
+              ${(r.booked_by === 'caretaker' || r.caretaker_name) ? `<div style="font-size:11.5px;color:var(--pine-deep);margin-top:4px;font-weight:600;">🩺 Booked by Caretaker: ${r.caretaker_name || 'You'}</div>` : ''}
+            </div>
+            ${getStatusBadgeHtml(r.status)}
+          </div>
+        </div>
+      `;
+    } else {
+      return `
+        <div style="border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;background:var(--paper);">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+            <div>
+              <div style="font-weight:700;font-size:14.5px;color:var(--ink);">${r.patient_name || 'Patient'} <span style="font-size:11.5px;font-weight:normal;color:var(--muted);">(Care Assignment Request)</span></div>
+              <div style="font-size:12px;color:var(--muted);margin-top:3px;">Request Date: <b>${(r.created_at || '').split('T')[0] || new Date(r.created_at).toLocaleDateString()}</b></div>
+            </div>
+            ${getStatusBadgeHtml(r.status)}
+          </div>
+          ${r.status === 'pending' ? `
+            <div style="display:flex;gap:8px;margin-top:10px;">
+              <button class="btn-action primary" style="padding:5px 12px;font-size:12px;" onclick="updateCaretakerRequest(${r.id}, 'accepted')">Accept Care Request</button>
+              <button class="btn-action danger" style="padding:5px 12px;font-size:12px;" onclick="updateCaretakerRequest(${r.id}, 'rejected')">Reject</button>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+  }).join('');
+}
+
+async function updateCaretakerRequest(reqId, st){
+  try {
+    const res = await fetch('/api/auth/caretaker/requests', {
+      method: 'POST',
+      headers: getAuthHeader(),
+      body: JSON.stringify({ request_id: reqId, status: st })
+    });
+    if(res.ok){
+      loadCaretakerRequests();
+      loadCaretakerPatients();
+    }
+  } catch(e){ alert(e.message); }
+}
+
+let pastPatientsList = [];
+
+async function loadCaretakerPatients(){
+  try {
+    const res = await fetch('/api/auth/caretaker/patients', { headers: getAuthHeader() });
+    if(res.ok){
+      const data = await res.json();
+      currentAssignedPatients = data.active || (Array.isArray(data) ? data : []);
+      pastPatientsList = data.past || [];
+
+      const pastBtn = document.getElementById('btnPastPatients');
+      if(pastBtn){
+        if(pastPatientsList.length > 0){
+          pastBtn.style.display = 'inline-block';
+          pastBtn.textContent = `📜 Past Connections (${pastPatientsList.length})`;
+        } else {
+          pastBtn.style.display = 'none';
+        }
+      }
+
+      const container = document.getElementById('patientsContainer');
+      if(!currentAssignedPatients || currentAssignedPatients.length === 0){
+        container.innerHTML = '<div class="empty-box">No patients currently under your care. Accept a patient care request to view patient profiles.</div>';
       } else {
-        container.innerHTML = reqs.map(r => `
-          <div style="border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;">
-            <div style="font-weight:600;font-size:14px;">${r.patient_name || 'Patient'}</div>
-            <div style="font-size:12px;color:var(--muted);margin-top:2px;">Status: ${r.status} · Notes: ${r.notes || 'None'}</div>
+        container.innerHTML = currentAssignedPatients.map(p => `
+          <div style="border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;background:var(--paper);box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+            <!-- Header -->
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line);">
+              <div>
+                <div style="font-weight:700;font-size:16px;color:var(--ink);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                  ${p.full_name}
+                  <span class="mono" style="font-size:11px;color:var(--pine-deep);background:var(--pine-soft);padding:2px 8px;border-radius:12px;font-weight:600;">${p.patient_code}</span>
+                  <span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;background:#D1FAE5;color:#065F46;border:1px solid #A7F3D0;">✓ CONNECTED</span>
+                </div>
+                <div style="font-size:12px;color:var(--muted);margin-top:4px;">📍 ${p.location || 'Location Not Provided'}</div>
+              </div>
+              <button class="btn-action secondary" style="padding:6px 12px;font-size:12px;white-space:nowrap;border-radius:8px;display:inline-flex;align-items:center;gap:5px;" onclick="viewPatientModal(${JSON.stringify(p).replace(/"/g, '&quot;')})">👤 Visit Profile</button>
+            </div>
+
+            <!-- Key Info Grid -->
+            <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:10px 14px;font-size:12.5px;background:var(--surface);padding:14px;border-radius:10px;border:1px solid var(--line);">
+              <div><span style="color:var(--muted);font-weight:500;">DOB:</span> <b style="color:var(--ink);">${p.dob}</b></div>
+              <div><span style="color:var(--muted);font-weight:500;">Gender:</span> <b style="color:var(--ink);">${p.gender}</b></div>
+              <div style="grid-column:span 2;"><span style="color:var(--muted);font-weight:500;">Phone:</span> <b style="color:var(--ink);">${p.mobile_number}</b></div>
+              <div style="grid-column:span 2;word-break:break-all;"><span style="color:var(--muted);font-weight:500;">Insurance:</span> <b style="color:var(--ink);">${p.insurance_details}</b></div>
+              <div style="grid-column:span 2;word-break:break-word;"><span style="color:var(--muted);font-weight:500;">Emergency Contact:</span> <b style="color:var(--ink);">${p.emergency_contact}</b></div>
+              <div style="grid-column:span 2;word-break:break-word;padding-top:8px;border-top:1px dashed var(--line);"><span style="color:var(--muted);font-weight:500;">Medical History / Notes:</span> <div style="color:var(--ink);margin-top:3px;font-weight:500;line-height:1.45;">${p.medical_history_notes}</div></div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="margin-top:12px;display:flex;justify-content:flex-end;">
+              <button style="padding:6px 14px;font-size:12px;font-weight:600;background:var(--brick);color:#fff;border:none;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;" onclick="removeAssignedPatient(${p.patient_id}, '${p.full_name.replace(/'/g, "\\'")}')">🗑 Remove Patient</button>
+            </div>
           </div>
         `).join('');
       }
     }
   } catch(e){ console.log(e); }
+}
+
+function openPastPatientsModal(){
+  if(!pastPatientsList || pastPatientsList.length === 0) return;
+  let modal = document.getElementById('pastPatientsModal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'pastPatientsModal';
+    modal.className = 'modal-backdrop';
+    document.body.appendChild(modal);
+  }
+
+  const pastHtml = pastPatientsList.map(p => `
+    <div style="border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;background:var(--paper);">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div>
+          <b style="font-size:14.5px;color:var(--ink);">${p.full_name} <span class="mono" style="font-size:11px;color:var(--muted);font-weight:normal;">(${p.patient_code})</span></b>
+          <span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5;margin-left:6px;">UNLINKED</span>
+          <div style="font-size:12px;color:var(--muted);margin-top:3px;">📍 ${p.location} · 📞 ${p.mobile_number}</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  modal.innerHTML = `
+    <div class="modal" style="max-width:580px;">
+      <div class="modal-head">
+        <h3>📜 Past Patient Connections</h3>
+        <button class="modal-close" onclick="document.getElementById('pastPatientsModal').classList.remove('open')">✕</button>
+      </div>
+      <div style="margin-top:14px;max-height:70vh;overflow-y:auto;">
+        ${pastHtml}
+      </div>
+    </div>
+  `;
+  modal.classList.add('open');
+}
+
+async function removeAssignedPatient(patientId, patientName){
+  if(!confirm(`Are you sure you want to end care assignment for patient ${patientName}?`)) return;
+
+  try {
+    const res = await fetch('/api/auth/caretaker/unlink', {
+      method: 'POST',
+      headers: getAuthHeader(),
+      body: JSON.stringify({ patient_id: patientId })
+    });
+    if(res.ok){
+      alert(`Patient ${patientName} has been removed from your care assignment.`);
+      loadCaretakerPatients();
+    } else {
+      const err = await res.json();
+      alert(err.detail || 'Failed to remove patient assignment.');
+    }
+  } catch(e){ alert(e.message); }
+}
+
+function openPatientEditModal(patientId){
+  const p = currentAssignedPatients.find(item => item.patient_id == patientId);
+  if(!p) return;
+  document.getElementById('editPatientId').value = p.patient_id;
+  document.getElementById('editPatModalTitle').textContent = 'Request Profile Edit for ' + p.full_name;
+  document.getElementById('editPatName').value = p.full_name || '';
+  document.getElementById('editPatDob').value = (p.dob && p.dob !== 'Not provided') ? p.dob : '';
+  document.getElementById('editPatGender').value = (p.gender && p.gender !== 'Not provided') ? p.gender : '';
+  document.getElementById('editPatMarital').value = p.marital_status || '';
+  document.getElementById('editPatPhone').value = p.mobile_number || '';
+  document.getElementById('editPatLocation').value = (p.location && p.location !== 'Not provided') ? p.location : '';
+  document.getElementById('editPatLang').value = (p.languages && p.languages !== 'Not provided') ? p.languages : '';
+  document.getElementById('editPatInsurance').value = (p.insurance_details && p.insurance_details !== 'Not provided') ? p.insurance_details : '';
+  
+  let emName = '', emPhone = '';
+  if(p.emergency_contact && p.emergency_contact !== 'Not provided'){
+    const match = p.emergency_contact.match(/^(.*?)(?:\s*\((.*?)\))?$/);
+    if(match){ emName = match[1] || ''; emPhone = match[2] || ''; }
+  }
+  document.getElementById('editPatEmName').value = emName;
+  document.getElementById('editPatEmPhone').value = emPhone;
+  document.getElementById('editPatHistory').value = (p.medical_history_notes && p.medical_history_notes !== 'No notes provided') ? p.medical_history_notes : '';
+  document.getElementById('editPatientModal').classList.add('open');
+}
+
+function closeEditPatientModal(){
+  document.getElementById('editPatientModal').classList.remove('open');
+}
+
+async function savePatientProfileEdit(e){
+  e.preventDefault();
+  const patientId = document.getElementById('editPatientId').value;
+  const payload = {
+    patient_id: patientId,
+    full_name: document.getElementById('editPatName').value,
+    dob: document.getElementById('editPatDob').value || null,
+    gender: document.getElementById('editPatGender').value,
+    marital_status: document.getElementById('editPatMarital').value,
+    phone_number: document.getElementById('editPatPhone').value,
+    location: document.getElementById('editPatLocation').value,
+    languages: document.getElementById('editPatLang').value,
+    insurance_details: document.getElementById('editPatInsurance').value,
+    emergency_contact_name: document.getElementById('editPatEmName').value,
+    emergency_contact_phone: document.getElementById('editPatEmPhone').value,
+    medical_history_notes: document.getElementById('editPatHistory').value,
+    proposed_changes: 'Updated patient profile details via caretaker portal',
+    reason: 'Caretaker patient profile edit request'
+  };
+
+  try {
+    const res = await fetch('/api/auth/caretaker/patient-edit-request', {
+      method: 'POST',
+      headers: getAuthHeader(),
+      body: JSON.stringify(payload)
+    });
+    if(res.ok){
+      closeEditPatientModal();
+      alert('Patient profile updated successfully!');
+      loadCaretakerPatients();
+    } else {
+      const err = await res.json();
+      alert(err.detail || 'Failed to update patient profile.');
+    }
+  } catch(err){ alert(err.message); }
+}
+
+async function viewPatientModal(p){
+  let modal = document.getElementById('patientModal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'patientModal';
+    modal.className = 'modal-backdrop';
+    document.body.appendChild(modal);
+  }
+  
+  modal.innerHTML = `
+    <div class="modal" style="max-width:680px;">
+      <div class="modal-head">
+        <h3>Patient Profile: ${p.full_name} <span style="font-size:12px;font-weight:normal;color:var(--muted);">(Read-Only)</span></h3>
+        <button class="modal-close" onclick="document.getElementById('patientModal').classList.remove('open')">✕</button>
+      </div>
+
+      <div style="margin-top:16px;max-height:75vh;overflow-y:auto;">
+        <!-- Header Banner -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:14px;">
+          <div>
+            <div style="font-weight:700;font-size:17px;color:var(--ink);">${p.full_name} <span class="mono" style="font-size:12px;color:var(--muted);font-weight:normal;">(${p.patient_code})</span></div>
+            <div style="font-size:12.5px;color:var(--pine);margin-top:4px;font-weight:600;">Condition / Notes: ${p.medical_history_notes}</div>
+          </div>
+          <span style="background:var(--pine-soft);color:var(--pine-deep);font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;">READ ONLY</span>
+        </div>
+
+        <!-- Full Patient Profile Grid -->
+        <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:12px;font-size:13px;background:var(--surface);padding:14px;border-radius:10px;border:1px solid var(--line);">
+          <div><span style="color:var(--muted);">Date of Birth:</span> <b style="color:var(--ink);">${p.dob}</b></div>
+          <div><span style="color:var(--muted);">Gender:</span> <b style="color:var(--ink);">${p.gender}</b></div>
+          <div><span style="color:var(--muted);">Marital Status:</span> <b style="color:var(--ink);">${p.marital_status || 'Not provided'}</b></div>
+          <div><span style="color:var(--muted);">Location:</span> <b style="color:var(--ink);">${p.location}</b></div>
+          <div><span style="color:var(--muted);">Phone Number:</span> <b style="color:var(--ink);">${p.mobile_number}</b></div>
+          <div><span style="color:var(--muted);">Email Address:</span> <b style="color:var(--ink);">${p.email}</b></div>
+          <div style="grid-column:span 2;"><span style="color:var(--muted);">Languages Spoken:</span> <b style="color:var(--ink);">${p.languages}</b></div>
+          <div style="grid-column:span 2;word-break:break-all;"><span style="color:var(--muted);">Insurance Details:</span> <b style="color:var(--ink);">${p.insurance_details}</b></div>
+          <div style="grid-column:span 2;"><span style="color:var(--muted);">Nearest Emergency Contact:</span> <b style="color:var(--ink);">${p.emergency_contact}</b></div>
+        </div>
+
+        <!-- Patient Medical Documents Section -->
+        <div style="margin-top:16px;">
+          <b style="color:var(--pine-deep);display:block;margin-bottom:8px;font-size:13.5px;">📁 Patient Medical Documents:</b>
+          <div id="ctPatDocsContainer_${p.patient_id}">
+            <div class="empty-box" style="font-size:12px;">Loading patient medical documents...</div>
+          </div>
+        </div>
+
+        <!-- Patient Doctor Appointments History -->
+        <div style="margin-top:16px;">
+          <b style="color:var(--pine-deep);display:block;margin-bottom:8px;font-size:13.5px;">🗓️ Patient Doctor Appointments:</b>
+          <div id="ctPatAptsContainer_${p.patient_id}">
+            <div class="empty-box" style="font-size:12px;">Loading patient doctor appointments...</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  modal.classList.add('open');
+
+  loadCaretakerPatientDocs(p.patient_id);
+  loadCaretakerPatientApts(p.patient_id);
+}
+
+function openFullWindowDoc(fileSource, title){
+  if(!fileSource || fileSource === '#') return;
+  if(fileSource.startsWith('data:')){
+    const win = window.open();
+    if(win){
+      win.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>${title} - Full Screen Document View</title></head>
+        <body style="margin:0;padding:0;background:#1e1e1e;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;">
+          <iframe src="${fileSource}#toolbar=1&navpanes=0&scrollbar=1&view=FitH" style="width:100vw;height:100vh;border:none;"></iframe>
+        </body>
+        </html>
+      `);
+    }
+  } else {
+    window.open(fileSource, '_blank');
+  }
+}
+
+function closeDocumentPreviewModal(){
+  const modal = document.getElementById('documentViewerModal');
+  if(modal) modal.classList.remove('open');
+}
+
+function previewMedicalDocument(title, fileSource, isImg, isPdf, notes){
+  let modal = document.getElementById('documentViewerModal');
+  if(!modal){
+    modal = document.createElement('div');
+    modal.id = 'documentViewerModal';
+    modal.className = 'modal-backdrop';
+    document.body.appendChild(modal);
+  }
+
+  const titleEl = document.getElementById('docPreviewTitle');
+  if(titleEl) titleEl.textContent = `Document Preview: ${title}`;
+
+  let body = document.getElementById('docPreviewBody');
+  if(!body){
+    modal.innerHTML = `
+      <div class="modal" style="max-width:92vw;width:960px;">
+        <div class="modal-head">
+          <h3 id="docPreviewTitle">Document Preview: ${title}</h3>
+          <button class="modal-close" onclick="closeDocumentPreviewModal()">✕</button>
+        </div>
+        <div id="docPreviewBody" style="margin-top:14px;max-height:80vh;overflow-y:auto;">
+        </div>
+      </div>
+    `;
+    body = document.getElementById('docPreviewBody');
+  }
+
+  const pdfUrl = (fileSource && fileSource.startsWith('data:application/pdf')) ? `${fileSource}#toolbar=1&navpanes=0&scrollbar=1&view=FitH` : fileSource;
+
+  let toolbarHtml = `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:var(--paper);border:1px solid var(--line);border-radius:10px;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+      <div style="font-size:12.5px;color:var(--muted);">${notes || 'Medical report document preview'}</div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-sm" style="background:#2563EB;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:5px;" onclick="openFullWindowDoc('${fileSource.replace(/'/g, "\\'")}', '${title.replace(/'/g, "\\'")}')">🔍 Open Full Screen / New Tab</button>
+        ${fileSource && fileSource !== '#' ? `<a href="${fileSource}" download="${title}.pdf" style="background:var(--pine);color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;gap:5px;">📥 Download File</a>` : ''}
+      </div>
+    </div>
+  `;
+
+  let contentHtml = '';
+  if (isImg && fileSource && fileSource !== '#') {
+    contentHtml = `
+      ${toolbarHtml}
+      <div style="text-align:center;background:#1e1e1e;padding:16px;border-radius:10px;border:1px solid var(--line);">
+        <img src="${fileSource}" alt="${title}" style="max-width:100%;max-height:650px;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,0.2);" onerror="this.onerror=null; this.src='https://placehold.co/600x400?text=Document+Preview+Image';"/>
+      </div>
+    `;
+  } else if (isPdf && fileSource && fileSource !== '#') {
+    contentHtml = `
+      ${toolbarHtml}
+      <div style="position:relative;border-radius:10px;overflow:hidden;border:1px solid var(--line);background:#525659;">
+        <iframe src="${pdfUrl}" style="width:100%;height:650px;border:none;" title="${title}"></iframe>
+      </div>
+    `;
+  } else {
+    contentHtml = `
+      ${toolbarHtml}
+      <div style="text-align:left;background:var(--surface);padding:20px;border-radius:10px;border:1px solid var(--line);">
+        <h4 style="margin-top:0;color:var(--pine-deep);">${title}</h4>
+        <div style="font-size:14px;line-height:1.6;color:var(--ink);background:var(--paper);padding:16px;border-radius:8px;border:1px solid var(--line);">${notes || 'Medical report document content ready for review.'}</div>
+      </div>
+    `;
+  }
+
+  body.innerHTML = contentHtml;
+  modal.classList.add('open');
+}
+
+async function loadCaretakerPatientDocs(patientId){
+  const container = document.getElementById(`ctPatDocsContainer_${patientId}`);
+  if(!container) return;
+  try {
+    const res = await fetch(`/api/auth/doctor/patients/${patientId}/records`, { headers: getAuthHeader() });
+    if(res.ok){
+      const docs = await res.json();
+      if(!docs || docs.length === 0){
+        container.innerHTML = '<div class="empty-box" style="font-size:12px;">No medical documents uploaded by patient yet.</div>';
+      } else {
+        container.innerHTML = docs.map(d => {
+          const fileSource = d.file_data || d.file_url || d.file_path || '#';
+          const fName = d.file_name || d.title || 'Document';
+          const isImg = (fileSource && fileSource.startsWith('data:image')) || /\.(jpg|jpeg|png|webp|gif)$/i.test(fName) || /\.(jpg|jpeg|png|webp|gif)$/i.test(fileSource);
+          const isPdf = (fileSource && fileSource.startsWith('data:application/pdf')) || /\.pdf$/i.test(fName) || /\.pdf$/i.test(fileSource);
+
+          return `
+            <div style="padding:10px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;background:var(--paper);display:flex;justify-content:space-between;align-items:center;font-size:12px;flex-wrap:wrap;gap:8px;">
+              <div>
+                <b>${d.title}</b>
+                <div style="color:var(--muted);font-size:11px;">${d.notes || d.file_name} · Uploaded: ${new Date(d.uploaded_at).toLocaleDateString()}</div>
+              </div>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <button class="btn-sm" style="background:var(--pine-deep);color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:600;cursor:pointer;" onclick="previewMedicalDocument('${d.title.replace(/'/g, "\\'")}', '${fileSource.replace(/'/g, "\\'")}', ${isImg}, ${isPdf}, '${(d.notes||'').replace(/'/g, "\\'")}')">👁 Preview File</button>
+                ${fileSource !== '#' ? `<a href="${fileSource}" download="${fName}" style="padding:4px 10px;background:var(--pine);color:#fff;border-radius:6px;text-decoration:none;font-size:11.5px;font-weight:600;">Download</a>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+    } else {
+      container.innerHTML = '<div class="empty-box" style="font-size:12px;">No documents available.</div>';
+    }
+  } catch(e){
+    container.innerHTML = `<div class="empty-box" style="font-size:12px;">${e.message}</div>`;
+  }
+}
+
+async function loadCaretakerPatientApts(patientId){
+  const container = document.getElementById(`ctPatAptsContainer_${patientId}`);
+  if(!container) return;
+  try {
+    const res = await fetch('/api/auth/patient/appointments', { headers: getAuthHeader() });
+    if(res.ok){
+      const apts = await res.json();
+      const patApts = (apts || []).filter(a => a.patient == patientId || a.patient_id == patientId);
+      if(!patApts || patApts.length === 0){
+        container.innerHTML = '<div class="empty-box" style="font-size:12px;">No doctor appointments booked yet.</div>';
+      } else {
+        container.innerHTML = patApts.map(a => {
+          const st = (a.status || 'pending').toLowerCase();
+          let bg = '#FEF3C7', fg = '#92400E';
+          if (st === 'accepted') { bg = '#D1FAE5'; fg = '#065F46'; }
+          else if (st === 'completed') { bg = '#DBEAFE'; fg = '#1E40AF'; }
+          else if (st === 'rejected') { bg = '#FEE2E2'; fg = '#991B1B'; }
+          else if (st === 'missed') { bg = '#FFEDD5'; fg = '#9A3412'; }
+
+          return `
+            <div style="padding:10px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;background:var(--paper);display:flex;justify-content:space-between;align-items:center;font-size:12px;">
+              <div>
+                <b>Dr. ${a.doctor_name || 'Doctor'}</b>
+                <div style="color:var(--muted);font-size:11px;">Date: ${a.appointment_date} · Slot: ${a.time_slot} · Reason: ${a.reason}</div>
+              </div>
+              <span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;background:${bg};color:${fg};text-transform:uppercase;">${st}</span>
+            </div>
+          `;
+        }).join('');
+      }
+    }
+  } catch(e){
+    container.innerHTML = `<div class="empty-box" style="font-size:12px;">${e.message}</div>`;
+  }
+}
+
+async function requestPatientEdit(patientId, patientName){
+  const changes = prompt(`Enter proposed profile changes for ${patientName}:`);
+  if(!changes) return;
+  const reason = prompt(`Enter reason for edit request:`) || 'Caretaker update';
+  try {
+    const res = await fetch('/api/auth/caretaker/patient-edit-request', {
+      method: 'POST',
+      headers: getAuthHeader(),
+      body: JSON.stringify({ patient_id: patientId, proposed_changes: changes, reason: reason })
+    });
+    if(res.ok){
+      alert(`Edit request submitted successfully for ${patientName}!`);
+    } else {
+      alert('Failed to submit edit request.');
+    }
+  } catch(e){ alert(e.message); }
 }
 
 function openEditModal(){
@@ -311,10 +962,128 @@ async function deleteMyProfile(){
   } catch(e){ alert(e.message); }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
+function initCaretakerPage(){
   loadCaretakerProfile();
   loadCaretakerRequests();
-});
+  loadCaretakerPatients();
+}
+
+// ── Emergency Alert Notifications ──────────────────────────────────────────
+let emergencyPollTimer = null;
+let shownAlertIds = new Set();
+
+async function pollEmergencyAlerts(){
+  try {
+    const res = await fetch('/api/auth/caretaker/emergency-alerts?unseen=true', { headers: getAuthHeader() });
+    if(res.ok){
+      const alerts = await res.json();
+      if(alerts && alerts.length > 0){
+        alerts.forEach(a => {
+          if(!shownAlertIds.has(a.id)){
+            shownAlertIds.add(a.id);
+            showEmergencyNotification(a);
+          }
+        });
+      }
+    }
+  } catch(e){ console.log('Emergency poll error:', e); }
+}
+
+function showEmergencyNotification(alert){
+  // Create overlay notification
+  let overlay = document.getElementById('emergencyOverlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'emergencyOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;right:0;z-index:9999;display:flex;flex-direction:column;gap:10px;padding:16px;max-width:420px;width:100%;pointer-events:none;';
+    document.body.appendChild(overlay);
+  }
+
+  let severityColor = '#3B82F6', severityBg = '#EFF6FF', severityIcon = '💊', severityLabel = 'MEDICAL CONCERN';
+  if(alert.severity === 'critical'){
+    severityColor = '#EF4444'; severityBg = '#FEF2F2'; severityIcon = '🚨'; severityLabel = 'CRITICAL EMERGENCY';
+  } else if(alert.severity === 'urgent'){
+    severityColor = '#F59E0B'; severityBg = '#FFFBEB'; severityIcon = '⚠️'; severityLabel = 'URGENT MEDICAL NEED';
+  }
+
+  const dt = new Date(alert.created_at);
+  const timeStr = dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+
+  const card = document.createElement('div');
+  card.style.cssText = `pointer-events:all;background:${severityBg};border:2px solid ${severityColor};border-radius:16px;padding:18px;box-shadow:0 8px 32px rgba(0,0,0,0.25);animation:slideInRight 0.4s ease-out;`;
+  card.innerHTML = `
+    <style>
+      @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+      @keyframes pulseAlert { 0%, 100% { box-shadow: 0 8px 32px rgba(0,0,0,0.25); } 50% { box-shadow: 0 8px 32px rgba(239,68,68,0.5); } }
+    </style>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:22px;">${severityIcon}</span>
+        <div>
+          <div style="font-size:12px;font-weight:800;color:${severityColor};text-transform:uppercase;letter-spacing:0.8px;">${severityLabel}</div>
+          <div style="font-size:10.5px;color:#6B7280;margin-top:2px;">${timeStr}</div>
+        </div>
+      </div>
+      <button onclick="dismissEmergencyNotif(this, ${alert.id})" style="background:none;border:none;font-size:18px;cursor:pointer;color:#9CA3AF;padding:2px 6px;">✕</button>
+    </div>
+    <div style="margin-top:12px;padding:12px;background:#fff;border-radius:10px;border:1px solid ${severityColor}30;">
+      <div style="font-size:14px;font-weight:700;color:#111827;margin-bottom:4px;">Your patient needs quick assistance!</div>
+      <div style="font-size:13px;color:#374151;line-height:1.5;margin-bottom:8px;">${alert.condition_summary}</div>
+      <div style="font-size:11.5px;color:#6B7280;"><b>Specialty:</b> ${alert.detected_specialty || 'General Medicine'}</div>
+    </div>
+    <div style="margin-top:10px;padding:10px 12px;background:#fff;border-radius:10px;border:1px solid var(--line);">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+        <span style="font-size:14px;">👤</span>
+        <div>
+          <div style="font-size:13.5px;font-weight:700;color:#111827;">${alert.patient_name} <span style="font-size:11px;color:#6B7280;font-weight:normal;">(${alert.patient_code})</span></div>
+          <div style="font-size:11.5px;color:#6B7280;">${alert.patient_location}</div>
+        </div>
+      </div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+      ${(alert.latitude && alert.longitude) ? `<a href="https://www.google.com/maps?q=${alert.latitude},${alert.longitude}" target="_blank" style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 14px;background:#0D9488;color:#fff;border-radius:10px;font-size:12.5px;font-weight:700;text-decoration:none;border:none;cursor:pointer;">📍 Patient Current Location</a>` : `<div style="flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 14px;background:#D1D5DB;color:#6B7280;border-radius:10px;font-size:12.5px;font-weight:600;">📍 Location Not Available</div>`}
+      ${alert.patient_phone ? `<a href="tel:${alert.patient_phone}" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:10px 14px;background:#2563EB;color:#fff;border-radius:10px;font-size:12.5px;font-weight:700;text-decoration:none;border:none;cursor:pointer;">📞 ${alert.patient_phone}</a>` : ''}
+    </div>
+  `;
+
+  // If critical, add pulsing animation
+  if(alert.severity === 'critical'){
+    card.style.animation = 'slideInRight 0.4s ease-out, pulseAlert 2s ease-in-out infinite';
+  }
+
+  overlay.prepend(card);
+
+  // Auto-dismiss after 60 seconds for non-critical
+  if(alert.severity !== 'critical'){
+    setTimeout(() => {
+      if(card.parentNode) card.remove();
+    }, 60000);
+  }
+}
+
+async function dismissEmergencyNotif(btn, alertId){
+  const card = btn.closest('div[style*="pointer-events:all"]');
+  if(card) card.remove();
+  try {
+    await fetch('/api/auth/caretaker/emergency-alerts', {
+      method: 'POST',
+      headers: getAuthHeader(),
+      body: JSON.stringify({ alert_ids: [alertId] })
+    });
+  } catch(e){ console.log(e); }
+}
+
+function startEmergencyPolling(){
+  pollEmergencyAlerts();
+  emergencyPollTimer = setInterval(pollEmergencyAlerts, 15000);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => { initCaretakerPage(); startEmergencyPolling(); });
+} else {
+  initCaretakerPage();
+  startEmergencyPolling();
+}
 </script>
 </body>
 </html>

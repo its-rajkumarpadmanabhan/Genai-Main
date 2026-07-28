@@ -217,7 +217,7 @@
       const role = data.user && data.user.role ? data.user.role : selectedRole;
       const targetPage = role === 'admin' ? '/admin-dashboard.html' :
                          role === 'doctor' ? '/doctor-profile.html' :
-                         role === 'caretaker' ? '/caretaker-dashboard.html' : '/patient-profile.html';
+                         role === 'caretaker' ? '/caretaker-dashboard.html' : '/app.html';
 
       setTimeout(() => window.location.href = targetPage, 1200);
     } catch(err){
