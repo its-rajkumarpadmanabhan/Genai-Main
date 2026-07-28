@@ -113,6 +113,7 @@
     <nav>
       <button class="active" onclick="window.location.href='/doctor-caretaker-list.html'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Directory</span></button>
       <button onclick="window.location.href='/app.html'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Voice AI Engine</span></button>
+      <button onclick="window.location.href='/voice-timeline.html'" id="sidebarTimelineBtn" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>Voice AI Health Timeline</span></button>
       <button onclick="goToMyDashboard()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>My Dashboard</span></button>
       <button onclick="localStorage.clear(); window.location.href='/login.html';"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></button>
     </nav>
@@ -174,7 +175,7 @@
 <div class="modal-backdrop" id="reviewModal">
   <div class="modal">
     <div class="modal-head">
-      <h3 id="reviewModalTitle">Rate & Review</h3>
+      <h3 id="reviewModalTitle">Star & Review</h3>
       <button class="modal-close" onclick="closeReviewModal()">✕</button>
     </div>
     <form id="reviewForm" onsubmit="submitReview(event)">
@@ -245,12 +246,14 @@ function renderList(){
     const name = (item.full_name || item.username || '').toLowerCase();
     const code = (item.doctor_code || item.caretaker_code || '').toLowerCase();
     const loc = (item.location || '').toLowerCase();
+    const state = (item.state || '').toLowerCase();
+    const hospital = (item.hospital_name || '').toLowerCase();
     const gender = (item.gender || '').toLowerCase();
     const expYears = parseInt(item.experience_years || 0);
 
-    const matchesQ = !q || name.includes(q) || code.includes(q) || loc.includes(q) || (item.major_department||'').toLowerCase().includes(q);
+    const matchesQ = !q || name.includes(q) || code.includes(q) || loc.includes(q) || state.includes(q) || hospital.includes(q) || (item.major_department||'').toLowerCase().includes(q);
     const matchesGender = !filterG || gender === filterG;
-    const matchesLoc = !filterLoc || loc.includes(filterLoc);
+    const matchesLoc = !filterLoc || loc.includes(filterLoc) || state.includes(filterLoc) || hospital.includes(filterLoc);
 
     let matchesExp = true;
     if(filterE === '1-3') matchesExp = expYears >= 1 && expYears <= 3;
@@ -306,7 +309,12 @@ function renderList(){
         </div>
 
         <div class="c-tags">
-          <span class="tag loc">${item.location || 'Local'}</span>
+          <span class="tag loc" title="${item.location || 'Local'}">
+            📍 ${currentTab==='doctors' ? 
+              ((item.hospital_name || item.location || item.state) ? `${item.hospital_name || ''}${item.location ? ' · ' + item.location : ''}${item.state ? ', ' + item.state : ''}` : (item.location || 'Local')) : 
+              (item.location || 'Local')
+            }
+          </span>
           <span class="tag exp">${exp}</span>
         </div>
         <div class="c-meta">Fee: <b>${fee}</b> · Hours: ${item.available_hours || 'Available'}</div>
@@ -319,7 +327,7 @@ function renderList(){
             ) :
             `<button class="btn-sm primary" onclick="requestCaretaker(${item.user_id || item.id})">Request</button>`
           }
-          <button class="btn-sm secondary" onclick="openReviewModal('${currentTab==='doctors'?'doctor':'caretaker'}', ${item.id}, '${name.replace(/'/g, "\\'")}')">Rate ★</button>
+          <button class="btn-sm secondary" onclick="openReviewModal('${currentTab==='doctors'?'doctor':'caretaker'}', ${item.id}, '${name.replace(/'/g, "\\'")}')">Star ★</button>
         </div>
       </div>
     `;
@@ -335,7 +343,7 @@ function setRating(r){
 function openReviewModal(type, id, name){
   reviewTarget = { type, id, name };
   setRating(5);
-  document.getElementById('reviewModalTitle').textContent = 'Rate & Review ' + name;
+  document.getElementById('reviewModalTitle').textContent = 'Star & Review ' + name;
   document.getElementById('reviewComment').value = '';
   document.getElementById('reviewModal').classList.add('open');
 }
@@ -357,7 +365,7 @@ async function submitReview(e){
     });
     if(res.ok){
       closeReviewModal();
-      alert('Thank you for rating ' + reviewTarget.name + '!');
+      alert('Thank you for starring ' + reviewTarget.name + '!');
       fetchDirectory();
     } else {
       const err = await res.json();
@@ -378,7 +386,8 @@ async function bookDoctor(docUserId){
     try {
       const pRes = await fetch('/api/auth/caretaker/patients', { headers: getAuthHeader() });
       if(pRes.ok){
-        const assignedPatients = await pRes.json();
+        const data = await pRes.json();
+        const assignedPatients = data.active || (Array.isArray(data) ? data : []);
         if(!assignedPatients || assignedPatients.length === 0){
           alert('You have no assigned patients under your care. Accept a patient care request first before booking a doctor appointment.');
           return;
@@ -401,12 +410,18 @@ async function bookDoctor(docUserId){
 
   const appDate = prompt('Enter appointment date (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
   if(!appDate) return;
+  
+  const appTypeChoice = prompt('Enter appointment type:\n1. Online (Video Call)\n2. Offline (In-Person)\n\nType 1 or 2:', '1');
+  if(!appTypeChoice) return;
+  const appType = (appTypeChoice.trim() === '2') ? 'offline' : 'online';
+
   const reason = prompt('Enter reason for appointment:');
 
   const payload = {
     doctor_id: docUserId,
     appointment_date: appDate,
     reason: reason || '',
+    appointment_type: appType,
     booked_by: (userRole === 'caretaker' ? 'caretaker' : 'patient')
   };
   if(selectedPatientId){
@@ -452,6 +467,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if(userRaw){
     try {
       const u = JSON.parse(userRaw);
+      if(u.role === 'patient' || u.role === 'admin'){
+        const btn = document.getElementById('sidebarTimelineBtn');
+        if(btn) btn.style.display = 'flex';
+      }
       if(u.role === 'caretaker'){
         const tabC = document.getElementById('tabCaretakers');
         if(tabC) tabC.style.display = 'none';

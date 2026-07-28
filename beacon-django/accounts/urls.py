@@ -30,6 +30,8 @@ from .views import (
     CreateEmergencyAlertView,
     PatientEmergencyAlertsView,
     CaretakerEmergencyAlertsView,
+    AppointmentStartCallView,
+    AppointmentEndCallView,
 )
 
 urlpatterns = [
@@ -70,6 +72,8 @@ urlpatterns = [
     # Shared / Directory / Appointments / Reviews
     path('directory/search', DirectoryListView.as_view(), name='directory-search'),
     path('appointments/book', AppointmentBookingView.as_view(), name='appointments-book'),
+    path('appointments/<int:apt_id>/start-call', AppointmentStartCallView.as_view(), name='appointment-start-call'),
+    path('appointments/<int:apt_id>/end-call', AppointmentEndCallView.as_view(), name='appointment-end-call'),
     path('review', SubmitReviewView.as_view(), name='submit-review'),
 
     # Emergency Alerts

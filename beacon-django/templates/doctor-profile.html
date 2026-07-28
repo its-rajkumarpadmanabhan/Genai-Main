@@ -164,11 +164,15 @@
           </div>
 
           <div class="p-meta">
+            <div><div class="k">Gender</div><div class="v" id="dGender">Not provided</div></div>
+            <div><div class="k">Email Address</div><div class="v" id="dEmail">Not provided</div></div>
             <div><div class="k">License No.</div><div class="v mono" id="dLicense">Not provided</div></div>
             <div><div class="k">Experience</div><div class="v" id="dExp">0 Years</div></div>
             <div><div class="k">Consultation Fee</div><div class="v" id="dFee">₹0</div></div>
             <div><div class="k">Available Hours</div><div class="v" id="dHours">09:00 AM - 05:00 PM</div></div>
+            <div><div class="k">Hospital Name</div><div class="v" id="dHospital">Not provided</div></div>
             <div><div class="k">Location</div><div class="v" id="dLocation">Not provided</div></div>
+            <div><div class="k">State</div><div class="v" id="dState">Not provided</div></div>
             <div><div class="k">Languages</div><div class="v" id="dLang">Not provided</div></div>
             <div><div class="k">Phone Number</div><div class="v" id="dPhone">Not provided</div></div>
             <div><div class="k">Specialization</div><div class="v" id="dSpecialized">Not provided</div></div>
@@ -244,12 +248,21 @@
           </select>
         </div>
         <div class="field"><label>Major Department</label><input id="inputDept" type="text" placeholder="e.g. Cardiology, Neurology"></div>
+        <div class="field"><label>Gender</label>
+          <select id="inputGender" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:var(--paper);color:var(--ink);">
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
         <div class="field"><label>Experience (Years)</label><input id="inputExp" type="number" placeholder="e.g. 10"></div>
         <div class="field"><label>License Number</label><input id="inputLicense" type="text" placeholder="License / Registration No"></div>
         <div class="field"><label>Consultation Fee (₹)</label><input id="inputFee" type="number" step="0.01" placeholder="500.00"></div>
         <div class="field"><label>Available Hours</label><input id="inputHours" type="text" placeholder="e.g. 09:00 AM - 05:00 PM"></div>
         <div class="field"><label>Phone Number</label><input id="inputPhone" type="tel" placeholder="+91 98470 xxxxx"></div>
-        <div class="field full"><label>Location / Clinic Address</label><input id="inputLocation" type="text" placeholder="City, State, Pincode"></div>
+        <div class="field full"><label>Location</label><input id="inputLocation" type="text" placeholder="e.g. aluva, Kochi"></div>
+        <div class="field"><label>State</label><input id="inputState" type="text" placeholder="e.g. Kerala, Karnataka"></div>
+        <div class="field full"><label>Hospital Name</label><input id="inputHospital" type="text" placeholder="e.g. Aster Medcity, Manipal Hospital"></div>
         <div class="field full"><label>Languages Spoken</label><input id="inputLang" type="text" placeholder="e.g. English, Malayalam, Hindi"></div>
         <div class="field full"><label>Specialization Details</label><textarea id="inputSpecialized" rows="2" placeholder="Describe your medical expertise and services"></textarea></div>
       </div>
@@ -305,11 +318,15 @@ async function loadDoctorProfile(){
       document.getElementById('bcDocName').textContent = docName;
       document.getElementById('dCode').textContent = profileData.doctor_code || 'DOC-NEW';
       document.getElementById('dDept').textContent = profileData.major_department || 'General Practitioner';
+      document.getElementById('dGender').textContent = profileData.gender || 'Not provided';
+      document.getElementById('dEmail').textContent = profileData.email || 'Not provided';
       document.getElementById('dLicense').textContent = profileData.license_number || 'Not provided';
       document.getElementById('dExp').textContent = (profileData.experience_years || 0) + ' Years';
       document.getElementById('dFee').textContent = '₹' + (profileData.consultation_fee || '0');
       document.getElementById('dHours').textContent = profileData.available_hours || '09:00 AM - 05:00 PM';
       document.getElementById('dLocation').textContent = profileData.location || 'Not provided';
+      document.getElementById('dState').textContent = profileData.state || 'Not provided';
+      document.getElementById('dHospital').textContent = profileData.hospital_name || 'Not provided';
       document.getElementById('dLang').textContent = profileData.languages_speak || 'Not provided';
       document.getElementById('dPhone').textContent = profileData.phone_number || profileData.mobile_number || 'Not provided';
       document.getElementById('dSpecialized').textContent = profileData.specialized_details || 'Not provided';
@@ -468,11 +485,18 @@ function renderDoctorAppointments(){
             <span style="background:var(--pine-soft);color:var(--pine-deep);font-size:11px;font-weight:700;padding:2px 8px;border-radius:12px;">Reg #${a.queue_number}</span>
             <div class="req-name" style="font-weight:700;font-size:15px;color:var(--ink);">${a.patient_name || 'Patient'}</div>
           </div>
-          <div class="req-sub" style="font-size:12px;color:var(--muted);margin-top:4px;">Date: <b>${a.appointment_date || 'TBD'}</b> · Time Slot: <b>${a.time_slot || '10:00 AM'}</b></div>
+          <div class="req-sub" style="font-size:12px;color:var(--muted);margin-top:4px;">Date: <b>${a.appointment_date || 'TBD'}</b> · Time Slot: <b>${a.time_slot || '10:00 AM'}</b> · Mode: <b>${a.appointment_type === 'online' ? '🟢 Online (Video)' : '📍 Offline (In-Person)'}</b></div>
         </div>
         ${getStatusBadgeHtml(a.status)}
       </div>
       <div class="req-reason" style="font-size:12.5px;margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);"><b>Reason:</b> ${a.reason || 'General consultation'}</div>
+      
+      <div style="font-size:11.5px;color:var(--pine-deep);margin-top:6px;font-weight:600;">
+        ${(a.booked_by === 'caretaker' || a.caretaker_name)
+          ? `🩺 Booked by Caretaker: ${a.caretaker_name || 'Assigned Caretaker'}`
+          : `🩺 Booked by Patient: ${a.patient_name || 'Patient'} | ${a.patient_code || 'ID'}`
+        }
+      </div>
       
       <div class="req-actions" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn-sm" style="background:#0D9488;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="openFullPatientModal(${a.patient}, '${(a.patient_name||'Patient').replace(/'/g, "\\'")}')">👤 View Patient Profile</button>
@@ -484,12 +508,31 @@ function renderDoctorAppointments(){
 
         ${a.status === 'accepted' ? `
           <button class="btn-sm" style="background:var(--pine-deep);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="viewPatientRecords(${a.patient}, '${(a.patient_name||'Patient').replace(/'/g, "\\'")}')">📁 View Medical Records (Read-Only)</button>
+          ${a.appointment_type === 'online' ? `
+            ${a.is_call_active ? `
+              <button class="btn-sm" style="display:inline-flex;align-items:center;gap:6px;background:#EF4444;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="endVideoCall(${a.id})">📴 End Video Call Session</button>
+            ` : `
+              <button class="btn-sm" style="display:inline-flex;align-items:center;gap:6px;background:#2563EB;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="startVideoCall(${a.id})">🎥 Join Video Call</button>
+            `}
+          ` : ''}
+          ${a.prescription_pdf ? `
+            <button class="btn-sm" style="background:var(--amber);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="previewMedicalDocument('${a.prescription_name || 'Prescription'}', '${a.prescription_pdf.replace(/'/g, "\\'")}', false, true, 'Doctor Prescription PDF')">📄 View Prescription</button>
+            <button class="btn-sm" style="background:var(--slate);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="triggerPrescriptionUpload(${a.id}, '${a.status}')">🔄 Update Prescription PDF</button>
+          ` : `
+            <button class="btn-sm" style="background:var(--slate);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="triggerPrescriptionUpload(${a.id}, '${a.status}')">📄 Upload Prescription PDF</button>
+          `}
           <button class="btn-sm" style="background:#2563EB;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="updateStatus(${a.id}, 'completed')">✓ Mark Checkup Completed</button>
           <button class="btn-sm" style="background:#D97706;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="updateStatus(${a.id}, 'missed')">⚠ Mark Missed</button>
         ` : ''}
 
         ${(a.status === 'completed' || a.status === 'missed') ? `
           <button class="btn-sm" style="background:var(--pine-deep);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="viewPatientRecords(${a.patient}, '${(a.patient_name||'Patient').replace(/'/g, "\\'")}')">📁 View Medical Records (Read-Only)</button>
+          ${a.prescription_pdf ? `
+            <button class="btn-sm" style="background:var(--amber);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="previewMedicalDocument('${a.prescription_name || 'Prescription'}', '${a.prescription_pdf.replace(/'/g, "\\'")}', false, true, 'Doctor Prescription PDF')">📄 View Prescription</button>
+            <button class="btn-sm" style="background:var(--slate);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="triggerPrescriptionUpload(${a.id}, '${a.status}')">🔄 Update Prescription PDF</button>
+          ` : `
+            <button class="btn-sm" style="background:var(--slate);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="triggerPrescriptionUpload(${a.id}, '${a.status}')">📄 Upload Prescription PDF</button>
+          `}
         ` : ''}
       </div>
     </div>
@@ -759,12 +802,15 @@ function openEditModal(){
   document.getElementById('inputName').value = profileData.full_name || '';
   document.getElementById('inputAvailability').value = profileData.availability_status || 'Active Today';
   document.getElementById('inputDept').value = profileData.major_department || '';
+  document.getElementById('inputGender').value = profileData.gender || 'Male';
   document.getElementById('inputExp').value = profileData.experience_years || 0;
   document.getElementById('inputLicense').value = profileData.license_number || '';
   document.getElementById('inputFee').value = profileData.consultation_fee || '';
   document.getElementById('inputHours').value = profileData.available_hours || '';
   document.getElementById('inputPhone').value = profileData.phone_number || '';
   document.getElementById('inputLocation').value = profileData.location || '';
+  document.getElementById('inputState').value = profileData.state || '';
+  document.getElementById('inputHospital').value = profileData.hospital_name || '';
   document.getElementById('inputLang').value = profileData.languages_speak || '';
   document.getElementById('inputSpecialized').value = profileData.specialized_details || '';
   document.getElementById('editModal').classList.add('open');
@@ -777,12 +823,15 @@ async function saveProfile(e){
     full_name: document.getElementById('inputName').value,
     availability_status: document.getElementById('inputAvailability').value,
     major_department: document.getElementById('inputDept').value,
+    gender: document.getElementById('inputGender').value,
     experience_years: parseInt(document.getElementById('inputExp').value || 0),
     license_number: document.getElementById('inputLicense').value,
     consultation_fee: parseFloat(document.getElementById('inputFee').value || 0),
     available_hours: document.getElementById('inputHours').value,
     phone_number: document.getElementById('inputPhone').value,
     location: document.getElementById('inputLocation').value,
+    state: document.getElementById('inputState').value,
+    hospital_name: document.getElementById('inputHospital').value,
     languages_speak: document.getElementById('inputLang').value,
     specialized_details: document.getElementById('inputSpecialized').value,
   };
@@ -811,6 +860,65 @@ async function updateStatus(aptId, st){
       loadDoctorPatients();
     }
   } catch(e){ alert(e.message); }
+}
+
+async function startVideoCall(aptId) {
+  try {
+    await fetch(`/api/auth/appointments/${aptId}/start-call`, {
+      method: 'POST',
+      headers: getAuthHeader()
+    });
+    loadDoctorAppointments();
+    window.open(`https://meet.jit.si/BeaconRoom-${aptId}`, '_blank');
+  } catch(e){ console.error(e); }
+}
+
+async function endVideoCall(aptId) {
+  try {
+    await fetch(`/api/auth/appointments/${aptId}/end-call`, {
+      method: 'POST',
+      headers: getAuthHeader()
+    });
+    loadDoctorAppointments();
+  } catch(e){ console.error(e); }
+}
+
+function triggerPrescriptionUpload(apptId, currentStatus) {
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = 'application/pdf';
+  fileInput.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.type !== 'application/pdf') {
+      alert('Only PDF files are supported.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const base64Data = reader.result;
+      try {
+        const res = await fetch('/api/auth/doctor/appointments', {
+          method: 'POST',
+          headers: getAuthHeader(),
+          body: JSON.stringify({
+            appointment_id: apptId,
+            status: currentStatus,
+            prescription_pdf: base64Data,
+            prescription_name: file.name
+          })
+        });
+        if (res.ok) {
+          alert('Prescription uploaded successfully!');
+          loadDoctorAppointments();
+        } else {
+          alert('Upload failed.');
+        }
+      } catch (err) { alert(err.message); }
+    };
+    reader.readAsDataURL(file);
+  };
+  fileInput.click();
 }
 
 async function loadDoctorPatients(){

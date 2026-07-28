@@ -84,14 +84,20 @@ class CustomUserSerializer(serializers.ModelSerializer):
 class PatientProfileSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(source='user.id', read_only=True)
     username = serializers.CharField(source='user.username', read_only=True)
-    email = serializers.CharField(source='user.email', read_only=True)
     mobile_number = serializers.CharField(source='user.mobile_number', read_only=True)
     assigned_caretaker_details = serializers.SerializerMethodField()
     past_caretakers_history = serializers.SerializerMethodField()
+    caretaker_requests_categorized = serializers.SerializerMethodField()
 
     class Meta:
         model = PatientProfile
         fields = '__all__'
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not data.get('email') and instance.user.email:
+            data['email'] = instance.user.email
+        return data
 
     def get_assigned_caretaker_details(self, obj):
         if not obj.assigned_caretaker:
@@ -127,6 +133,34 @@ class PatientProfileSerializer(serializers.ModelSerializer):
                 'unlinked_at': str(r.created_at).split(' ')[0]
             })
         return past_list
+
+    def get_caretaker_requests_categorized(self, obj):
+        from .models import CaretakerRequest, CaretakerProfile
+        reqs = CaretakerRequest.objects.filter(patient=obj.user).order_by('-created_at')
+        result = {
+            'accepted': [],
+            'pending': [],
+            'rejected': [],
+            'unlinked': []
+        }
+        for r in reqs:
+            c_user = r.caretaker
+            c_profile = CaretakerProfile.objects.filter(user=c_user).first()
+            c_data = {
+                'id': r.id,
+                'caretaker_id': c_user.id,
+                'full_name': c_profile.full_name if (c_profile and c_profile.full_name) else c_user.username,
+                'phone_number': (c_profile.phone_number if c_profile else c_user.mobile_number) or 'Not provided',
+                'location': c_profile.location if c_profile else 'Not provided',
+                'created_at': str(r.created_at).split(' ')[0],
+                'status': r.status
+            }
+            if r.status in result:
+                result[r.status].append(c_data)
+            else:
+                result['pending'].append(c_data)
+        return result
+
 
 
 class DoctorProfileSerializer(serializers.ModelSerializer):
@@ -167,13 +201,28 @@ class CaretakerRequestSerializer(serializers.ModelSerializer):
 
 
 class AppointmentSerializer(serializers.ModelSerializer):
-    patient_name = serializers.CharField(source='patient.username', read_only=True)
-    doctor_name = serializers.CharField(source='doctor.username', read_only=True)
+    patient_name = serializers.SerializerMethodField()
+    doctor_name = serializers.SerializerMethodField()
     caretaker_name = serializers.SerializerMethodField()
+    patient_code = serializers.SerializerMethodField()
 
     class Meta:
         model = Appointment
         fields = '__all__'
+
+    def get_patient_name(self, obj):
+        if obj.patient:
+            from .models import PatientProfile
+            p_prof = PatientProfile.objects.filter(user=obj.patient).first()
+            return p_prof.full_name if (p_prof and p_prof.full_name) else obj.patient.username
+        return None
+
+    def get_doctor_name(self, obj):
+        if obj.doctor:
+            from .models import DoctorProfile
+            d_prof = DoctorProfile.objects.filter(user=obj.doctor).first()
+            return d_prof.full_name if (d_prof and d_prof.full_name) else obj.doctor.username
+        return None
 
     def get_caretaker_name(self, obj):
         if obj.caretaker:
@@ -181,3 +230,11 @@ class AppointmentSerializer(serializers.ModelSerializer):
             c_prof = CaretakerProfile.objects.filter(user=obj.caretaker).first()
             return c_prof.full_name if (c_prof and c_prof.full_name) else obj.caretaker.username
         return None
+
+    def get_patient_code(self, obj):
+        if obj.patient:
+            from .models import PatientProfile
+            p_prof = PatientProfile.objects.filter(user=obj.patient).first()
+            return p_prof.patient_code if p_prof else None
+        return None
+

@@ -342,6 +342,9 @@ class PatientProfileView(APIView):
         if not profile.phone_number and request.user.mobile_number:
             profile.phone_number = request.user.mobile_number
             profile.save()
+        if not profile.email and request.user.email:
+            profile.email = request.user.email
+            profile.save()
         from .serializers import PatientProfileSerializer
         return Response(PatientProfileSerializer(profile).data)
 
@@ -401,18 +404,32 @@ class DirectoryListView(APIView):
         location = request.query_params.get('location', '').strip().lower()
         gender = request.query_params.get('gender', '').strip().lower()
         dept = request.query_params.get('dept', '').strip().lower()
+        experience = request.query_params.get('experience', '').strip()
 
         from .models import DoctorProfile, CaretakerProfile
         from .serializers import DoctorProfileSerializer, CaretakerProfileSerializer
 
+        def filter_experience(queryset, val):
+            if val == '1-3':
+                return queryset.filter(experience_years__range=(1, 3))
+            elif val == '4-6':
+                return queryset.filter(experience_years__range=(4, 6))
+            elif val == '7+':
+                return queryset.filter(experience_years__gte=7)
+            return queryset
+
+        from django.db.models import Q
+
         if dir_type == 'doctor':
             qs = DoctorProfile.objects.all()
             if location:
-                qs = qs.filter(location__icontains=location)
+                qs = qs.filter(Q(location__icontains=location) | Q(state__icontains=location) | Q(hospital_name__icontains=location))
             if gender:
                 qs = qs.filter(gender__iexact=gender)
             if dept:
                 qs = qs.filter(major_department__icontains=dept)
+            if experience:
+                qs = filter_experience(qs, experience)
             return Response(DoctorProfileSerializer(qs, many=True).data)
         elif dir_type == 'caretaker':
             qs = CaretakerProfile.objects.all()
@@ -420,18 +437,23 @@ class DirectoryListView(APIView):
                 qs = qs.filter(location__icontains=location)
             if gender:
                 qs = qs.filter(gender__iexact=gender)
+            if experience:
+                qs = filter_experience(qs, experience)
             return Response(CaretakerProfileSerializer(qs, many=True).data)
         else:
             d_qs = DoctorProfile.objects.all()
             c_qs = CaretakerProfile.objects.all()
             if location:
-                d_qs = d_qs.filter(location__icontains=location)
+                d_qs = d_qs.filter(Q(location__icontains=location) | Q(state__icontains=location) | Q(hospital_name__icontains=location))
                 c_qs = c_qs.filter(location__icontains=location)
             if gender:
                 d_qs = d_qs.filter(gender__iexact=gender)
                 c_qs = c_qs.filter(gender__iexact=gender)
             if dept:
                 d_qs = d_qs.filter(major_department__icontains=dept)
+            if experience:
+                d_qs = filter_experience(d_qs, experience)
+                c_qs = filter_experience(c_qs, experience)
             return Response({
                 'doctors': DoctorProfileSerializer(d_qs, many=True).data,
                 'caretakers': CaretakerProfileSerializer(c_qs, many=True).data
@@ -460,6 +482,20 @@ class CaretakerRequestView(APIView):
         if not caretaker:
             return Response({'detail': 'Caretaker not found.'}, status=status.HTTP_404_NOT_FOUND)
 
+        # Check if patient already has an active caretaker
+        from .models import PatientProfile
+        p_profile = PatientProfile.objects.filter(user=request.user).first()
+        if p_profile and p_profile.assigned_caretaker:
+            return Response({'detail': 'You already have an active caretaker assigned. You cannot send new requests until you unlink the current caretaker.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Enforce limit of Max 5 pending caretaker requests
+        active_and_pending_count = CaretakerRequest.objects.filter(
+            patient=request.user,
+            status='pending'
+        ).count()
+        if active_and_pending_count >= 5:
+            return Response({'detail': 'You cannot send requests to more than 5 caretakers at a time.'}, status=status.HTTP_400_BAD_REQUEST)
+
         req_obj = CaretakerRequest.objects.filter(patient=request.user, caretaker=caretaker).first()
         if not req_obj:
             req_obj = CaretakerRequest.objects.create(patient=request.user, caretaker=caretaker, status='pending')
@@ -468,6 +504,7 @@ class CaretakerRequestView(APIView):
             req_obj.save()
 
         return Response({'status': 'success', 'request_id': req_obj.id, 'status_text': 'pending'})
+
 
 
 class AppointmentBookingView(APIView):
@@ -496,6 +533,7 @@ class AppointmentBookingView(APIView):
         time_slot = request.data.get('time_slot', '10:00 AM')
         reason = request.data.get('reason', '')
         booked_by = request.data.get('booked_by', 'patient')
+        appointment_type = request.data.get('appointment_type', 'offline')
 
         patient_user = request.user
         if booked_by == 'caretaker' and request.data.get('patient_id'):
@@ -509,6 +547,7 @@ class AppointmentBookingView(APIView):
             appointment_date=app_date,
             time_slot=time_slot,
             reason=reason,
+            appointment_type=appointment_type,
             status='pending'
         )
         return Response({'status': 'success', 'appointment_id': apt.id}, status=status.HTTP_201_CREATED)
@@ -539,13 +578,27 @@ class DoctorProfileView(APIView):
     def put(self, request):
         if request.user.role not in ['doctor', 'admin'] and not request.user.is_staff:
             return Response({'detail': 'Doctor access required.'}, status=status.HTTP_403_FORBIDDEN)
-        from .models import DoctorProfile
+        from .models import DoctorProfile, Appointment
         from .serializers import DoctorProfileSerializer
+        import datetime
         profile, _ = DoctorProfile.objects.get_or_create(user=request.user)
+        old_availability = profile.availability_status
         for k, v in request.data.items():
             if hasattr(profile, k):
                 setattr(profile, k, v)
         profile.save()
+        
+        if old_availability != 'On Leave Today' and profile.availability_status == 'On Leave Today':
+            today = datetime.date.today()
+            today_apts = Appointment.objects.filter(
+                doctor=request.user,
+                appointment_date=today,
+                status__in=['pending', 'accepted']
+            )
+            for apt in today_apts:
+                apt.status = 'cancelled_by_doctor'
+                apt.save()
+                
         return Response(DoctorProfileSerializer(profile).data)
 
 
@@ -558,8 +611,14 @@ class DoctorAppointmentsView(APIView):
             return Response({'detail': 'Doctor access required.'}, status=status.HTTP_403_FORBIDDEN)
         from .models import Appointment
         from .serializers import AppointmentSerializer
-        # Order by registration timestamp ascending (First Come First Served)
-        apts = Appointment.objects.filter(doctor=request.user).order_by('created_at', 'appointment_date')
+        from django.db.models import Case, When, Value, IntegerField
+        apts = Appointment.objects.filter(doctor=request.user).annotate(
+            status_priority=Case(
+                When(status__in=['pending', 'accepted'], then=Value(1)),
+                default=Value(2),
+                output_field=IntegerField(),
+            )
+        ).order_by('status_priority', '-appointment_date', '-created_at')
         return Response(AppointmentSerializer(apts, many=True).data)
 
     def post(self, request):
@@ -571,12 +630,96 @@ class DoctorAppointmentsView(APIView):
             return Response({'detail': 'Appointment not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         if new_status in ['accepted', 'rejected', 'completed', 'missed']:
+            old_status = apt.status
             apt.status = new_status
             if request.data.get('doctor_notes'):
                 apt.doctor_notes = request.data.get('doctor_notes')
+            if 'prescription_pdf' in request.data:
+                apt.prescription_pdf = request.data.get('prescription_pdf')
+            if 'prescription_name' in request.data:
+                apt.prescription_name = request.data.get('prescription_name')
             apt.save()
+
+            if new_status == 'accepted' and old_status != 'accepted':
+                # Fetch details for the email
+                from django.core.mail import send_mail
+                from .models import DoctorProfile
+                
+                doc_profile = DoctorProfile.objects.filter(user=apt.doctor).first()
+                doc_name = doc_profile.full_name if (doc_profile and doc_profile.full_name) else apt.doctor.username
+                hospital = doc_profile.hospital_name if doc_profile else "Not specified"
+                location = doc_profile.location if doc_profile else "Not specified"
+                patient_name = apt.patient.username
+                recipient_email = apt.patient.email
+
+                # Fetch patient profile name and email if available
+                from .models import PatientProfile
+                pat_profile = PatientProfile.objects.filter(user=apt.patient).first()
+                if pat_profile:
+                    if pat_profile.full_name:
+                        patient_name = pat_profile.full_name
+                    if pat_profile.email:
+                        recipient_email = pat_profile.email
+
+                subject = f"Appointment Confirmed: Dr. {doc_name}"
+                mode_str = "Online (Video Call)" if apt.appointment_type == "online" else "Offline (In-Person Clinic Visit)"
+                message = (
+                    f"Dear {patient_name},\n\n"
+                    f"Your appointment request has been accepted. Here are the confirmation details:\n\n"
+                    f"Doctor: Dr. {doc_name}\n"
+                    f"Hospital: {hospital}\n"
+                    f"Location: {location}\n"
+                    f"Date: {apt.appointment_date}\n"
+                    f"Time Slot: {apt.time_slot}\n"
+                    f"Appointment Type: {mode_str}\n"
+                    f"Reason for Visit: {apt.reason or 'General Consultation'}\n\n"
+                    f"Thank you,\n"
+                    f"Beacon Health Support"
+                )
+                try:
+                    send_mail(
+                        subject,
+                        message,
+                        None, # Uses DEFAULT_FROM_EMAIL
+                        [recipient_email],
+                        fail_silently=False,
+                    )
+                except Exception as e:
+                    print("Error sending appointment confirmation email:", e)
+
             return Response({'status': 'success', 'new_status': apt.status})
         return Response({'detail': 'Invalid status.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AppointmentStartCallView(APIView):
+    """POST /api/auth/appointments/<int:apt_id>/start-call"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, apt_id):
+        from .models import Appointment
+        apt = Appointment.objects.filter(id=apt_id, doctor=request.user).first()
+        if not apt:
+            return Response({'detail': 'Appointment not found or you are not the doctor.'}, status=status.HTTP_404_NOT_FOUND)
+        apt.is_call_active = True
+        apt.save()
+        return Response({'status': 'success', 'is_call_active': True})
+
+
+class AppointmentEndCallView(APIView):
+    """POST /api/auth/appointments/<int:apt_id>/end-call"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, apt_id):
+        from .models import Appointment
+        from django.db.models import Q
+        apt = Appointment.objects.filter(
+            Q(id=apt_id) & (Q(doctor=request.user) | Q(patient=request.user) | Q(caretaker=request.user))
+        ).first()
+        if not apt:
+            return Response({'detail': 'Appointment not found or access denied.'}, status=status.HTTP_404_NOT_FOUND)
+        apt.is_call_active = False
+        apt.save()
+        return Response({'status': 'success', 'is_call_active': False})
 
 
 class DoctorPatientsListView(APIView):
@@ -787,11 +930,11 @@ class CaretakerRequestsView(APIView):
         for a in apt_data:
             a['item_type'] = 'doctor_appointment'
 
-        # Combine both lists
-        combined = list(req_data) + list(apt_data)
-        combined.sort(key=lambda x: str(x.get('appointment_date') or (x.get('created_at') or '').split('T')[0] or ''), reverse=True)
-
-        return Response(combined)
+        # Return both categorized requests and doctor appointments
+        return Response({
+            'requests': req_data,
+            'appointments': apt_data
+        })
 
     def post(self, request):
         from .models import CaretakerRequest, PatientProfile
@@ -802,12 +945,19 @@ class CaretakerRequestsView(APIView):
             return Response({'detail': 'Request not found.'}, status=status.HTTP_404_NOT_FOUND)
 
         if new_status in ['accepted', 'rejected']:
+            if new_status == 'accepted':
+                # Enforce limit: max 1 active patient
+                active_count = PatientProfile.objects.filter(assigned_caretaker=request.user).count()
+                if active_count >= 1:
+                    return Response({'detail': 'You cannot accept more than 1 patient under your care. Please unlink your current patient before accepting another.'}, status=status.HTTP_400_BAD_REQUEST)
+
             creq.status = new_status
             creq.save()
             if new_status == 'accepted':
                 PatientProfile.objects.filter(user=creq.patient).update(assigned_caretaker=request.user)
             return Response({'status': 'success', 'new_status': creq.status})
         return Response({'detail': 'Invalid status.'}, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class CaretakerEditRequestView(APIView):
@@ -967,22 +1117,25 @@ class PatientAppointmentsView(APIView):
         from .serializers import AppointmentSerializer
         from django.db.models import Q
         
+        from django.db.models import Case, When, Value, IntegerField
         user = request.user
         if user.role == 'patient':
-            p_profile = PatientProfile.objects.filter(user=user).first()
-            assigned_c = p_profile.assigned_caretaker if p_profile else None
-            if assigned_c:
-                apts = Appointment.objects.filter(Q(patient=user) | Q(caretaker=assigned_c)).order_by('-appointment_date')
-            else:
-                apts = Appointment.objects.filter(patient=user).order_by('-appointment_date')
+            apts = Appointment.objects.filter(patient=user)
         elif user.role == 'caretaker':
             assigned_patients = PatientProfile.objects.filter(assigned_caretaker=user).values_list('user_id', flat=True)
             apts = Appointment.objects.filter(
                 Q(caretaker=user) | Q(patient_id__in=assigned_patients)
-            ).order_by('-appointment_date')
+            )
         else:
-            apts = Appointment.objects.filter(patient=user).order_by('-appointment_date')
+            apts = Appointment.objects.filter(patient=user)
             
+        apts = apts.annotate(
+            status_priority=Case(
+                When(status__in=['pending', 'accepted'], then=Value(1)),
+                default=Value(2),
+                output_field=IntegerField(),
+            )
+        ).order_by('status_priority', '-appointment_date', '-time_slot')
         return Response(AppointmentSerializer(apts, many=True).data)
 
 
@@ -1195,14 +1348,25 @@ class CreateEmergencyAlertView(APIView):
 
 
 class PatientEmergencyAlertsView(APIView):
-    """GET /api/auth/patient/emergency-alerts — Patient views their own alert history."""
+    """GET /api/auth/patient/emergency-alerts — Patient views their own alert history or caretaker views assigned patient history."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if request.user.role not in ('patient', 'admin'):
-            return Response({'detail': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
+        from .models import PatientProfile, EmergencyAlert
+        user = request.user
+        patient_id = request.query_params.get('patient_id')
 
-        alerts = EmergencyAlert.objects.filter(patient=request.user).order_by('-created_at')[:50]
+        if patient_id:
+            # Check if logged-in caretaker is assigned to the patient
+            is_assigned = PatientProfile.objects.filter(user_id=patient_id, assigned_caretaker=user).exists()
+            if not is_assigned and user.id != int(patient_id) and user.role != 'admin':
+                return Response({'detail': 'Access denied. You must be the assigned caretaker to view health timeline.'}, status=status.HTTP_403_FORBIDDEN)
+            alerts = EmergencyAlert.objects.filter(patient_id=patient_id).order_by('-created_at')[:50]
+        else:
+            if user.role not in ('patient', 'admin'):
+                return Response({'detail': 'Access denied.'}, status=status.HTTP_403_FORBIDDEN)
+            alerts = EmergencyAlert.objects.filter(patient=user).order_by('-created_at')[:50]
+
         data = []
         for a in alerts:
             data.append({
@@ -1217,6 +1381,7 @@ class PatientEmergencyAlertsView(APIView):
                 'created_at': a.created_at.isoformat(),
             })
         return Response(data)
+
 
 
 class CaretakerEmergencyAlertsView(APIView):

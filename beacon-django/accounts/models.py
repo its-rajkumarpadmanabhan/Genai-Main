@@ -88,6 +88,7 @@ class PatientProfile(models.Model):
     location = models.CharField(max_length=255, blank=True, null=True)
     languages = models.CharField(max_length=255, blank=True, null=True)
     phone_number = models.CharField(max_length=20, blank=True, null=True)
+    email = models.CharField(max_length=100, blank=True, null=True)
     insurance_details = models.TextField(blank=True, null=True)
     
     # Emergency Contact
@@ -119,6 +120,8 @@ class DoctorProfile(models.Model):
     gender = models.CharField(max_length=20, blank=True, null=True)
     experience_years = models.IntegerField(default=0)
     location = models.CharField(max_length=255, blank=True, null=True)
+    state = models.CharField(max_length=100, blank=True, null=True)
+    hospital_name = models.CharField(max_length=255, blank=True, null=True)
     pincode = models.CharField(max_length=10, blank=True, null=True)
     major_department = models.CharField(max_length=100, blank=True, null=True)
     languages_speak = models.CharField(max_length=255, blank=True, null=True)
@@ -244,6 +247,10 @@ class Appointment(models.Model):
     time_slot = models.CharField(max_length=50, default='10:00 AM')
     reason = models.TextField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    appointment_type = models.CharField(max_length=20, default='offline') # 'online' or 'offline'
+    prescription_pdf = models.TextField(blank=True, null=True) # base64 PDF
+    prescription_name = models.CharField(max_length=255, blank=True, null=True)
+    is_call_active = models.BooleanField(default=False)
     doctor_notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

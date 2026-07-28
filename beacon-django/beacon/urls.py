@@ -34,4 +34,5 @@ urlpatterns = [
     path('doctor-caretaker-list.html', TemplateView.as_view(template_name='doctor caretaker list.html'), name='doctor-caretaker-list'),
     path('doctor-profile.html', TemplateView.as_view(template_name='doctor-profile.html'), name='doctor-profile'),
     path('patient-profile.html', TemplateView.as_view(template_name='patient-profile.html'), name='patient-profile'),
+    path('voice-timeline.html', TemplateView.as_view(template_name='voice-timeline.html'), name='voice-timeline'),
 ]

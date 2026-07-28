@@ -119,6 +119,7 @@
       <a href="/patient-profile.html" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>My Profile</span></a>
       <a href="/doctor-caretaker-list.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Find Caretaker / Doctor</span></a>
       <a href="/app.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Voice AI Engine</span></a>
+      <a href="/voice-timeline.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>Voice AI Health Timeline</span></a>
       <a href="#" onclick="localStorage.clear(); window.location.href='/login.html';"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></a>
     </nav>
     <div class="sidebar-foot">
@@ -154,6 +155,7 @@
           <div class="p-meta">
             <div><div class="k">Date of Birth</div><div class="v" id="pDob">Not provided</div></div>
             <div><div class="k">Gender</div><div class="v" id="pGender">Not provided</div></div>
+            <div><div class="k">Email Address</div><div class="v" id="pEmail">Not provided</div></div>
             <div><div class="k">Marital Status</div><div class="v" id="pMarital">Not provided</div></div>
             <div><div class="k">Location</div><div class="v" id="pLocation">Not provided</div></div>
             <div><div class="k">Languages</div><div class="v" id="pLang">Not provided</div></div>
@@ -163,19 +165,24 @@
           </div>
         </div>
 
-        <!-- ASSIGNED CARETAKER CARD -->
-        <div id="assignedCaretakerCard" style="display:none;background:var(--paper);border:1.5px solid var(--pine);border-radius:12px;padding:16px;margin-top:16px;">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="background:var(--pine);color:#fff;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px;">🟢 REQUEST ACCEPTED</span>
-              <h3 style="font-size:15px;margin:0;color:var(--pine-deep);">Assigned Caretaker</h3>
-            </div>
-            <div style="display:flex;gap:6px;">
-              <button class="btn-action secondary" onclick="viewCaretakerProfile()" style="font-size:11.5px;padding:4px 10px;">Visit Caretaker Profile</button>
-              <button class="btn-action danger" onclick="removeAssignedCaretaker()" style="font-size:11.5px;padding:4px 10px;background:var(--brick);color:#fff;border:none;">Remove Caretaker</button>
-            </div>
+        <!-- CARETAKER CONNECTIONS & REQUESTS -->
+        <div class="section-box" style="margin-top:16px;">
+          <div class="section-head">
+            <h2>Caretaker Connections & Requests</h2>
+            <a href="/doctor-caretaker-list.html" class="btn-action" style="padding:6px 11px;font-size:11.5px;">Find Caretaker</a>
           </div>
-          <div id="caretakerSummary" style="font-size:13px;color:var(--ink);"></div>
+
+          <!-- Category Tabs -->
+          <div style="display:flex;gap:8px;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:12px;flex-wrap:wrap;">
+            <button id="careTabActive" onclick="switchCareCategory('accepted')" style="background:var(--pine);color:#fff;border:none;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Active / Accepted (0)</button>
+            <button id="careTabPending" onclick="switchCareCategory('pending')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Pending / Sent (0)</button>
+            <button id="careTabRejected" onclick="switchCareCategory('rejected')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Rejected (0)</button>
+            <button id="careTabUnlinked" onclick="switchCareCategory('unlinked')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Past Connections (0)</button>
+          </div>
+
+          <div id="careRequestsContainer">
+            <div class="empty-box">No caretaker requests or connections found.</div>
+          </div>
         </div>
 
         <!-- Appointments Section -->
@@ -210,16 +217,7 @@
           </div>
         </div>
 
-        <!-- Voice AI Health Timeline -->
-        <div class="section-box">
-          <div class="section-head">
-            <h2>🩺 Voice AI Health Timeline</h2>
-            <span style="font-size:11px;color:var(--pine-deep);background:var(--pine-soft);padding:3px 10px;border-radius:12px;font-weight:600;">AI Detected Records</span>
-          </div>
-          <div id="emergencyAlertsContainer">
-            <div class="empty-box">No health concerns recorded yet. Use the Voice AI Engine to get medical guidance — records will appear here automatically.</div>
-          </div>
-        </div>
+
       </div>
     </div>
   </main>
@@ -254,6 +252,7 @@
           </select>
         </div>
         <div class="field"><label>Phone Number</label><input id="inputPhone" type="tel" placeholder="+91 98470 xxxxx"></div>
+        <div class="field"><label>Email Address</label><input id="inputEmail" type="email" placeholder="email@example.com"></div>
         <div class="field full"><label>Location / Address</label><input id="inputLocation" type="text" placeholder="City, State"></div>
         <div class="field full"><label>Languages Spoken</label><input id="inputLang" type="text" placeholder="e.g. English, Malayalam, Hindi"></div>
         <div class="field full"><label>Insurance Details</label><input id="inputInsurance" type="text" placeholder="e.g. Star Health Senior / Policy #"></div>
@@ -301,6 +300,7 @@ async function loadPatientProfile(){
       document.getElementById('pNotes').textContent = profileData.medical_history_notes || 'No medical condition specified yet';
       document.getElementById('pDob').textContent = profileData.dob || 'Not provided';
       document.getElementById('pGender').textContent = profileData.gender || 'Not provided';
+      document.getElementById('pEmail').textContent = profileData.email || 'Not provided';
       document.getElementById('pMarital').textContent = profileData.marital_status || 'Not provided';
       document.getElementById('pLocation').textContent = profileData.location || 'Not provided';
       document.getElementById('pLang').textContent = profileData.languages || 'Not provided';
@@ -310,34 +310,7 @@ async function loadPatientProfile(){
       const em = (profileData.emergency_contact_name || '') + (profileData.emergency_contact_phone ? ' (' + profileData.emergency_contact_phone + ')' : '');
       document.getElementById('pEmergency').textContent = em || 'Not provided';
 
-      const hasActive = !!profileData.assigned_caretaker_details;
-      const hasPast = profileData.past_caretakers_history && profileData.past_caretakers_history.length > 0;
-
-      if (hasActive || hasPast) {
-        document.getElementById('assignedCaretakerCard').style.display = 'block';
-        let summaryHtml = '';
-        if (hasActive) {
-          const c = profileData.assigned_caretaker_details;
-          summaryHtml = `<div><b>Caretaker:</b> ${c.full_name} · <b>Phone:</b> ${c.phone_number} · <b>Location:</b> ${c.location} · <b>Fee:</b> ₹${c.consultation_fee}/day</div>`;
-        } else {
-          summaryHtml = `<div style="font-size:12.5px;color:var(--muted);">No active caretaker assigned currently.</div>`;
-        }
-
-        if (hasPast) {
-          summaryHtml += `
-            <div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--line);display:flex;justify-content:space-between;align-items:center;">
-              <span style="font-size:11.5px;color:var(--muted);">Past connections available</span>
-              <button class="btn-action secondary" style="padding:4px 10px;font-size:11.5px;" onclick="openPastConnectionsModal()">📜 View Past Connections (${profileData.past_caretakers_history.length})</button>
-            </div>
-          `;
-        }
-
-        document.getElementById('caretakerSummary').innerHTML = summaryHtml;
-        const btnRemove = document.querySelector('#assignedCaretakerCard button.btn-action.danger');
-        if(btnRemove) btnRemove.style.display = hasActive ? 'inline-block' : 'none';
-      } else {
-        document.getElementById('assignedCaretakerCard').style.display = 'none';
-      }
+      renderCaretakerRequestsCategorized();
 
       const beaconUserRaw = localStorage.getItem('beacon_user');
       if (beaconUserRaw) {
@@ -389,39 +362,83 @@ function viewCaretakerProfile(){
   modal.classList.add('open');
 }
 
-function openPastConnectionsModal(){
-  if(!profileData.past_caretakers_history || profileData.past_caretakers_history.length === 0) return;
-  let modal = document.getElementById('pastConnectionsModal');
-  if(!modal){
-    modal = document.createElement('div');
-    modal.id = 'pastConnectionsModal';
-    modal.className = 'modal-backdrop';
-    document.body.appendChild(modal);
+let careActiveCategory = 'accepted';
+
+function switchCareCategory(cat){
+  careActiveCategory = cat;
+  ['accepted', 'pending', 'rejected', 'unlinked'].forEach(t => {
+    const el = document.getElementById('careTab' + t.charAt(0).toUpperCase() + t.slice(1));
+    if(el){
+      if(t === cat){
+        el.style.background = 'var(--pine)';
+        el.style.color = '#fff';
+        el.style.border = 'none';
+      } else {
+        el.style.background = 'var(--paper)';
+        el.style.color = 'var(--ink)';
+        el.style.border = '1px solid var(--line)';
+      }
+    }
+  });
+  renderCaretakerRequestsCategorized();
+}
+
+function renderCaretakerRequestsCategorized(){
+  const cats = profileData.caretaker_requests_categorized || { accepted: [], pending: [], rejected: [], unlinked: [] };
+  
+  const btnActive = document.getElementById('careTabActive');
+  const btnPending = document.getElementById('careTabPending');
+  const btnRejected = document.getElementById('careTabRejected');
+  const btnUnlinked = document.getElementById('careTabUnlinked');
+  
+  if(btnActive) btnActive.textContent = `Active / Accepted (${cats.accepted ? cats.accepted.length : 0})`;
+  if(btnPending) btnPending.textContent = `Pending / Sent (${cats.pending ? cats.pending.length : 0})`;
+  if(btnRejected) btnRejected.textContent = `Rejected (${cats.rejected ? cats.rejected.length : 0})`;
+  if(btnUnlinked) btnUnlinked.textContent = `Past Connections (${cats.unlinked ? cats.unlinked.length : 0})`;
+
+  const list = cats[careActiveCategory] || [];
+  const container = document.getElementById('careRequestsContainer');
+  if(!container) return;
+
+  if(list.length === 0){
+    container.innerHTML = `<div class="empty-box">No ${careActiveCategory} caretaker connections.</div>`;
+    return;
   }
 
-  const pastListHtml = profileData.past_caretakers_history.map(pc => `
-    <div style="padding:12px 14px;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;background:var(--paper);">
-      <div style="display:flex;justify-content:space-between;align-items:center;">
-        <b style="font-size:14px;color:var(--ink);">${pc.full_name}</b>
-        <span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5;">UNLINKED</span>
-      </div>
-      <div style="font-size:12px;color:var(--muted);margin-top:4px;">📍 ${pc.location} · 📞 ${pc.phone_number}</div>
-      <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">Unlinked Date: ${pc.unlinked_at}</div>
-    </div>
-  `).join('');
+  container.innerHTML = list.map(c => {
+    let actionBtn = '';
+    let statusBadge = '';
+    
+    if(careActiveCategory === 'accepted'){
+      statusBadge = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:#D1FAE5;color:#065F46;border:1px solid #A7F3D0;">✓ CONNECTED</span>`;
+      actionBtn = `
+        <div style="margin-top:10px;display:flex;gap:6px;justify-content:flex-end;">
+          <button class="btn-action secondary" style="padding:4px 10px;font-size:11.5px;" onclick="viewCaretakerProfile()">Visit Caretaker Profile</button>
+          <button class="btn-action danger" style="padding:4px 10px;font-size:11.5px;background:var(--brick);color:#fff;border:none;" onclick="removeAssignedCaretaker()">Remove Caretaker</button>
+        </div>
+      `;
+    } else if(careActiveCategory === 'pending'){
+      statusBadge = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:#FEF3C7;color:#92400E;border:1px solid #FDE68A;">⏳ WAITING CONFIRMATION</span>`;
+    } else if(careActiveCategory === 'rejected'){
+      statusBadge = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5;">❌ REJECTED</span>`;
+    } else if(careActiveCategory === 'unlinked'){
+      statusBadge = `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:#F3F4F6;color:#374151;border:1px solid #D1D5DB;">📜 UNLINKED</span>`;
+    }
 
-  modal.innerHTML = `
-    <div class="modal" style="max-width:520px;">
-      <div class="modal-head">
-        <h3>📜 Past Caretaker Connections</h3>
-        <button class="modal-close" onclick="document.getElementById('pastConnectionsModal').classList.remove('open')">✕</button>
+    return `
+      <div style="padding:14px;border:1px solid var(--line);border-radius:12px;margin-bottom:10px;background:var(--paper);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div>
+            <b style="font-size:14.5px;color:var(--ink);">${c.full_name}</b>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px;">📍 ${c.location} · 📞 ${c.phone_number}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px;">Request Date: ${c.created_at}</div>
+          </div>
+          ${statusBadge}
+        </div>
+        ${actionBtn}
       </div>
-      <div style="margin-top:14px;max-height:65vh;overflow-y:auto;">
-        ${pastListHtml}
-      </div>
-    </div>
-  `;
-  modal.classList.add('open');
+    `;
+  }).join('');
 }
 
 async function removeAssignedCaretaker(){
@@ -463,6 +480,7 @@ function getStatusBadgeHtml(st){
   else if (st === 'completed') { bg = '#DBEAFE'; fg = '#1E40AF'; border = '#BFDBFE'; label = '✓ COMPLETED'; }
   else if (st === 'rejected') { bg = '#FEE2E2'; fg = '#991B1B'; border = '#FCA5A5'; label = '✕ REJECTED'; }
   else if (st === 'missed') { bg = '#FFEDD5'; fg = '#9A3412'; border = '#FED7AA'; label = '⚠ MISSED'; }
+  else if (st === 'cancelled_by_doctor') { bg = '#FEE2E2'; fg = '#EF4444'; border = '#FCA5A5'; label = '✕ CANCELLED BY DOCTOR'; }
   return `<span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;background:${bg};color:${fg};border:1px solid ${border};">${label}</span>`;
 }
 
@@ -485,11 +503,58 @@ function switchPatAptCategory(cat){
   renderPatientAppointments();
 }
 
+function showDoctorLeaveOverlayNotification(a) {
+  let overlay = document.getElementById('emergencyOverlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'emergencyOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;right:0;z-index:9999;display:flex;flex-direction:column;gap:10px;padding:16px;max-width:420px;width:100%;pointer-events:none;';
+    document.body.appendChild(overlay);
+  }
+
+  const card = document.createElement('div');
+  card.className = 'emergency-alert-card';
+  card.style.cssText = `pointer-events:all;background:#FEF2F2;border:2px solid #EF4444;border-radius:16px;padding:18px;box-shadow:0 8px 32px rgba(0,0,0,0.25);animation:slideInRight 0.4s ease-out;margin-bottom:10px;`;
+  card.innerHTML = `
+    <style>
+      @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    </style>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:22px;">⚠️</span>
+        <div>
+          <div style="font-size:12px;font-weight:800;color:#EF4444;text-transform:uppercase;letter-spacing:0.8px;">Appointment Cancelled</div>
+          <div style="font-size:10.5px;color:#6B7280;margin-top:2px;">Today's Appointment</div>
+        </div>
+      </div>
+      <button onclick="this.closest('.emergency-alert-card').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#9CA3AF;padding:2px 6px;">✕</button>
+    </div>
+    <div style="margin-top:12px;padding:12px;background:#fff;border-radius:10px;border:1px solid #EF444430;">
+      <div style="font-size:13px;color:#374151;line-height:1.5;font-weight:600;">todays appoinment cancelled by doctor becuse doctor is on leave today</div>
+    </div>
+    <div style="margin-top:10px;padding:10px 12px;background:#fff;border-radius:10px;border:1px solid var(--line);">
+      <div style="font-size:12.5px;font-weight:700;color:#111827;">Dr. ${a.doctor_name || 'Doctor'}</div>
+      <div style="font-size:11.5px;color:#6B7280;margin-top:2px;">Date: ${a.appointment_date} · Slot: ${a.time_slot || '10:00 AM'}</div>
+    </div>
+  `;
+  overlay.appendChild(card);
+}
+
 async function loadPatientAppointments(){
   try {
     const res = await fetch('/api/auth/patient/appointments', { headers: getAuthHeader() });
     if(res.ok){
       patAllAppointments = await res.json();
+      // Check for cancelled today's appointments and show popup
+      patAllAppointments.forEach(a => {
+        if(a.status === 'cancelled_by_doctor') {
+          const key = 'alerted_cancel_' + a.id;
+          if(localStorage.getItem(key) !== 'true') {
+            showDoctorLeaveOverlayNotification(a);
+            localStorage.setItem(key, 'true');
+          }
+        }
+      });
       renderPatientAppointments();
     }
   } catch(e){ console.log(e); }
@@ -533,9 +598,19 @@ function renderPatientAppointments(){
     <div style="padding:12px 14px;border:1px solid var(--line);border-radius:10px;margin-bottom:10px;background:var(--paper);display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
       <div>
         <div style="font-weight:700;font-size:14.5px;color:var(--ink);">${a.doctor_name ? 'Dr. ' + a.doctor_name : 'Consultation'}</div>
-        <div style="font-size:12px;color:var(--muted);margin-top:3px;">Date: <b>${a.appointment_date || 'TBD'}</b> · Time Slot: <b>${a.time_slot || '10:00 AM'}</b></div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px;">Date: <b>${a.appointment_date || 'TBD'}</b> · Time Slot: <b>${a.time_slot || '10:00 AM'}</b> · Mode: <b>${a.appointment_type === 'online' ? '🟢 Online (Video)' : '📍 Offline (In-Person)'}</b></div>
         <div style="font-size:12px;color:var(--ink);margin-top:3px;"><b>Reason:</b> ${a.reason || 'General Checkup'}</div>
-        ${(a.booked_by === 'caretaker' || a.caretaker_name) ? `<div style="font-size:11.5px;color:var(--pine-deep);margin-top:4px;font-weight:600;">🩺 Booked by Caretaker: ${a.caretaker_name || 'Assigned Caretaker'}</div>` : ''}
+        ${(a.booked_by === 'caretaker' || a.caretaker_name) 
+          ? `<div style="font-size:11.5px;color:var(--pine-deep);margin-top:4px;font-weight:600;">🩺 Booked by Caretaker: ${a.caretaker_name || 'Assigned Caretaker'}</div>` 
+          : `<div style="font-size:11.5px;color:var(--pine-deep);margin-top:4px;font-weight:600;">🩺 Booked by Patient: ${a.patient_name || 'Patient'} | ${a.patient_code || 'ID'}</div>`
+        }
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+          ${a.prescription_pdf ? `
+            <button onclick="openPrescriptionPDF('${a.prescription_pdf.replace(/'/g, "\\'")}', '${(a.prescription_name || 'Prescription').replace(/'/g, "\\'")}')" class="btn-sm" style="display:inline-flex;align-items:center;gap:6px;background:var(--amber);color:white;border:none;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+              📄 Prescription
+            </button>
+          ` : ''}
+        </div>
       </div>
       ${getStatusBadgeHtml(a.status)}
     </div>
@@ -595,6 +670,7 @@ function openEditModal(){
   document.getElementById('inputGender').value = profileData.gender || '';
   document.getElementById('inputMarital').value = profileData.marital_status || '';
   document.getElementById('inputPhone').value = profileData.phone_number || '';
+  document.getElementById('inputEmail').value = profileData.email || '';
   document.getElementById('inputLocation').value = profileData.location || '';
   document.getElementById('inputLang').value = profileData.languages || '';
   document.getElementById('inputInsurance').value = profileData.insurance_details || '';
@@ -613,6 +689,7 @@ async function saveProfile(e){
     gender: document.getElementById('inputGender').value,
     marital_status: document.getElementById('inputMarital').value,
     phone_number: document.getElementById('inputPhone').value,
+    email: document.getElementById('inputEmail').value,
     location: document.getElementById('inputLocation').value,
     languages: document.getElementById('inputLang').value,
     insurance_details: document.getElementById('inputInsurance').value,
@@ -735,6 +812,22 @@ async function loadEmergencyAlerts(){
       }).join('');
     }
   } catch(e){ console.log('Error loading emergency alerts:', e); }
+}
+
+function openPrescriptionPDF(base64Data, name) {
+  if(!base64Data || base64Data === '#') return;
+  const win = window.open();
+  if(win){
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Prescription: ${name}</title></head>
+      <body style="margin:0;padding:0;background:#1e1e1e;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;">
+        <iframe src="${base64Data}#toolbar=1&navpanes=0&scrollbar=1&view=FitH" style="width:100vw;height:100vh;border:none;"></iframe>
+      </body>
+      </html>
+    `);
+  }
 }
 
 function initPatientPage(){
