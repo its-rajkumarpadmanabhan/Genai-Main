@@ -12,13 +12,16 @@
       try {
         const user = JSON.parse(userRaw);
         const role = user.role || 'patient';
-        const target = role === 'admin' ? '/admin-dashboard.html' :
-                       role === 'doctor' ? '/doctor-profile.html' :
-                       role === 'caretaker' ? '/caretaker-dashboard.html' : '/patient-profile.html';
+        const target = role === 'admin' ? '/admin-dashboard' :
+                       role === 'doctor' ? '/doctor-profile' :
+                       role === 'caretaker' ? '/caretaker-dashboard' : '/patient-profile';
         window.location.href = target;
       } catch(e){}
     }
   })();
+  document.addEventListener('contextmenu', event => {
+    event.preventDefault();
+  });
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -29,9 +32,9 @@
       try {
         const u = JSON.parse(userRaw);
         const role = u.role || 'patient';
-        const targetPage = role === 'admin' ? '/admin-dashboard.html' :
-                           role === 'doctor' ? '/doctor-profile.html' :
-                           role === 'caretaker' ? '/caretaker-dashboard.html' : '/patient-profile.html';
+        const targetPage = role === 'admin' ? '/admin-dashboard' :
+                           role === 'doctor' ? '/doctor-profile' :
+                           role === 'caretaker' ? '/caretaker-dashboard' : '/patient-profile';
         window.location.replace(targetPage);
       } catch(e){}
     }
@@ -99,7 +102,7 @@
     </div>
 
     <div class="auth-tabs">
-      <button onclick="window.location.href='/login.html'">Log in</button>
+      <button onclick="window.location.href='/login'">Log in</button>
       <button class="active">Sign up</button>
     </div>
 
@@ -130,7 +133,7 @@
     <div class="form-msg" id="authMsg"></div>
 
     <div class="form-sublink">
-      Already have an account? <a href="/login.html">Log in here</a>
+      Already have an account? <a href="/login">Log in here</a>
     </div>
   </div>
 </div>
@@ -199,7 +202,7 @@
       if(!res.ok){
         const errDetail = safeDetail(data.detail) || 'Signup failed.';
         if(errDetail.toLowerCase().includes('email already exists')){
-          msg.innerHTML = 'An account with this email already exists. <a href="/login.html" style="color:var(--pine);font-weight:600;text-decoration:underline;">Click here to log in</a>.';
+          msg.innerHTML = 'An account with this email already exists. <a href="/login" style="color:var(--pine);font-weight:600;text-decoration:underline;">Click here to log in</a>.';
           btn.disabled = false;
           btn.textContent = 'Create ' + selectedRole + ' account';
           return;
@@ -215,9 +218,9 @@
       msg.textContent = 'Account created! Redirecting to dashboard...';
 
       const role = data.user && data.user.role ? data.user.role : selectedRole;
-      const targetPage = role === 'admin' ? '/admin-dashboard.html' :
-                         role === 'doctor' ? '/doctor-profile.html' :
-                         role === 'caretaker' ? '/caretaker-dashboard.html' : '/app.html';
+      const targetPage = role === 'admin' ? '/admin-dashboard' :
+                         role === 'doctor' ? '/doctor-profile' :
+                         role === 'caretaker' ? '/caretaker-dashboard' : '/app';
 
       setTimeout(() => window.location.href = targetPage, 1200);
     } catch(err){

@@ -8,15 +8,18 @@
   (function(){
     const token = localStorage.getItem('beacon_token') || localStorage.getItem('access_token');
     const userRaw = localStorage.getItem('beacon_user');
-    if(!token || !userRaw){ window.location.href = '/login.html'; return; }
+    if(!token || !userRaw){ window.location.href = '/login'; return; }
     try {
       const user = JSON.parse(userRaw);
       if(user.role !== 'doctor' && user.role !== 'admin'){
-        const target = user.role === 'caretaker' ? '/caretaker-dashboard.html' : '/patient-profile.html';
+        const target = user.role === 'caretaker' ? '/caretaker-dashboard' : '/patient-profile';
         window.location.href = target;
       }
-    } catch(e){ window.location.href = '/login.html'; }
+    } catch(e){ window.location.href = '/login'; }
   })();
+  document.addEventListener('contextmenu', event => {
+    event.preventDefault();
+  });
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -43,6 +46,27 @@
   nav a.active{background:#EFF3F0;color:var(--pine-deep);}
   nav a:not(.active):hover{background:rgba(255,255,255,.08);}
   .sidebar-foot{margin-top:auto;}
+  .btn-symbol {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .btn-symbol:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  }
+  .btn-symbol svg {
+    width: 17px;
+    height: 17px;
+    stroke-width: 2.2px;
+  }
+
   .help-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:var(--radius);padding:14px;font-size:12.5px;color:#C7DACF;}
   .help-card b{display:block;font-family:'Fraunces',serif;font-size:14px;color:#EFF3F0;margin-bottom:4px;}
 
@@ -90,6 +114,7 @@
   /* Modal */
   .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(30,42,34,.5);align-items:center;justify-content:center;z-index:90;padding:20px;}
   .modal-backdrop.open{display:flex;}
+  #documentViewerModal{z-index:1000 !important;}
   .modal{background:var(--surface);border-radius:18px;max-width:540px;width:100%;padding:24px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);}
   .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
   .modal-head h3{font-family:'Fraunces',serif;font-size:18px;margin:0;}
@@ -115,10 +140,10 @@
       <div><div class="brand-name">Carewell</div><div class="brand-sub">DOCTOR PORTAL</div></div>
     </div>
     <nav>
-      <a href="/doctor-profile.html" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Doctor Profile</span></a>
-      <a href="/doctor-caretaker-list.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Directory</span></a>
-      <a href="/app.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Voice AI Engine</span></a>
-      <a href="#" onclick="localStorage.clear(); window.location.href='/login.html';"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></a>
+      <a href="/doctor-profile" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Doctor Profile</span></a>
+      <a href="/doctor-caretaker-list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Directory</span></a>
+      <a href="/app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Voice AI Engine</span></a>
+      <a href="#" onclick="localStorage.clear(); window.location.href='/login';"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></a>
     </nav>
     <div class="sidebar-foot">
       <div class="help-card"><b>Need help?</b>Reach clinician support any time.</div>
@@ -129,7 +154,7 @@
   <main>
     <div id="roleWarningBanner" style="display:none;background:#FEF2F2;border:1px solid #FCA5A5;color:#991B1B;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:13px;align-items:center;justify-content:space-between;box-shadow:0 2px 6px rgba(0,0,0,0.02);">
       <div>⚠️ <span id="roleWarningText">Doctor Portal access requires a Doctor account. You are currently logged in as a non-doctor user.</span></div>
-      <a href="/login.html" onclick="localStorage.clear()" style="background:#991B1B;color:#fff;padding:6px 14px;border-radius:6px;text-decoration:none;font-weight:600;font-size:12px;white-space:nowrap;">Log in as Doctor</a>
+      <a href="/login" onclick="localStorage.clear()" style="background:#991B1B;color:#fff;padding:6px 14px;border-radius:6px;text-decoration:none;font-weight:600;font-size:12px;white-space:nowrap;">Log in as Doctor</a>
     </div>
 
     <div class="topbar">
@@ -347,7 +372,7 @@ async function loadDoctorProfile(){
     } else if(res.status === 401){
       localStorage.clear();
       alert('Your login session has expired. Please log in again.');
-      window.location.href = '/login.html';
+      window.location.href = '/login';
     } else {
       const err = await res.json().catch(() => ({}));
       const banner = document.getElementById('roleWarningBanner');
@@ -436,7 +461,7 @@ function renderDoctorAppointments(){
     // First Come First Served queue number based on registration timestamp
     a.queue_number = idx + 1;
 
-    if (st === 'completed' || st === 'missed' || st === 'rejected' || (aDate && aDate < todayStr)) {
+    if (st === 'completed' || st === 'missed' || st === 'rejected' || st === 'cancelled_by_doctor' || (aDate && aDate < todayStr)) {
       pastList.push(a);
     } else if (aDate === todayStr || (!aDate && st === 'pending')) {
       todayList.push(a);
@@ -473,7 +498,10 @@ function renderDoctorAppointments(){
   if(!activeList || activeList.length === 0){
     const filterInfo = searchQuery ? ` matching "${searchQuery}"` : '';
     const statusInfo = statusFilter !== 'all' ? ` with status "${statusFilter}"` : '';
-    container.innerHTML = `<div class="empty-box">No ${activeAptCategory} appointments${filterInfo}${statusInfo} found.</div>`;
+    const emptyMsg = (activeAptCategory === 'today' && !searchQuery && statusFilter === 'all')
+      ? 'no more appointment today'
+      : `No ${activeAptCategory} appointments${filterInfo}${statusInfo} found.`;
+    container.innerHTML = `<div class="empty-box">${emptyMsg}</div>`;
     return;
   }
 
@@ -498,40 +526,63 @@ function renderDoctorAppointments(){
         }
       </div>
       
-      <div class="req-actions" style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn-sm" style="background:#0D9488;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="openFullPatientModal(${a.patient}, '${(a.patient_name||'Patient').replace(/'/g, "\\'")}')">👤 View Patient Profile</button>
+      <div class="req-actions" style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+        <button class="btn-symbol" title="View Patient Profile" style="color:#0D9488;background:rgba(13, 148, 136, 0.08);" onclick="openFullPatientModal(${a.patient}, '${(a.patient_name||'Patient').replace(/'/g, "\\'")}')">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </button>
 
         ${a.status === 'pending' ? `
-          <button class="btn-sm accept" style="background:var(--pine);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="updateStatus(${a.id}, 'accepted')">Accept</button>
-          <button class="btn-sm decline" style="background:var(--brick);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="updateStatus(${a.id}, 'rejected')">Reject</button>
+          <button class="btn-symbol" title="Accept Appointment" style="color:#33604F;background:rgba(51, 96, 79, 0.08);" onclick="updateStatus(${a.id}, 'accepted')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <button class="btn-symbol" title="Reject Appointment" style="color:#AE4436;background:rgba(174, 68, 54, 0.08);" onclick="updateStatus(${a.id}, 'rejected')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
         ` : ''}
 
         ${a.status === 'accepted' ? `
-          <button class="btn-sm" style="background:var(--pine-deep);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="viewPatientRecords(${a.patient}, '${(a.patient_name||'Patient').replace(/'/g, "\\'")}')">📁 View Medical Records (Read-Only)</button>
           ${a.appointment_type === 'online' ? `
+            <button class="btn-symbol" title="Join Video Call" style="color:#2563EB;background:rgba(37, 99, 235, 0.08);" onclick="startVideoCall(${a.id})">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/></svg>
+            </button>
             ${a.is_call_active ? `
-              <button class="btn-sm" style="display:inline-flex;align-items:center;gap:6px;background:#EF4444;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="endVideoCall(${a.id})">📴 End Video Call Session</button>
-            ` : `
-              <button class="btn-sm" style="display:inline-flex;align-items:center;gap:6px;background:#2563EB;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="startVideoCall(${a.id})">🎥 Join Video Call</button>
-            `}
+              <button class="btn-symbol" title="End Call" style="color:#EF4444;background:rgba(239, 68, 68, 0.08);" onclick="endVideoCall(${a.id})">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            ` : ''}
           ` : ''}
           ${a.prescription_pdf ? `
-            <button class="btn-sm" style="background:var(--amber);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="previewMedicalDocument('${a.prescription_name || 'Prescription'}', '${a.prescription_pdf.replace(/'/g, "\\'")}', false, true, 'Doctor Prescription PDF')">📄 View Prescription</button>
-            <button class="btn-sm" style="background:var(--slate);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="triggerPrescriptionUpload(${a.id}, '${a.status}')">🔄 Update Prescription PDF</button>
+            <button class="btn-symbol" title="View Prescription" style="color:#D97706;background:rgba(217, 119, 6, 0.08);" onclick="previewMedicalDocument('${a.prescription_name || 'Prescription'}', '${a.prescription_pdf.replace(/'/g, "\\'")}', false, true, 'Doctor Prescription PDF')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            <button class="btn-symbol" title="Update Prescription" style="color:#4B5563;background:rgba(75, 85, 99, 0.08);" onclick="triggerPrescriptionUpload(${a.id}, '${a.status}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </button>
           ` : `
-            <button class="btn-sm" style="background:var(--slate);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="triggerPrescriptionUpload(${a.id}, '${a.status}')">📄 Upload Prescription PDF</button>
+            <button class="btn-symbol" title="Upload Prescription" style="color:#4B5563;background:rgba(75, 85, 99, 0.08);" onclick="triggerPrescriptionUpload(${a.id}, '${a.status}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </button>
           `}
-          <button class="btn-sm" style="background:#2563EB;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="updateStatus(${a.id}, 'completed')">✓ Mark Checkup Completed</button>
-          <button class="btn-sm" style="background:#D97706;color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="updateStatus(${a.id}, 'missed')">⚠ Mark Missed</button>
+          <button class="btn-symbol" title="Mark Checkup Completed" style="color:#10B981;background:rgba(16, 185, 129, 0.08);" onclick="updateStatus(${a.id}, 'completed')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+          <button class="btn-symbol" title="Mark Missed" style="color:#EA580C;background:rgba(234, 88, 12, 0.08);" onclick="updateStatus(${a.id}, 'missed')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+          </button>
         ` : ''}
 
         ${(a.status === 'completed' || a.status === 'missed') ? `
-          <button class="btn-sm" style="background:var(--pine-deep);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="viewPatientRecords(${a.patient}, '${(a.patient_name||'Patient').replace(/'/g, "\\'")}')">📁 View Medical Records (Read-Only)</button>
           ${a.prescription_pdf ? `
-            <button class="btn-sm" style="background:var(--amber);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="previewMedicalDocument('${a.prescription_name || 'Prescription'}', '${a.prescription_pdf.replace(/'/g, "\\'")}', false, true, 'Doctor Prescription PDF')">📄 View Prescription</button>
-            <button class="btn-sm" style="background:var(--slate);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="triggerPrescriptionUpload(${a.id}, '${a.status}')">🔄 Update Prescription PDF</button>
+            <button class="btn-symbol" title="View Prescription" style="color:#D97706;background:rgba(217, 119, 6, 0.08);" onclick="previewMedicalDocument('${a.prescription_name || 'Prescription'}', '${a.prescription_pdf.replace(/'/g, "\\'")}', false, true, 'Doctor Prescription PDF')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            </button>
+            <button class="btn-symbol" title="Update Prescription" style="color:#4B5563;background:rgba(75, 85, 99, 0.08);" onclick="triggerPrescriptionUpload(${a.id}, '${a.status}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </button>
           ` : `
-            <button class="btn-sm" style="background:var(--slate);color:#fff;border:none;padding:6px 14px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;" onclick="triggerPrescriptionUpload(${a.id}, '${a.status}')">📄 Upload Prescription PDF</button>
+            <button class="btn-symbol" title="Upload Prescription" style="color:#4B5563;background:rgba(75, 85, 99, 0.08);" onclick="triggerPrescriptionUpload(${a.id}, '${a.status}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </button>
           `}
         ` : ''}
       </div>
@@ -597,7 +648,6 @@ async function openFullPatientModal(patientId, patientName){
                 <div><b>Full Name:</b> ${p.assigned_caretaker.full_name}</div>
                 <div><b>Mobile Phone:</b> ${p.assigned_caretaker.phone_number}</div>
                 <div><b>Experience:</b> ${p.assigned_caretaker.experience_years} Years</div>
-                <div><b>Daily Fee:</b> ₹${p.assigned_caretaker.consultation_fee}</div>
                 <div style="grid-column:span 2;"><b>Location:</b> ${p.assigned_caretaker.location}</div>
                 <div style="grid-column:span 2;"><b>Languages Spoken:</b> ${p.assigned_caretaker.languages}</div>
               </div>
@@ -734,6 +784,7 @@ function previewMedicalDocument(title, fileSource, isImg, isPdf, notes){
     modal.className = 'modal-backdrop';
     document.body.appendChild(modal);
   }
+  modal.style.zIndex = '9999';
 
   const titleEl = document.getElementById('docPreviewTitle');
   if(titleEl) titleEl.textContent = `Document Preview: ${title}`;
@@ -869,7 +920,8 @@ async function startVideoCall(aptId) {
       headers: getAuthHeader()
     });
     loadDoctorAppointments();
-    window.open(`https://meet.jit.si/BeaconRoom-${aptId}`, '_blank');
+    const token = localStorage.getItem('access_token') || localStorage.getItem('beacon_token');
+    window.open(`/api/auth/appointments/${aptId}/join-video-call?token=${token}`, '_blank');
   } catch(e){ console.error(e); }
 }
 
@@ -968,7 +1020,7 @@ async function deleteMyProfile(){
     if(res.ok){
       localStorage.clear();
       alert('Your account has been deleted.');
-      window.location.href = '/signup.html';
+      window.location.href = '/signup';
     }
   } catch(e){ alert(e.message); }
 }

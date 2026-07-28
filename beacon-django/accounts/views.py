@@ -612,13 +612,7 @@ class DoctorAppointmentsView(APIView):
         from .models import Appointment
         from .serializers import AppointmentSerializer
         from django.db.models import Case, When, Value, IntegerField
-        apts = Appointment.objects.filter(doctor=request.user).annotate(
-            status_priority=Case(
-                When(status__in=['pending', 'accepted'], then=Value(1)),
-                default=Value(2),
-                output_field=IntegerField(),
-            )
-        ).order_by('status_priority', '-appointment_date', '-created_at')
+        apts = Appointment.objects.filter(doctor=request.user).order_by('-appointment_date', '-created_at')
         return Response(AppointmentSerializer(apts, many=True).data)
 
     def post(self, request):
@@ -632,6 +626,8 @@ class DoctorAppointmentsView(APIView):
         if new_status in ['accepted', 'rejected', 'completed', 'missed']:
             old_status = apt.status
             apt.status = new_status
+            if new_status in ['completed', 'missed', 'rejected']:
+                apt.is_call_active = False
             if request.data.get('doctor_notes'):
                 apt.doctor_notes = request.data.get('doctor_notes')
             if 'prescription_pdf' in request.data:
@@ -711,15 +707,96 @@ class AppointmentEndCallView(APIView):
 
     def post(self, request, apt_id):
         from .models import Appointment
-        from django.db.models import Q
-        apt = Appointment.objects.filter(
-            Q(id=apt_id) & (Q(doctor=request.user) | Q(patient=request.user) | Q(caretaker=request.user))
-        ).first()
+        apt = Appointment.objects.filter(id=apt_id, doctor=request.user).first()
         if not apt:
-            return Response({'detail': 'Appointment not found or access denied.'}, status=status.HTTP_404_NOT_FOUND)
+            return Response({'detail': 'Appointment not found or you are not the doctor.'}, status=status.HTTP_404_NOT_FOUND)
         apt.is_call_active = False
         apt.save()
         return Response({'status': 'success', 'is_call_active': False})
+
+
+class AppointmentToggleCaretakerCallView(APIView):
+    """POST /api/auth/appointments/<int:apt_id>/toggle-caretaker-call"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, apt_id):
+        from .models import Appointment
+        apt = Appointment.objects.filter(id=apt_id, doctor=request.user).first()
+        if not apt:
+            return Response({'detail': 'Appointment not found or you are not the doctor.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        apt.is_caretaker_added_to_call = not apt.is_caretaker_added_to_call
+        apt.save()
+        return Response({
+            'status': 'success',
+            'is_caretaker_added_to_call': apt.is_caretaker_added_to_call
+        })
+
+
+class AppointmentJoinVideoCallView(APIView):
+    """GET /api/auth/appointments/<int:apt_id>/join-video-call"""
+    permission_classes = [AllowAny]
+
+    def get(self, request, apt_id):
+        from .models import Appointment
+        from rest_framework_simplejwt.authentication import JWTAuthentication
+        from django.shortcuts import redirect
+        from django.http import HttpResponseForbidden
+
+        # 1. Authenticate user
+        user = None
+        auth_header = request.META.get('HTTP_AUTHORIZATION')
+        token = request.GET.get('token')
+
+        if auth_header:
+            try:
+                validated_token = JWTAuthentication().get_validated_token(auth_header.split()[1])
+                user = JWTAuthentication().get_user(validated_token)
+            except Exception:
+                pass
+        elif token:
+            try:
+                validated_token = JWTAuthentication().get_validated_token(token)
+                user = JWTAuthentication().get_user(validated_token)
+            except Exception:
+                pass
+
+        if not user or not user.is_authenticated:
+            return HttpResponseForbidden("Authentication credentials were not provided or are invalid.")
+
+        # 2. Retrieve appointment
+        apt = Appointment.objects.filter(id=apt_id).first()
+        if not apt:
+            return HttpResponseForbidden("Appointment not found.")
+
+        # 3. Check access permissions
+        is_doctor = (apt.doctor == user)
+        is_patient = (apt.patient == user)
+        
+        # Check if user is the assigned caretaker of the patient
+        is_caretaker = False
+        if apt.caretaker == user:
+            is_caretaker = True
+        elif hasattr(apt.patient, 'patient_profile') and apt.patient.patient_profile.assigned_caretaker == user:
+            is_caretaker = True
+
+        if is_doctor:
+            # Doctor can always join/initiate
+            pass
+        elif is_patient:
+            # Patient can only join if the doctor started the call
+            if not apt.is_call_active:
+                return HttpResponseForbidden("This video call session has not been started by the doctor yet.")
+        elif is_caretaker:
+            # Caretaker can join if call is active
+            if not apt.is_call_active:
+                return HttpResponseForbidden("This video call session has not been started by the doctor yet.")
+        else:
+            return HttpResponseForbidden("You do not have permission to join this video call session.")
+
+        # 4. Redirect to Jitsi Meet if authorized
+        meeting_url = f"https://meet.jit.si/BeaconRoom-{apt.id}"
+        return redirect(meeting_url)
 
 
 class DoctorPatientsListView(APIView):
@@ -924,7 +1001,7 @@ class CaretakerRequestsView(APIView):
         assigned_patients = PatientProfile.objects.filter(assigned_caretaker=request.user).values_list('user_id', flat=True)
         apts = Appointment.objects.filter(
             Q(caretaker=request.user) | Q(patient_id__in=assigned_patients)
-        ).order_by('-created_at')
+        ).order_by('-appointment_date', '-time_slot', '-created_at')
 
         apt_data = AppointmentSerializer(apts, many=True).data
         for a in apt_data:
@@ -1129,13 +1206,7 @@ class PatientAppointmentsView(APIView):
         else:
             apts = Appointment.objects.filter(patient=user)
             
-        apts = apts.annotate(
-            status_priority=Case(
-                When(status__in=['pending', 'accepted'], then=Value(1)),
-                default=Value(2),
-                output_field=IntegerField(),
-            )
-        ).order_by('status_priority', '-appointment_date', '-time_slot')
+        apts = apts.order_by('-appointment_date', '-time_slot', '-created_at')
         return Response(AppointmentSerializer(apts, many=True).data)
 
 

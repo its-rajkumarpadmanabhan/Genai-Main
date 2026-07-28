@@ -251,6 +251,7 @@ class Appointment(models.Model):
     prescription_pdf = models.TextField(blank=True, null=True) # base64 PDF
     prescription_name = models.CharField(max_length=255, blank=True, null=True)
     is_call_active = models.BooleanField(default=False)
+    is_caretaker_added_to_call = models.BooleanField(default=False)
     doctor_notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

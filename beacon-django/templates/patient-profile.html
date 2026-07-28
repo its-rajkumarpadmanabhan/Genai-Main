@@ -8,15 +8,18 @@
   (function(){
     const token = localStorage.getItem('beacon_token') || localStorage.getItem('access_token');
     const userRaw = localStorage.getItem('beacon_user');
-    if(!token || !userRaw){ window.location.href = '/login.html'; return; }
+    if(!token || !userRaw){ window.location.href = '/login'; return; }
     try {
       const user = JSON.parse(userRaw);
       if(user.role !== 'patient' && user.role !== 'admin'){
-        const target = user.role === 'doctor' ? '/doctor-profile.html' : '/caretaker-dashboard.html';
+        const target = user.role === 'doctor' ? '/doctor-profile' : '/caretaker-dashboard';
         window.location.href = target;
       }
-    } catch(e){ window.location.href = '/login.html'; }
+    } catch(e){ window.location.href = '/login'; }
   })();
+  document.addEventListener('contextmenu', event => {
+    event.preventDefault();
+  });
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -104,6 +107,38 @@
 
   @media (max-width:980px){ .app{grid-template-columns:1fr;} .sidebar{flex-direction:row;overflow-x:auto;align-items:center;gap:16px;} .sidebar nav{flex-direction:row;} .sidebar-foot,.brand-sub{display:none;} .grid-cols{grid-template-columns:1fr;} .p-meta{grid-template-columns:repeat(2,1fr);} }
   @media (max-width:600px){ .p-meta{grid-template-columns:1fr;} .form-grid{grid-template-columns:1fr;} .field.full{grid-column:span 1;} .topbar-right{width:100%;flex-direction:column;align-items:stretch;} .btn-action{text-align:center;} }
+
+  /* Calendar Styles */
+  .cal-header {
+    font-weight: 700;
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    padding-bottom: 6px;
+  }
+  .cal-day {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    font-weight: 500;
+  }
+  .cal-day:hover {
+    background: rgba(0,0,0,0.04);
+  }
+  .cal-day.has-apt {
+    background: #D1E7DD !important;
+    color: #0F5132 !important;
+    border: 1.5px solid #0F5132 !important;
+    font-weight: 700 !important;
+  }
+  .cal-day.today {
+    box-shadow: inset 0 0 0 1.5px var(--ink);
+  }
 </style>
 </head>
 <body>
@@ -116,11 +151,11 @@
       <div><div class="brand-name">Carewell</div><div class="brand-sub">PATIENT PORTAL</div></div>
     </div>
     <nav>
-      <a href="/patient-profile.html" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>My Profile</span></a>
-      <a href="/doctor-caretaker-list.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Find Caretaker / Doctor</span></a>
-      <a href="/app.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Voice AI Engine</span></a>
-      <a href="/voice-timeline.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>Voice AI Health Timeline</span></a>
-      <a href="#" onclick="localStorage.clear(); window.location.href='/login.html';"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></a>
+      <a href="/patient-profile" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>My Profile</span></a>
+      <a href="/doctor-caretaker-list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Find Caretaker / Doctor</span></a>
+      <a href="/app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Voice AI Engine</span></a>
+      <a href="/voice-timeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>Voice AI Health Timeline</span></a>
+      <a href="#" onclick="localStorage.clear(); window.location.href='/login';"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></a>
     </nav>
     <div class="sidebar-foot">
       <div class="help-card"><b>Need help?</b>Reach patient support any time.</div>
@@ -133,7 +168,7 @@
       <div class="breadcrumb">Patient Portal › <span id="bcPatientName">My Profile</span></div>
       <div class="topbar-right">
         <button class="btn-action secondary" onclick="openEditModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Edit Profile</button>
-        <a href="/doctor-caretaker-list.html" class="btn-action">Find Caretaker / Doctor</a>
+        <a href="/doctor-caretaker-list" class="btn-action">Find Caretaker / Doctor</a>
         <button class="btn-action danger" onclick="deleteMyProfile()">Delete Profile</button>
       </div>
     </div>
@@ -169,7 +204,7 @@
         <div class="section-box" style="margin-top:16px;">
           <div class="section-head">
             <h2>Caretaker Connections & Requests</h2>
-            <a href="/doctor-caretaker-list.html" class="btn-action" style="padding:6px 11px;font-size:11.5px;">Find Caretaker</a>
+            <a href="/doctor-caretaker-list" class="btn-action" style="padding:6px 11px;font-size:11.5px;">Find Caretaker</a>
           </div>
 
           <!-- Category Tabs -->
@@ -189,7 +224,7 @@
         <div class="section-box">
           <div class="section-head">
             <h2>My Appointments</h2>
-            <a href="/doctor-caretaker-list.html" class="btn-action" style="padding:6px 11px;font-size:11.5px;">Book Appointment</a>
+            <a href="/doctor-caretaker-list" class="btn-action" style="padding:6px 11px;font-size:11.5px;">Book Appointment</a>
           </div>
 
           <!-- Category Tabs (Today, Upcoming, Past) -->
@@ -217,7 +252,20 @@
           </div>
         </div>
 
-
+        <!-- Appointment Calendar -->
+        <div class="section-box" style="margin-top:16px;">
+          <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <h2>Appointment Calendar</h2>
+            <div style="display:flex;gap:10px;align-items:center;">
+              <button onclick="prevMonth()" style="background:none;border:none;color:var(--pine);font-size:20px;font-weight:bold;cursor:pointer;padding:0 5px;line-height:1;">&lsaquo;</button>
+              <span id="calendarMonthYear" style="font-weight:700;font-size:13.5px;color:var(--ink);"></span>
+              <button onclick="nextMonth()" style="background:none;border:none;color:var(--pine);font-size:20px;font-weight:bold;cursor:pointer;padding:0 5px;line-height:1;">&rsaquo;</button>
+            </div>
+          </div>
+          <div id="calendarGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center;font-size:12.5px;">
+            <!-- Rendered dynamically by JS -->
+          </div>
+        </div>
       </div>
     </div>
   </main>
@@ -325,7 +373,7 @@ async function loadPatientProfile(){
     } else {
       localStorage.clear();
       alert('Your account no longer exists or has been deleted by Admin. Please sign up to create a new profile.');
-      window.location.href = '/login.html';
+      window.location.href = '/login';
     }
   } catch(e){ console.log(e); }
 }
@@ -540,18 +588,65 @@ function showDoctorLeaveOverlayNotification(a) {
   overlay.appendChild(card);
 }
 
+function showVideoCallInviteNotification(a) {
+  let overlay = document.getElementById('emergencyOverlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'emergencyOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;right:0;z-index:9999;display:flex;flex-direction:column;gap:10px;padding:16px;max-width:420px;width:100%;pointer-events:none;';
+    document.body.appendChild(overlay);
+  }
+
+  if(document.getElementById('call_invite_' + a.id)) return;
+
+  const card = document.createElement('div');
+  card.id = 'call_invite_' + a.id;
+  card.className = 'emergency-alert-card';
+  card.style.cssText = `pointer-events:all;background:#EFF6FF;border:2px solid #3B82F6;border-radius:16px;padding:18px;box-shadow:0 8px 32px rgba(0,0,0,0.25);animation:slideInRight 0.4s ease-out;margin-bottom:10px;`;
+  card.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:22px;">🎥</span>
+        <div>
+          <div style="font-size:12px;font-weight:800;color:#1D4ED8;text-transform:uppercase;letter-spacing:0.8px;">Incoming Video Call</div>
+          <div style="font-size:10.5px;color:#6B7280;margin-top:2px;">Online Consultation</div>
+        </div>
+      </div>
+      <button onclick="localStorage.setItem('alerted_call_${a.id}', 'true'); this.closest('.emergency-alert-card').remove();" style="background:none;border:none;font-size:18px;cursor:pointer;color:#9CA3AF;padding:2px 6px;">✕</button>
+    </div>
+    <div style="margin-top:10px;padding:10px 12px;background:#fff;border-radius:10px;border:1px solid var(--line);">
+      <div style="font-size:12.5px;font-weight:700;color:#111827;">Dr. ${a.doctor_name || 'Doctor'}</div>
+      <div style="font-size:11.5px;color:#6B7280;margin-top:2px;">Date: ${a.appointment_date} · Slot: ${a.time_slot || '10:00 AM'}</div>
+    </div>
+    <button onclick="localStorage.setItem('alerted_call_${a.id}', 'true'); joinVideoCall(${a.id}); this.closest('.emergency-alert-card').remove();" class="btn-submit" style="width:100%;background:#2563EB;color:#fff;border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:6px;">
+      🎥 Accept & Join Meeting
+    </button>
+  `;
+  overlay.appendChild(card);
+}
+
 async function loadPatientAppointments(){
   try {
     const res = await fetch('/api/auth/patient/appointments', { headers: getAuthHeader() });
     if(res.ok){
       patAllAppointments = await res.json();
-      // Check for cancelled today's appointments and show popup
+      // Check for cancelled today's appointments and active video calls
       patAllAppointments.forEach(a => {
         if(a.status === 'cancelled_by_doctor') {
           const key = 'alerted_cancel_' + a.id;
           if(localStorage.getItem(key) !== 'true') {
             showDoctorLeaveOverlayNotification(a);
             localStorage.setItem(key, 'true');
+          }
+        }
+        if(a.appointment_type === 'online') {
+          if(a.is_call_active) {
+            const key = 'alerted_call_' + a.id;
+            if(localStorage.getItem(key) !== 'true') {
+              showVideoCallInviteNotification(a);
+            }
+          } else {
+            localStorage.removeItem('alerted_call_' + a.id);
           }
         }
       });
@@ -561,6 +656,7 @@ async function loadPatientAppointments(){
 }
 
 function renderPatientAppointments(){
+  renderCalendar();
   const todayStr = getTodayString();
   const todayList = [];
   const upcomingList = [];
@@ -568,12 +664,13 @@ function renderPatientAppointments(){
 
   (patAllAppointments || []).forEach(a => {
     const aptDate = a.appointment_date;
-    if(!aptDate || aptDate === todayStr){
-      todayList.push(a);
-    } else if(aptDate > todayStr){
-      upcomingList.push(a);
-    } else {
+    const st = (a.status || '').toLowerCase();
+    if (st === 'completed' || st === 'missed' || st === 'rejected' || st === 'cancelled_by_doctor' || (aptDate && aptDate < todayStr)) {
       pastList.push(a);
+    } else if (!aptDate || aptDate === todayStr) {
+      todayList.push(a);
+    } else {
+      upcomingList.push(a);
     }
   });
 
@@ -604,12 +701,21 @@ function renderPatientAppointments(){
           ? `<div style="font-size:11.5px;color:var(--pine-deep);margin-top:4px;font-weight:600;">🩺 Booked by Caretaker: ${a.caretaker_name || 'Assigned Caretaker'}</div>` 
           : `<div style="font-size:11.5px;color:var(--pine-deep);margin-top:4px;font-weight:600;">🩺 Booked by Patient: ${a.patient_name || 'Patient'} | ${a.patient_code || 'ID'}</div>`
         }
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center;">
           ${a.prescription_pdf ? `
             <button onclick="openPrescriptionPDF('${a.prescription_pdf.replace(/'/g, "\\'")}', '${(a.prescription_name || 'Prescription').replace(/'/g, "\\'")}')" class="btn-sm" style="display:inline-flex;align-items:center;gap:6px;background:var(--amber);color:white;border:none;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
               📄 Prescription
             </button>
           ` : ''}
+          ${(a.appointment_type === 'online' && a.status === 'accepted') ? (
+            a.is_call_active ? `
+              <button onclick="joinVideoCall(${a.id})" class="btn-sm" style="display:inline-flex;align-items:center;gap:6px;background:#2563EB;color:white;border:none;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+                🎥 Join Video Call
+              </button>
+            ` : `
+              <span style="font-size:11px;color:var(--muted);font-style:italic;">Waiting for doctor to start call...</span>
+            `
+          ) : ''}
         </div>
       </div>
       ${getStatusBadgeHtml(a.status)}
@@ -758,7 +864,7 @@ async function deleteMyProfile(){
     if(res.ok){
       localStorage.clear();
       alert('Your account has been deleted.');
-      window.location.href = '/signup.html';
+      window.location.href = '/signup';
     }
   } catch(e){ alert(e.message); }
 }
@@ -830,11 +936,95 @@ function openPrescriptionPDF(base64Data, name) {
   }
 }
 
+function joinVideoCall(aptId) {
+  const token = localStorage.getItem('access_token') || localStorage.getItem('beacon_token');
+  window.open(`/api/auth/appointments/${aptId}/join-video-call?token=${token}`, '_blank');
+}
+
+let calCurrentDate = new Date();
+
+function prevMonth() {
+  calCurrentDate.setMonth(calCurrentDate.getMonth() - 1);
+  renderCalendar();
+}
+
+function nextMonth() {
+  calCurrentDate.setMonth(calCurrentDate.getMonth() + 1);
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const grid = document.getElementById('calendarGrid');
+  const monthYearLabel = document.getElementById('calendarMonthYear');
+  if(!grid || !monthYearLabel) return;
+
+  grid.innerHTML = '';
+
+  const year = calCurrentDate.getFullYear();
+  const month = calCurrentDate.getMonth();
+
+  const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  monthYearLabel.textContent = `${monthNames[month]} ${year}`;
+
+  const dayNames = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
+  dayNames.forEach(d => {
+    const el = document.createElement('div');
+    el.className = 'cal-header';
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  const firstDayIndex = (new Date(year, month, 1).getDay() + 6) % 7;
+  const totalDays = new Date(year, month + 1, 0).getDate();
+
+  for(let i = 0; i < firstDayIndex; i++) {
+    const space = document.createElement('div');
+    grid.appendChild(space);
+  }
+
+  const today = new Date();
+  const aptDates = new Set((patAllAppointments || []).map(a => a.appointment_date));
+
+  for(let day = 1; day <= totalDays; day++) {
+    const el = document.createElement('div');
+    el.className = 'cal-day';
+    el.textContent = day;
+
+    const mStr = String(month + 1).padStart(2, '0');
+    const dStr = String(day).padStart(2, '0');
+    const fullDateStr = `${year}-${mStr}-${dStr}`;
+
+    if(aptDates.has(fullDateStr)) {
+      el.classList.add('has-apt');
+      const dayApts = (patAllAppointments || []).filter(a => a.appointment_date === fullDateStr);
+      const uniqueApts = [];
+      const seenIds = new Set();
+      dayApts.forEach(a => {
+        if(!seenIds.has(a.id)) {
+          seenIds.add(a.id);
+          uniqueApts.push(a);
+        }
+      });
+      const tooltipText = uniqueApts.map(a => `Dr. ${a.doctor_name || 'Doctor'} (${a.time_slot || 'TBD'})`).join(', ');
+      el.title = `Appointments: ${tooltipText}`;
+    }
+
+    if(year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
+      el.classList.add('today');
+    }
+
+    grid.appendChild(el);
+  }
+}
+
 function initPatientPage(){
   loadPatientProfile();
   loadMedicalDocuments();
   loadPatientAppointments();
   loadEmergencyAlerts();
+  
+  // Poll appointments every 5 seconds for incoming video call notifications
+  setInterval(loadPatientAppointments, 5000);
 }
 
 if (document.readyState === 'loading') {

@@ -32,6 +32,8 @@ from .views import (
     CaretakerEmergencyAlertsView,
     AppointmentStartCallView,
     AppointmentEndCallView,
+    AppointmentToggleCaretakerCallView,
+    AppointmentJoinVideoCallView,
 )
 
 urlpatterns = [
@@ -74,6 +76,8 @@ urlpatterns = [
     path('appointments/book', AppointmentBookingView.as_view(), name='appointments-book'),
     path('appointments/<int:apt_id>/start-call', AppointmentStartCallView.as_view(), name='appointment-start-call'),
     path('appointments/<int:apt_id>/end-call', AppointmentEndCallView.as_view(), name='appointment-end-call'),
+    path('appointments/<int:apt_id>/toggle-caretaker-call', AppointmentToggleCaretakerCallView.as_view(), name='appointment-toggle-caretaker-call'),
+    path('appointments/<int:apt_id>/join-video-call', AppointmentJoinVideoCallView.as_view(), name='appointment-join-video-call'),
     path('review', SubmitReviewView.as_view(), name='submit-review'),
 
     # Emergency Alerts

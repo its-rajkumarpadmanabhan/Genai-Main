@@ -8,15 +8,18 @@
   (function(){
     const token = localStorage.getItem('beacon_token') || localStorage.getItem('access_token');
     const userRaw = localStorage.getItem('beacon_user');
-    if(!token || !userRaw){ window.location.href = '/login.html'; return; }
+    if(!token || !userRaw){ window.location.href = '/login'; return; }
     try {
       const user = JSON.parse(userRaw);
       if(user.role !== 'caretaker' && user.role !== 'admin'){
-        const target = user.role === 'doctor' ? '/doctor-profile.html' : '/patient-profile.html';
+        const target = user.role === 'doctor' ? '/doctor-profile' : '/patient-profile';
         window.location.href = target;
       }
-    } catch(e){ window.location.href = '/login.html'; }
+    } catch(e){ window.location.href = '/login'; }
   })();
+  document.addEventListener('contextmenu', event => {
+    event.preventDefault();
+  });
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -83,6 +86,7 @@
   /* Modal */
   .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(30,42,34,.5);align-items:center;justify-content:center;z-index:90;padding:20px;}
   .modal-backdrop.open{display:flex;}
+  #documentViewerModal{z-index:1000 !important;}
   .modal{background:var(--surface);border-radius:18px;max-width:540px;width:100%;padding:24px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.2);}
   .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
   .modal-head h3{font-family:'Fraunces',serif;font-size:18px;margin:0;}
@@ -112,10 +116,10 @@
     </div>
 
     <nav>
-      <a href="/caretaker-dashboard.html" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Overview</span></a>
-      <a href="/doctor-caretaker-list.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Directory</span></a>
-      <a href="/app.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Voice AI Engine</span></a>
-      <a href="#" onclick="localStorage.clear(); window.location.href='/login.html';"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></a>
+      <a href="/caretaker-dashboard" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Overview</span></a>
+      <a href="/doctor-caretaker-list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Directory</span></a>
+      <a href="/app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Voice AI Engine</span></a>
+      <a href="#" onclick="localStorage.clear(); window.location.href='/login';"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></a>
     </nav>
 
     <div class="sidebar-foot">
@@ -168,10 +172,10 @@
 
           <!-- Category Tabs -->
           <div style="display:flex;gap:8px;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:12px;flex-wrap:wrap;">
-            <button id="ctTabPending" onclick="switchCtCategory('pending')" style="background:var(--pine);color:#fff;border:none;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Pending Requests (0)</button>
+            <button id="ctTabAppointments" onclick="switchCtCategory('appointments')" style="background:var(--pine);color:#fff;border:none;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Doctor Appointments (0)</button>
+            <button id="ctTabPending" onclick="switchCtCategory('pending')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Pending Requests (0)</button>
             <button id="ctTabAccepted" onclick="switchCtCategory('accepted')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Accepted Care (0)</button>
             <button id="ctTabRejected" onclick="switchCtCategory('rejected')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Rejected / Past (0)</button>
-            <button id="ctTabAppointments" onclick="switchCtCategory('appointments')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Doctor Appointments (0)</button>
           </div>
 
           <div id="reqContainer">
@@ -315,7 +319,7 @@ async function loadCaretakerProfile(){
     } else {
       localStorage.clear();
       alert('Your account no longer exists or has been deleted by Admin. Please sign up to create a new profile.');
-      window.location.href = '/login.html';
+      window.location.href = '/login';
     }
   } catch(e){ console.log(e); }
 }
@@ -338,9 +342,15 @@ async function loadCaretakerPatientApts(patientId){
     const res = await fetch('/api/auth/patient/appointments', { headers: getAuthHeader() });
     if(res.ok){
       const apts = await res.json();
-      const patApts = (apts || []).filter(a => a.patient == patientId || a.patient_id == patientId);
+      const todayStr = getTodayString();
+      const patApts = (apts || []).filter(a => {
+        if(a.patient != patientId && a.patient_id != patientId) return false;
+        const st = (a.status || 'pending').toLowerCase();
+        if(st === 'completed' || st === 'missed' || st === 'rejected' || st === 'cancelled_by_doctor') return false;
+        return !a.appointment_date || a.appointment_date >= todayStr;
+      });
       if(!patApts || patApts.length === 0){
-        container.innerHTML = '<div class="empty-box" style="font-size:12px;">No doctor appointments booked yet.</div>';
+        container.innerHTML = '<div class="empty-box" style="font-size:12px;">No active doctor appointments scheduled today or upcoming.</div>';
       } else {
         container.innerHTML = patApts.map(a => {
           return `
@@ -373,7 +383,12 @@ async function loadCaretakerPatientVoiceTimeline(patientId){
         container.innerHTML = '<div class="empty-box" style="font-size:12px;">No voice AI health records found for this patient.</div>';
         return;
       }
-      container.innerHTML = alerts.map(a => {
+      
+      const limit = 3;
+      const visibleAlerts = alerts.slice(0, limit);
+      const hiddenAlerts = alerts.slice(limit);
+      
+      const mapAlert = a => {
         let borderColor = 'var(--line)', bgColor = 'var(--paper)', icon = 'ℹ️', label = 'Medical Concern';
         if(a.severity === 'critical'){
           borderColor = '#EF4444'; bgColor = '#FEF2F2'; icon = '🚨'; label = 'CRITICAL EMERGENCY';
@@ -396,7 +411,18 @@ async function loadCaretakerPatientVoiceTimeline(patientId){
             <div style="margin-top:5px;font-size:11px;color:var(--muted);"><b>AI Advice:</b> ${a.ai_advice || 'No advice.'}</div>
           </div>
         `;
-      }).join('');
+      };
+      
+      let html = visibleAlerts.map(mapAlert).join('');
+      if(hiddenAlerts.length > 0){
+        html += `
+          <div id="hiddenTimeline_${patientId}" style="display:none;">
+            ${hiddenAlerts.map(mapAlert).join('')}
+          </div>
+          <button id="btnSeeMoreTimeline_${patientId}" onclick="document.getElementById('hiddenTimeline_${patientId}').style.display='block'; this.style.display='none';" style="background:none;border:none;color:var(--pine);font-weight:700;font-size:12px;cursor:pointer;padding:6px 0;display:block;text-align:left;">See More (+${hiddenAlerts.length})</button>
+        `;
+      }
+      container.innerHTML = html;
     }
   } catch(e){
     container.innerHTML = `<div class="empty-box" style="font-size:12px;">${e.message}</div>`;
@@ -404,7 +430,7 @@ async function loadCaretakerPatientVoiceTimeline(patientId){
 }
 let ctAllRequests = [];
 let ctAllAppointments = [];
-let ctActiveCategory = 'pending';
+let ctActiveCategory = 'appointments';
 
 function getTodayString(){
   const d = new Date();
@@ -542,12 +568,21 @@ function renderCaretakerRequests(){
                 ? `<div style="font-size:11.5px;color:var(--pine-deep);margin-top:4px;font-weight:600;">🩺 Booked by Caretaker: ${r.caretaker_name || 'You'}</div>`
                 : `<div style="font-size:11.5px;color:var(--pine-deep);margin-top:4px;font-weight:600;">🩺 Booked by Patient: ${r.patient_name || 'Patient'} | ${r.patient_code || 'ID'}</div>`
               }
-              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;">
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center;">
                 ${r.prescription_pdf ? `
                   <button onclick="openPrescriptionPDF('${r.prescription_pdf.replace(/'/g, "\\'")}', '${(r.prescription_name || 'Prescription').replace(/'/g, "\\'")}')" class="btn-sm" style="display:inline-flex;align-items:center;gap:6px;background:var(--amber);color:white;border:none;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
                     📄 Prescription
                   </button>
                 ` : ''}
+                ${(r.appointment_type === 'online' && r.status === 'accepted') ? (
+                  r.is_call_active ? `
+                    <button onclick="joinVideoCall(${r.id})" class="btn-sm" style="display:inline-flex;align-items:center;gap:6px;background:#2563EB;color:white;border:none;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+                      🎥 Join Video Call
+                    </button>
+                  ` : `
+                    <div style="font-size:11px;color:var(--muted);font-style:italic;">Waiting for doctor to start call...</div>
+                  `
+                ) : ''}
               </div>
             </div>
             ${getStatusBadgeHtml(r.status)}
@@ -899,6 +934,7 @@ function previewMedicalDocument(title, fileSource, isImg, isPdf, notes){
     modal.className = 'modal-backdrop';
     document.body.appendChild(modal);
   }
+  modal.style.zIndex = '9999';
 
   const titleEl = document.getElementById('docPreviewTitle');
   if(titleEl) titleEl.textContent = `Document Preview: ${title}`;
@@ -1021,11 +1057,20 @@ async function loadCaretakerPatientApts(patientId){
               <div>
                 <b>Dr. ${a.doctor_name || 'Doctor'}</b>
                 <div style="color:var(--muted);font-size:11px;">Date: ${a.appointment_date} · Slot: ${a.time_slot} · Reason: ${a.reason} · Mode: <b>${a.appointment_type === 'online' ? '🟢 Online' : '📍 Offline'}</b></div>
-                ${a.prescription_pdf ? `
+                 ${a.prescription_pdf ? `
                   <button onclick="openPrescriptionPDF('${a.prescription_pdf.replace(/'/g, "\\'")}', '${(a.prescription_name || 'Prescription').replace(/'/g, "\\'")}')" class="btn-sm" style="display:inline-flex;align-items:center;gap:4px;background:var(--amber);color:white;border:none;padding:2px 8px;border-radius:4px;font-size:10.5px;font-weight:600;cursor:pointer;margin-top:4px;">
                     📄 Prescription
                   </button>
                 ` : ''}
+                ${(a.appointment_type === 'online' && a.status === 'accepted') ? (
+                  a.is_call_active ? `
+                    <button onclick="joinVideoCall(${a.id})" class="btn-sm" style="display:inline-flex;align-items:center;gap:4px;background:#2563EB;color:white;border:none;padding:2px 8px;border-radius:4px;font-size:10.5px;font-weight:600;cursor:pointer;margin-top:4px;">
+                      🎥 Join Video Call
+                    </button>
+                  ` : `
+                    <div style="font-size:10.5px;color:var(--muted);font-style:italic;margin-top:4px;">Waiting for doctor to start call...</div>
+                  `
+                ) : ''}
               </div>
               <span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;background:${bg};color:${fg};text-transform:uppercase;">${st}</span>
             </div>
@@ -1101,7 +1146,7 @@ async function deleteMyProfile(){
     if(res.ok){
       localStorage.clear();
       alert('Your account has been deleted.');
-      window.location.href = '/signup.html';
+      window.location.href = '/signup';
     }
   } catch(e){ alert(e.message); }
 }
@@ -1218,9 +1263,77 @@ async function dismissEmergencyNotif(btn, alertId){
   } catch(e){ console.log(e); }
 }
 
+function joinVideoCall(aptId) {
+  const token = localStorage.getItem('access_token') || localStorage.getItem('beacon_token');
+  window.open(`/api/auth/appointments/${aptId}/join-video-call?token=${token}`, '_blank');
+}
+
+function showCaretakerVideoCallInvite(a) {
+  let overlay = document.getElementById('emergencyOverlay');
+  if(!overlay){
+    overlay = document.createElement('div');
+    overlay.id = 'emergencyOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;right:0;z-index:9999;display:flex;flex-direction:column;gap:10px;padding:16px;max-width:420px;width:100%;pointer-events:none;';
+    document.body.appendChild(overlay);
+  }
+
+  if(document.getElementById('call_invite_' + a.id)) return;
+
+  const card = document.createElement('div');
+  card.id = 'call_invite_' + a.id;
+  card.className = 'emergency-alert-card';
+  card.style.cssText = `pointer-events:all;background:#EFF6FF;border:2px solid #3B82F6;border-radius:16px;padding:18px;box-shadow:0 8px 32px rgba(0,0,0,0.25);animation:slideInRight 0.4s ease-out;margin-bottom:10px;`;
+  card.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:22px;">🎥</span>
+        <div>
+          <div style="font-size:12px;font-weight:800;color:#1D4ED8;text-transform:uppercase;letter-spacing:0.8px;">Incoming Patient Call</div>
+          <div style="font-size:10.5px;color:#6B7280;margin-top:2px;">Online Video Consultation</div>
+        </div>
+      </div>
+      <button onclick="localStorage.setItem('alerted_call_${a.id}', 'true'); this.closest('.emergency-alert-card').remove();" style="background:none;border:none;font-size:18px;cursor:pointer;color:#9CA3AF;padding:2px 6px;">✕</button>
+    </div>
+    <div style="margin-top:10px;padding:10px 12px;background:#fff;border-radius:10px;border:1px solid var(--line);">
+      <div style="font-size:12.5px;font-weight:700;color:#111827;">Patient: ${a.patient_name || 'Patient'}</div>
+      <div style="font-size:12px;color:var(--pine-deep);font-weight:600;margin-top:4px;">Dr. ${a.doctor_name || 'Doctor'}</div>
+      <div style="font-size:11.5px;color:#6B7280;margin-top:2px;">Date: ${a.appointment_date} · Slot: ${a.time_slot || '10:00 AM'}</div>
+    </div>
+    <button onclick="localStorage.setItem('alerted_call_${a.id}', 'true'); joinVideoCall(${a.id}); this.closest('.emergency-alert-card').remove();" class="btn-submit" style="width:100%;background:#2563EB;color:#fff;border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:6px;">
+      🎥 Accept & Join Meeting
+    </button>
+  `;
+  overlay.appendChild(card);
+}
+
+async function pollCaretakerAppointments(){
+  try {
+    const res = await fetch('/api/auth/patient/appointments', { headers: getAuthHeader() });
+    if(res.ok){
+      const apts = await res.json();
+      (apts || []).forEach(a => {
+        if(a.appointment_type === 'online') {
+          if(a.is_call_active) {
+            const key = 'alerted_call_' + a.id;
+            if(localStorage.getItem(key) !== 'true') {
+              showCaretakerVideoCallInvite(a);
+            }
+          } else {
+            localStorage.removeItem('alerted_call_' + a.id);
+          }
+        }
+      });
+    }
+  } catch(e){ console.log(e); }
+}
+
 function startEmergencyPolling(){
   pollEmergencyAlerts();
   emergencyPollTimer = setInterval(pollEmergencyAlerts, 15000);
+  
+  // Poll appointments for active call invitations
+  pollCaretakerAppointments();
+  setInterval(pollCaretakerAppointments, 5000);
 }
 
 if (document.readyState === 'loading') {

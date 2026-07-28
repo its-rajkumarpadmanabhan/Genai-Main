@@ -9,9 +9,12 @@
   (function () {
     const token = localStorage.getItem('beacon_token') || localStorage.getItem('access_token');
     if (!token) {
-      window.location.replace('/login.html');
+      window.location.replace('/login');
     }
   })();
+  document.addEventListener('contextmenu', event => {
+    event.preventDefault();
+  });
 </script>
 <style>
   body { visibility: hidden; }
@@ -469,7 +472,7 @@
           detectLocationAndScan();
       } catch (err) {
           clearTokens();
-          window.location.replace('/login.html');
+          window.location.replace('/login');
       }
   }
   verifySession();
@@ -486,7 +489,7 @@
       const response = await fetch(url, { ...options, headers });
       if (response.status === 401 && (url.includes('/api/auth/') || url.includes('/me'))) {
           clearTokens();
-          window.location.replace('/login.html');
+          window.location.replace('/login');
           throw new Error('Session expired.');
       }
       return response;
@@ -498,9 +501,9 @@
       if (!userRaw) return;
       const user = JSON.parse(userRaw);
       const role = user.role || 'patient';
-      const targetPage = role === 'admin' ? '/admin-dashboard.html' :
-                         role === 'doctor' ? '/doctor-profile.html' :
-                         role === 'caretaker' ? '/caretaker-dashboard.html' : '/patient-profile.html';
+      const targetPage = role === 'admin' ? '/admin-dashboard' :
+                         role === 'doctor' ? '/doctor-profile' :
+                         role === 'caretaker' ? '/caretaker-dashboard' : '/patient-profile';
 
       widget.innerHTML = `
           <a href="${targetPage}" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-teal-900/60 border border-teal-500/40 text-teal-200 text-xs font-semibold hover:bg-teal-800/80 transition">
@@ -519,7 +522,7 @@
 
   function logout() {
       clearTokens();
-      window.location.replace('/login.html');
+      window.location.replace('/login');
   }
 
   // Radar visual state helpers

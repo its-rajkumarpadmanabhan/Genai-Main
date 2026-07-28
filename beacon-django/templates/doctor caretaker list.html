@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Carewell — Directory</title>
+<script>
+  (function(){
+    const token = localStorage.getItem('beacon_token') || localStorage.getItem('access_token');
+    if(!token){ window.location.href = '/login'; }
+  })();
+  document.addEventListener('contextmenu', event => {
+    event.preventDefault();
+  });
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -111,11 +120,11 @@
       <div><div class="brand-name">Carewell</div><div class="brand-sub">DIRECTORY</div></div>
     </div>
     <nav>
-      <button class="active" onclick="window.location.href='/doctor-caretaker-list.html'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Directory</span></button>
-      <button onclick="window.location.href='/app.html'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Voice AI Engine</span></button>
-      <button onclick="window.location.href='/voice-timeline.html'" id="sidebarTimelineBtn" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>Voice AI Health Timeline</span></button>
+      <button class="active" onclick="window.location.href='/doctor-caretaker-list'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Directory</span></button>
+      <button onclick="window.location.href='/app'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Voice AI Engine</span></button>
+      <button onclick="window.location.href='/voice-timeline'" id="sidebarTimelineBtn" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>Voice AI Health Timeline</span></button>
       <button onclick="goToMyDashboard()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><span>My Dashboard</span></button>
-      <button onclick="localStorage.clear(); window.location.href='/login.html';"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></button>
+      <button onclick="localStorage.clear(); window.location.href='/login';"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></button>
     </nav>
     <div class="sidebar-foot">
       <div class="help-card"><b>Need help?</b>Reach platform support any time.</div>
@@ -410,6 +419,9 @@ async function bookDoctor(docUserId){
 
   const appDate = prompt('Enter appointment date (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
   if(!appDate) return;
+
+  const appTime = prompt('Enter appointment time slot (e.g. 10:00 AM, 02:30 PM):', '10:00 AM');
+  if(!appTime) return;
   
   const appTypeChoice = prompt('Enter appointment type:\n1. Online (Video Call)\n2. Offline (In-Person)\n\nType 1 or 2:', '1');
   if(!appTypeChoice) return;
@@ -420,6 +432,7 @@ async function bookDoctor(docUserId){
   const payload = {
     doctor_id: docUserId,
     appointment_date: appDate,
+    time_slot: appTime,
     reason: reason || '',
     appointment_type: appType,
     booked_by: (userRole === 'caretaker' ? 'caretaker' : 'patient')
@@ -453,12 +466,12 @@ async function requestCaretaker(careUserId){
 
 function goToMyDashboard(){
   const userRaw = localStorage.getItem('beacon_user');
-  if(!userRaw){ window.location.href = '/login.html'; return; }
+  if(!userRaw){ window.location.href = '/login'; return; }
   const user = JSON.parse(userRaw);
   const role = user.role || 'patient';
-  const targetPage = role === 'admin' ? '/admin-dashboard.html' :
-                     role === 'doctor' ? '/doctor-profile.html' :
-                     role === 'caretaker' ? '/caretaker-dashboard.html' : '/patient-profile.html';
+  const targetPage = role === 'admin' ? '/admin-dashboard' :
+                     role === 'doctor' ? '/doctor-profile' :
+                     role === 'caretaker' ? '/caretaker-dashboard' : '/patient-profile';
   window.location.href = targetPage;
 }
 
