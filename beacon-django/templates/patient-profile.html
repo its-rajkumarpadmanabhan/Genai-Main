@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <title>Carewell — Patient Profile</title>
 <script>
   (function(){
@@ -1445,6 +1446,14 @@ if (document.readyState === 'loading') {
 } else {
   initPatientPage();
 }
+
+// Silent background refresh every 2 seconds (no visible page reload)
+setInterval(() => {
+  loadPatientProfile();
+  loadMedicalDocuments();
+  loadPatientAppointments();
+  loadEmergencyAlerts();
+}, 2000);
 </script>
 </body>
 </html>

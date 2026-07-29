@@ -1233,7 +1233,9 @@ class DoctorProfileView(APIView):
             for apt in today_apts:
                 apt.status = 'cancelled_by_doctor'
                 apt.save()
-                
+                # Notify patient + caretaker about the cancellation
+                from .emails import send_appointment_rejected_email
+                send_appointment_rejected_email(apt, email_type='cancelled_by_doctor')
         return Response(DoctorProfileSerializer(profile).data)
 
 
@@ -1272,51 +1274,12 @@ class DoctorAppointmentsView(APIView):
             apt.save()
 
             if new_status == 'accepted' and old_status != 'accepted':
-                # Fetch details for the email
-                from django.core.mail import send_mail
-                from .models import DoctorProfile
-                
-                doc_profile = DoctorProfile.objects.filter(user=apt.doctor).first()
-                doc_name = doc_profile.full_name if (doc_profile and doc_profile.full_name) else apt.doctor.username
-                hospital = doc_profile.hospital_name if doc_profile else "Not specified"
-                location = doc_profile.location if doc_profile else "Not specified"
-                patient_name = apt.patient.username
-                recipient_email = apt.patient.email
+                from .emails import send_appointment_accepted_email
+                send_appointment_accepted_email(apt)
 
-                # Fetch patient profile name and email if available
-                from .models import PatientProfile
-                pat_profile = PatientProfile.objects.filter(user=apt.patient).first()
-                if pat_profile:
-                    if pat_profile.full_name:
-                        patient_name = pat_profile.full_name
-                    if pat_profile.email:
-                        recipient_email = pat_profile.email
-
-                subject = f"Appointment Confirmed: Dr. {doc_name}"
-                mode_str = "Online (Video Call)" if apt.appointment_type == "online" else "Offline (In-Person Clinic Visit)"
-                message = (
-                    f"Dear {patient_name},\n\n"
-                    f"Your appointment request has been accepted. Here are the confirmation details:\n\n"
-                    f"Doctor: Dr. {doc_name}\n"
-                    f"Hospital: {hospital}\n"
-                    f"Location: {location}\n"
-                    f"Date: {apt.appointment_date}\n"
-                    f"Time Slot: {apt.time_slot}\n"
-                    f"Appointment Type: {mode_str}\n"
-                    f"Reason for Visit: {apt.reason or 'General Consultation'}\n\n"
-                    f"Thank you,\n"
-                    f"Beacon Health Support"
-                )
-                try:
-                    send_mail(
-                        subject,
-                        message,
-                        None, # Uses DEFAULT_FROM_EMAIL
-                        [recipient_email],
-                        fail_silently=False,
-                    )
-                except Exception as e:
-                    print("Error sending appointment confirmation email:", e)
+            if new_status == 'rejected' and old_status != 'rejected':
+                from .emails import send_appointment_rejected_email
+                send_appointment_rejected_email(apt, email_type='rejected')
 
             return Response({'status': 'success', 'new_status': apt.status})
         return Response({'detail': 'Invalid status.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1637,7 +1600,7 @@ class CaretakerProfileView(APIView):
                 setattr(profile, k, v)
         profile.save()
 
-        # Sync back to User model
+        # Sync back to User model (full_name, phone_number, and email)
         sync_user = False
         if profile.full_name and profile.full_name != request.user.username:
             request.user.username = profile.full_name
@@ -1645,8 +1608,30 @@ class CaretakerProfileView(APIView):
         if getattr(profile, 'phone_number', None) and profile.phone_number != request.user.mobile_number:
             request.user.mobile_number = profile.phone_number
             sync_user = True
+
+        # Sync email — the canonical email lives on the User model;
+        # update it whenever the caretaker edits their email in the profile form.
+        new_email = request.data.get('email', '').strip()
+        if new_email and new_email != request.user.email:
+            from django.core.validators import validate_email
+            from django.core.exceptions import ValidationError as DjangoValidationError
+            try:
+                validate_email(new_email)
+                # Check uniqueness (ignore own current email)
+                from django.contrib.auth import get_user_model
+                _User = get_user_model()
+                if not _User.objects.filter(email__iexact=new_email).exclude(id=request.user.id).exists():
+                    request.user.email = new_email
+                    sync_user = True
+                # If duplicate email — silently keep old email; profile still saves
+            except DjangoValidationError:
+                pass  # Invalid email format — ignore silently
+
         if sync_user:
             request.user.save()
+
+        # Re-fetch profile so serializer returns the freshest data (incl. synced user.email)
+        profile.refresh_from_db()
         return Response(CaretakerProfileSerializer(profile).data)
 
 
