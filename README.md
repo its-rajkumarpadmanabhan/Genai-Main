@@ -67,3 +67,129 @@ Admin Gatekeeping: All sensitive administrative routes are protected via custom 
 This project is open-source and intended for emergency health assistance. Always consult with a licensed professional for non-emergency medical decisions.
 
 Made with ❤️ for Global Emergency Response
+
+---
+
+## Deploying the Django Backend to Render
+
+The full-stack web platform (beacon-django/) is a Django 4 + REST API app deployable to Render.com for free.
+
+### Prerequisites
+- GitHub account with this repo pushed
+- Render.com account (sign up free with GitHub)
+- Gmail account with 2-Step Verification enabled (for email notifications)
+
+---
+
+### Step 1 - Create a PostgreSQL Database on Render
+
+1. Go to dashboard.render.com
+2. Click New + -> PostgreSQL
+3. Set Name: beacon-db, Plan: Free
+4. Click Create Database
+5. Copy the Internal Database URL (needed in Step 3)
+
+---
+
+### Step 2 - Create a Web Service
+
+1. Click New + -> Web Service
+2. Connect repository: its-rajkumarpadmanabhan/Genai-Main
+3. Configure:
+
+| Setting | Value |
+|---|---|
+| Name | beacon-django |
+| Root Directory | beacon-django (REQUIRED - subfolder with manage.py) |
+| Environment | Python 3 |
+| Build Command | pip install -r requirements.txt && python manage.py collectstatic --noinput |
+| Start Command | gunicorn beacon.wsgi:application --bind 0.0.0.0:$PORT --workers 4 |
+| Plan | Free |
+
+---
+
+### Step 3 - Set Environment Variables
+
+In Web Service -> Environment tab, add:
+
+| Key | Value |
+|---|---|
+| DEBUG | False |
+| DJANGO_SECRET_KEY | Click Generate in Render UI |
+| JWT_SECRET | Any long random string |
+| ALLOWED_HOSTS | beacon-django.onrender.com |
+| FRONTEND_BASE_URL | https://beacon-django.onrender.com |
+| DATABASE_URL | Internal Database URL from Step 1 |
+| GEMINI_API_KEY | Your Google Gemini API key |
+| SMTP_HOST | smtp.gmail.com |
+| SMTP_PORT | 587 |
+| SMTP_USER | yourname@gmail.com |
+| SMTP_PASSWORD | 16-char Gmail App Password (no spaces) |
+| SMTP_FROM_EMAIL | yourname@gmail.com |
+| SMTP_FROM_NAME | Beacon Recovery Platform |
+
+Gmail App Password: myaccount.google.com/apppasswords -> Generate for Mail. Requires 2-Step Verification.
+
+---
+
+### Step 4 - Deploy
+
+Click Create Web Service. Render automatically:
+1. Installs requirements.txt
+2. Runs collectstatic
+3. Runs python manage.py migrate (Procfile release command)
+4. Starts Gunicorn server
+
+Live URL: https://beacon-django.onrender.com
+
+---
+
+### Step 5 - Create Admin User (first time only)
+
+Open the Shell tab in Render dashboard and run:
+  python manage.py createsuperuser
+
+---
+
+### Auto-Deploy
+
+Every git push to main triggers an automatic redeploy on Render.
+
+---
+
+### Local Development Setup
+
+  # Clone the repo
+  git clone https://github.com/its-rajkumarpadmanabhan/Genai-Main.git
+  cd Genai-Main/beacon-django
+
+  # Create and activate virtual environment
+  python -m venv venv
+  venv\Scripts\activate
+
+  # Install dependencies
+  pip install -r requirements.txt
+
+  # Configure environment
+  copy .env.example .env
+
+  # Run migrations and start server
+  python manage.py migrate
+  python manage.py runserver
+
+Open: http://localhost:8000
+
+---
+
+### User Roles and Pages
+
+| Role | URL | Features |
+|---|---|---|
+| Admin | /admin-dashboard | Manage all users, platform stats |
+| Doctor | /doctor-profile | Appointments, video calls, prescriptions |
+| Patient | /patient-profile | Book appointments, caretaker requests, documents |
+| Caretaker | /caretaker-dashboard | Monitor patients, book on behalf, emergency alerts |
+
+---
+
+Free Tier Note: Render free services sleep after 15 min of inactivity. First request after idle takes ~30s to wake up. Upgrade for always-on availability.
