@@ -13,6 +13,7 @@ Preserved API contract (same paths, same JSON response shapes):
 
 import secrets
 import threading
+import re
 from datetime import datetime, timedelta, timezone
 
 from django.contrib.auth import get_user_model
@@ -76,7 +77,9 @@ class SignupView(APIView):
 
         data = serializer.validated_data
         normalized_email = data['email'].lower().strip()
-        username = data['username']
+        raw_username = data['username']
+        # Remove underscores from username for display and storage
+        username = raw_username.replace('_', '')
         mobile = data['mobile_number']
 
         # Duplicate checks (only email and mobile must be unique)
@@ -109,6 +112,7 @@ class SignupView(APIView):
             DoctorProfile.objects.get_or_create(user=user, defaults={'full_name': username, 'phone_number': mobile})
         elif role == 'caretaker':
             CaretakerProfile.objects.get_or_create(user=user, defaults={'full_name': username, 'phone_number': mobile})
+
 
         # Send welcome email in a background thread (non-blocking)
         threading.Thread(target=send_welcome_email, args=(user,), daemon=True).start()
@@ -165,10 +169,11 @@ class LoginView(APIView):
             )
 
         token = get_tokens_for_user(user)
+        sanitized_username = user.username.replace('_', '')
         return Response({
             'status': 'success',
             'access_token': token,
-            'user': {'id': user.id, 'username': user.username, 'email': user.email, 'role': user.role},
+            'user': {'id': user.id, 'username': sanitized_username, 'email': user.email, 'role': user.role},
         })
 
 
@@ -181,7 +186,7 @@ class MeView(APIView):
         user = request.user
         return Response({
             'id': user.id,
-            'username': user.username,
+            'username': user.username.replace('_', ''),
             'email': user.email,
             'mobile_number': user.mobile_number,
             'role': user.role,
@@ -794,6 +799,41 @@ class CaretakerRequestView(APIView):
 
 
 
+def parse_time_str(t_str):
+    if not t_str:
+        return None
+    t_str = str(t_str).strip().upper()
+    import datetime, re
+    for fmt in ('%I:%M %p', '%I:%M%p', '%I %p', '%H:%M'):
+        try:
+            return datetime.datetime.strptime(t_str, fmt).time()
+        except ValueError:
+            pass
+    m = re.search(r'(\d{1,2})(?::(\d{2}))?\s*(AM|PM)?', t_str, re.IGNORECASE)
+    if m:
+        h = int(m.group(1))
+        mn = int(m.group(2)) if m.group(2) else 0
+        ampm = (m.group(3) or '').upper()
+        if ampm == 'PM' and h < 12:
+            h += 12
+        elif ampm == 'AM' and h == 12:
+            h = 0
+        return datetime.time(h, mn)
+    return None
+
+def parse_available_hours(hours_str):
+    import datetime, re
+    if not hours_str or '24' in str(hours_str):
+        return datetime.time(0, 0), datetime.time(23, 59)
+    parts = re.split(r'\s*-\s*|\s+to\s+', str(hours_str), flags=re.IGNORECASE)
+    if len(parts) >= 2:
+        start_t = parse_time_str(parts[0])
+        end_t = parse_time_str(parts[1])
+        if start_t and end_t:
+            return start_t, end_t
+    return datetime.time(9, 0), datetime.time(17, 0)
+
+
 class AppointmentBookingView(APIView):
     """POST /api/appointments/book"""
     permission_classes = [IsAuthenticated]
@@ -826,12 +866,25 @@ class AppointmentBookingView(APIView):
         if booked_by == 'caretaker' and request.data.get('patient_id'):
             patient_user = User.objects.filter(id=request.data.get('patient_id')).first() or request.user
 
-        # Enforce rule: Appointments can only be booked for the current week (Monday to Sunday)
+        # Enforce rule: Time slot must fall strictly within doctor's Available Hours
+        if time_slot:
+            doc_prof = getattr(doctor, 'doctor_profile', None)
+            hours_str = doc_prof.available_hours if (doc_prof and doc_prof.available_hours) else '09:00 AM - 05:00 PM'
+            slot_t = parse_time_str(time_slot)
+            if slot_t:
+                start_t, end_t = parse_available_hours(hours_str)
+                is_within = (start_t <= slot_t <= end_t) if start_t <= end_t else (slot_t >= start_t or slot_t <= end_t)
+                if not is_within:
+                    doc_name = doc_prof.full_name if (doc_prof and doc_prof.full_name) else doctor.username
+                    return Response({
+                        'detail': f"Selected time slot ({time_slot}) is outside Dr. {doc_name}'s available hours ({hours_str}). Please choose a time slot between {start_t.strftime('%I:%M %p')} and {end_t.strftime('%I:%M %p')}."
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Enforce rule: Appointments can only be booked from today up to 7 days ahead (no past dates)
         if app_date:
             import datetime
             today_d = datetime.date.today()
-            start_of_week = today_d - datetime.timedelta(days=today_d.weekday())
-            end_of_week = start_of_week + datetime.timedelta(days=6)
+            max_date = today_d + datetime.timedelta(days=7)
 
             parsed_d = None
             if isinstance(app_date, str):
@@ -843,10 +896,23 @@ class AppointmentBookingView(APIView):
                 parsed_d = app_date
 
             if parsed_d:
-                if parsed_d < start_of_week or parsed_d > end_of_week:
+                if parsed_d < today_d:
                     return Response({
-                        'detail': f'Appointments can only be booked for the current week ({start_of_week.strftime("%d %b %Y")} to {end_of_week.strftime("%d %b %Y")}). Booking for next week, next month, or future years is not allowed.'
+                        'detail': f'Appointments cannot be booked for past dates. Please select tomorrow ({ (today_d + datetime.timedelta(days=1)).strftime("%d %b %Y") }) or a future date.'
                     }, status=status.HTTP_400_BAD_REQUEST)
+                if parsed_d > max_date:
+                    return Response({
+                        'detail': f'Appointments can only be booked up to 7 days in advance ({today_d.strftime("%d %b %Y")} to {max_date.strftime("%d %b %Y")}).'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+                # Enforce rule: Check if doctor is on leave or off duty when booking for current date
+                if parsed_d == today_d:
+                    doc_prof = getattr(doctor, 'doctor_profile', None)
+                    if doc_prof and doc_prof.availability_status in ['On Leave Today', 'Off Duty']:
+                        tomorrow_str = (today_d + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+                        return Response({
+                            'detail': f'Dr. {doc_prof.full_name or doctor.username} is currently {doc_prof.availability_status} today. Booking for current date is closed. Only next day ({tomorrow_str}) or future date booking is applicable.'
+                        }, status=status.HTTP_400_BAD_REQUEST)
 
         # Enforce rule: 1 active appointment per doctor per day
         if app_date:
@@ -854,7 +920,7 @@ class AppointmentBookingView(APIView):
                 patient=patient_user,
                 doctor=doctor,
                 appointment_date=app_date,
-                status__in=['pending', 'accepted', 'completed']
+                status__in=['pending', 'accepted']
             ).first()
             if active_apt:
                 doc_p = DoctorProfile.objects.filter(user=doctor).first()
@@ -868,12 +934,11 @@ class AppointmentBookingView(APIView):
             patient_time_conflict = Appointment.objects.filter(
                 patient=patient_user,
                 appointment_date=app_date,
-                time_slot=time_slot,
-                status__in=['pending', 'accepted', 'completed']
+                status__in=['pending', 'accepted']
             ).first()
             if patient_time_conflict:
                 return Response({
-                    'detail': f'You already have another appointment scheduled at {time_slot} on {app_date}. A patient cannot attend multiple doctor appointments at the same time.'
+                    'detail': f'You already have an active appointment on {app_date}. Complete or cancel it before booking another on the same day.'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
         # Enforce rule: Doctor cannot have 2 patients booked at exact same date and time slot
@@ -882,7 +947,7 @@ class AppointmentBookingView(APIView):
                 doctor=doctor,
                 appointment_date=app_date,
                 time_slot=time_slot,
-                status__in=['pending', 'accepted', 'completed']
+                status__in=['pending', 'accepted']
             ).first()
             if doc_time_conflict:
                 return Response({
@@ -897,7 +962,7 @@ class AppointmentBookingView(APIView):
             same_day_apts = Appointment.objects.filter(
                 patient=patient_user,
                 appointment_date=app_date,
-                status__in=['pending', 'accepted', 'completed']
+                status__in=['pending', 'accepted']
             )
 
             for ex_apt in same_day_apts:
@@ -1303,6 +1368,7 @@ class DoctorPatientsListView(APIView):
                 'offline_appointments_count': offline_cnt,
                 'upcoming_appointments_count': upcoming_cnt,
                 'last_appointment_date_time': last_apt_str,
+                'profile_picture': patient_user.profile_picture,
                 'assigned_caretaker': caretaker_data
             }
             results.append(patient_item)
@@ -1320,9 +1386,11 @@ class DoctorPatientRecordsView(APIView):
         
         has_apt = Appointment.objects.filter(doctor=request.user, patient_id=patient_id).exists()
         is_caretaker = PatientProfile.objects.filter(user_id=patient_id, assigned_caretaker=request.user).exists()
+        from .models import CaretakerRequest
+        is_past_caretaker = CaretakerRequest.objects.filter(caretaker=request.user, patient_id=patient_id).exists()
         is_self = (request.user.id == patient_id)
 
-        if not (has_apt or is_caretaker or is_self or request.user.role == 'admin' or request.user.is_staff):
+        if not (has_apt or is_caretaker or is_past_caretaker or request.user.role == 'admin' or request.user.is_staff):
             return Response({'detail': 'Access allowed for assigned patients/caretakers only.'}, status=status.HTTP_403_FORBIDDEN)
 
         docs = MedicalDocument.objects.filter(patient_id=patient_id)
@@ -1382,6 +1450,7 @@ class DoctorSinglePatientView(APIView):
             'appointment_status': last_apt.status if last_apt else 'accepted',
             'appointment_date': str(last_apt.appointment_date) if (last_apt and last_apt.appointment_date) else 'TBD',
             'reason': last_apt.reason if last_apt else 'General consultation',
+            'profile_picture': patient_user.profile_picture,
             'assigned_caretaker': caretaker_data
         }
         return Response(res_data)
@@ -1536,11 +1605,11 @@ class CaretakerPatientsListView(APIView):
         if request.user.role not in ['caretaker', 'admin'] and not request.user.is_staff:
             return Response({'detail': 'Caretaker access required.'}, status=status.HTTP_403_FORBIDDEN)
         
-        from .models import PatientProfile, CaretakerRequest
+        from .models import CustomUser, PatientProfile, CaretakerRequest, Appointment
         active_profiles = PatientProfile.objects.filter(assigned_caretaker=request.user)
         
-        unlinked_reqs = CaretakerRequest.objects.filter(caretaker=request.user, status='unlinked').values_list('patient_id', flat=True)
-        unlinked_profiles = PatientProfile.objects.filter(user_id__in=unlinked_reqs).exclude(assigned_caretaker=request.user)
+        all_past_reqs = CaretakerRequest.objects.filter(caretaker=request.user).values_list('patient_id', flat=True)
+        unlinked_profiles = PatientProfile.objects.filter(user_id__in=all_past_reqs).exclude(assigned_caretaker=request.user).distinct()
 
         active_results = []
         for p in active_profiles:
@@ -1559,6 +1628,7 @@ class CaretakerPatientsListView(APIView):
                 'insurance_details': p.insurance_details or 'Not provided',
                 'emergency_contact': f"{p.emergency_contact_name or ''} ({p.emergency_contact_phone or ''})".strip() or 'Not provided',
                 'medical_history_notes': p.medical_history_notes or 'No notes provided',
+                'profile_picture': p.user.profile_picture,
                 'assignment_status': 'active'
             })
 
@@ -1587,7 +1657,8 @@ class CaretakerPatientsListView(APIView):
                         'doctor_name': doc_name,
                         'major_department': dept,
                         'total_appointments': item['total_cnt'],
-                        'last_visit_date': last_date_str
+                        'last_visit_date': last_date_str,
+                        'profile_picture': d_user.profile_picture
                     })
 
             past_results.append({
@@ -1607,6 +1678,7 @@ class CaretakerPatientsListView(APIView):
                 'medical_history_notes': p.medical_history_notes or 'No notes provided',
                 'last_working_date': last_work_str,
                 'visited_doctors': visited_doctors,
+                'profile_picture': p.user.profile_picture,
                 'assignment_status': 'unlinked'
             })
 
@@ -1621,17 +1693,26 @@ class RemoveCaretakerAssignmentView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        from .models import PatientProfile, CaretakerRequest
+        from .models import CustomUser, PatientProfile, CaretakerRequest
         user = request.user
 
         if user.role == 'patient':
             p_profile = PatientProfile.objects.filter(user=user).first()
-            if p_profile and p_profile.assigned_caretaker:
+            caretaker_id = request.data.get('caretaker_id')
+            caretaker_user = None
+            if caretaker_id:
+                caretaker_user = CustomUser.objects.filter(id=caretaker_id).first()
+            if not caretaker_user and p_profile and p_profile.assigned_caretaker:
                 caretaker_user = p_profile.assigned_caretaker
-                p_profile.assigned_caretaker = None
-                p_profile.save()
 
-                CaretakerRequest.objects.filter(patient=user, caretaker=caretaker_user).update(status='unlinked')
+            if caretaker_user:
+                if p_profile and p_profile.assigned_caretaker == caretaker_user:
+                    p_profile.assigned_caretaker = None
+                    p_profile.save()
+
+                updated_cnt = CaretakerRequest.objects.filter(patient=user, caretaker=caretaker_user).update(status='unlinked')
+                if updated_cnt == 0:
+                    CaretakerRequest.objects.create(patient=user, caretaker=caretaker_user, status='unlinked')
                 return Response({'status': 'success', 'message': 'Caretaker removed from your profile.'})
             return Response({'detail': 'No assigned caretaker found to remove.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1649,7 +1730,9 @@ class RemoveCaretakerAssignmentView(APIView):
                 p_profile.assigned_caretaker = None
                 p_profile.save()
 
-                CaretakerRequest.objects.filter(patient=p_profile.user, caretaker=caretaker_user).update(status='unlinked')
+                updated_cnt = CaretakerRequest.objects.filter(patient=p_profile.user, caretaker=caretaker_user).update(status='unlinked')
+                if updated_cnt == 0:
+                    CaretakerRequest.objects.create(patient=p_profile.user, caretaker=caretaker_user, status='unlinked')
                 return Response({'status': 'success', 'message': f'Patient {p_profile.full_name or p_profile.user.username} removed from your care assignment.'})
             return Response({'detail': 'You are not assigned to this patient.'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -1670,10 +1753,12 @@ class PatientAppointmentsView(APIView):
         if user.role == 'patient':
             apts = Appointment.objects.filter(patient=user)
         elif user.role == 'caretaker':
+            from .models import CaretakerRequest
             assigned_patients = PatientProfile.objects.filter(assigned_caretaker=user).values_list('user_id', flat=True)
+            past_req_patients = CaretakerRequest.objects.filter(caretaker=user).values_list('patient_id', flat=True)
             apts = Appointment.objects.filter(
-                Q(caretaker=user) | Q(patient_id__in=assigned_patients)
-            )
+                Q(caretaker=user) | Q(patient_id__in=assigned_patients) | Q(patient_id__in=past_req_patients)
+            ).distinct()
         else:
             apts = Appointment.objects.filter(patient=user)
             

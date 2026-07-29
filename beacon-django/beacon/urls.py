@@ -12,8 +12,9 @@ urlpatterns = [
     # Django admin
     path('admin/', admin.site.urls),
 
-    # ── Auth API (/api/auth/*) ─────────────────────────────────────────────
+    # ── Auth API (/api/auth/* and /api/*) ──────────────────────────────────
     path('api/auth/', include('accounts.urls')),
+    path('api/', include('accounts.urls')),
 
     # ── Core API (/api/*) ─────────────────────────────────────────────────
     path('api/', include('core.urls')),

@@ -25,7 +25,7 @@
   *{box-sizing:border-box;}
   body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
   .mono{font-family:'JetBrains Mono',monospace;}
-  .app{display:grid;grid-template-columns:220px 1fr;max-width:1440px;margin:0 auto;min-height:100vh;}
+  .app{display:grid;grid-template-columns:230px 1fr;width:100%;min-height:100vh;margin:0;}
 
   .sidebar{background:var(--pine-deep);color:#EFF3F0;padding:28px 20px;display:flex;flex-direction:column;gap:30px;}
   .brand{display:flex;align-items:center;gap:10px;}
@@ -102,11 +102,27 @@
   .field textarea{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:13px;font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);}
   .btn-submit{width:100%;background:var(--pine-deep);color:#EFF3F0;border:none;border-radius:10px;padding:11px;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:6px;}
 
-  @media (max-width:820px){
+  /* UNIVERSAL RESPONSIVE STYLES (ANDROID, IOS, TABLET, DESKTOP) */
+  @media (max-width:1024px){
     .app{grid-template-columns:1fr;}
-    .sidebar{flex-direction:row;overflow-x:auto;align-items:center;gap:16px;}
-    .sidebar nav{flex-direction:row;}
+    .sidebar{position:sticky;top:0;z-index:100;flex-direction:row;overflow-x:auto;align-items:center;justify-content:space-between;padding:14px 18px;gap:16px;box-shadow:0 4px 12px rgba(0,0,0,0.15);}
+    .sidebar nav{flex-direction:row;white-space:nowrap;}
+    .sidebar nav button{padding:8px 14px;}
     .sidebar-foot,.brand-sub{display:none;}
+    .cards-grid{grid-template-columns:repeat(auto-fill,minmax(280px,1fr));}
+  }
+  @media (max-width:768px){
+    main{padding:16px 14px;}
+    .filter-bar{flex-direction:column;align-items:stretch;}
+    .filter-bar input, .filter-bar select{width:100%;}
+    .cards-grid{grid-template-columns:1fr;}
+    .modal-backdrop{padding:10px;}
+    .modal{padding:18px 14px;max-width:96vw;border-radius:14px;}
+    input, select, textarea{font-size:16px !important;} /* Prevents auto-zoom on iOS Safari */
+  }
+  @media (max-width:480px){
+    .topbar{flex-direction:column;align-items:flex-start;gap:10px;}
+    .brand-name{font-size:15px;}
   }
 </style>
 </head>
@@ -201,6 +217,82 @@
       </div>
       <button class="btn-submit" type="submit">Submit Star Review</button>
     </form>
+  </div>
+</div>
+
+<!-- DOCTOR APPOINTMENT BOOKING MODAL -->
+<div class="modal-backdrop" id="bookingModal">
+  <div class="modal" style="max-width:520px;border-radius:18px;box-shadow:0 20px 40px rgba(0,0,0,0.18);">
+    <div class="modal-head" style="border-bottom:1px solid var(--line);padding-bottom:12px;">
+      <div>
+        <h3 style="margin:0;font-size:18px;font-weight:700;color:var(--ink);display:flex;align-items:center;gap:8px;">
+          📅 Book Doctor Appointment
+        </h3>
+        <div id="modalDocSub" style="font-size:12.5px;color:var(--muted);margin-top:4px;"></div>
+      </div>
+      <button class="modal-close" onclick="closeBookingModal()" style="background:transparent;border:none;font-size:20px;cursor:pointer;color:var(--muted);">✕</button>
+    </div>
+
+    <!-- Error/Warning Alert Box inside Modal -->
+    <div id="bookingModalAlert" style="display:none;margin-top:14px;padding:12px 14px;border-radius:10px;font-size:12.5px;font-weight:600;">
+    </div>
+
+    <form id="bookingModalForm" onsubmit="submitDoctorBooking(event)" style="margin-top:14px;display:flex;flex-direction:column;gap:14px;">
+      <input type="hidden" id="bookModalDocUserId" />
+
+      <!-- Patient Selection for Caretakers -->
+      <div id="bookPatientGroup" style="display:none;">
+        <label style="font-size:12px;font-weight:700;color:var(--ink);display:block;margin-bottom:5px;">Select Patient under your care:</label>
+        <select id="bookPatientSelect" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--line);font-size:13px;background:var(--paper);color:var(--ink);">
+        </select>
+      </div>
+
+      <!-- Date Selection -->
+      <div>
+        <label style="font-size:12px;font-weight:700;color:var(--ink);display:block;margin-bottom:5px;">Appointment Date:</label>
+        <input type="date" id="bookDateInput" required style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--line);font-size:13px;background:var(--paper);color:var(--ink);" />
+        <span style="font-size:11px;color:var(--muted);margin-top:4px;display:block;">💡 Appointments can be booked up to 7 days in advance.</span>
+      </div>
+
+      <!-- Time Slot -->
+      <div>
+        <label style="font-size:12px;font-weight:700;color:var(--ink);display:block;margin-bottom:5px;">Time Slot:</label>
+        <input type="text" id="bookTimeInput" placeholder="e.g. 10:00 AM, 02:30 PM" value="10:00 AM" required style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--line);font-size:13px;background:var(--paper);color:var(--ink);" />
+        <span id="bookHoursHelper" style="font-size:11px;color:var(--pine-deep);font-weight:600;margin-top:4px;display:block;"></span>
+      </div>
+
+      <!-- Appointment Mode (Online / Offline) -->
+      <div>
+        <label style="font-size:12px;font-weight:700;color:var(--ink);display:block;margin-bottom:5px;">Appointment Type / Mode:</label>
+        <select id="bookTypeSelect" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--line);font-size:13px;background:var(--paper);color:var(--ink);">
+          <option value="online">🟢 Online (Video Call Consultation)</option>
+          <option value="offline">📍 Offline (In-Person Clinic Visit)</option>
+        </select>
+      </div>
+
+      <!-- Reason -->
+      <div>
+        <label style="font-size:12px;font-weight:700;color:var(--ink);display:block;margin-bottom:5px;">Reason for Appointment:</label>
+        <textarea id="bookReasonInput" rows="2" placeholder="Describe symptoms, medical concern, or routine checkup..." style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid var(--line);font-size:13px;background:var(--paper);color:var(--ink);resize:vertical;"></textarea>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:8px;padding-top:12px;border-top:1px solid var(--line);">
+        <button type="button" class="btn-sm secondary" onclick="closeBookingModal()" style="padding:8px 16px;font-size:13px;">Cancel</button>
+        <button type="submit" id="btnSubmitBooking" class="btn-sm primary" style="padding:8px 20px;font-size:13px;background:var(--pine);color:#fff;border:none;">Confirm Booking</button>
+      </div>
+    </form>
+  </div>
+<!-- GLOBAL CUSTOM ALERT & CONFIRMATION MODAL -->
+<div class="modal-backdrop" id="customAlertModal" style="z-index:99999;">
+  <div class="modal" style="max-width:440px;border-radius:16px;padding:24px;text-align:center;box-shadow:0 25px 50px -12px rgba(0,0,0,0.25);">
+    <div id="customAlertIcon" style="font-size:42px;margin-bottom:12px;">⚠️</div>
+    <h3 id="customAlertTitle" style="margin:0 0 8px 0;font-size:18px;font-weight:700;color:var(--ink);">Alert</h3>
+    <div id="customAlertMessage" style="font-size:13.5px;color:var(--muted);line-height:1.5;margin-bottom:20px;">Message content here...</div>
+    
+    <div style="display:flex;justify-content:center;gap:12px;" id="customAlertButtons">
+      <button type="button" class="btn-sm secondary" id="customAlertCancelBtn" style="padding:9px 20px;font-size:13px;border-radius:8px;">Cancel</button>
+      <button type="button" class="btn-sm primary" id="customAlertConfirmBtn" style="padding:9px 24px;font-size:13px;border-radius:8px;background:var(--pine);color:#fff;border:none;">OK</button>
+    </div>
   </div>
 </div>
 
@@ -301,10 +393,14 @@ function renderList(){
       availTag = '<span class="tag" style="background:#DCE9E2;color:var(--pine);font-weight:700;">🟢 Active Today</span>';
     }
 
+    const avatarHtml = item.profile_picture ? 
+      `<div class="c-avatar" style="overflow:hidden;padding:0;border-radius:12px;"><img src="${item.profile_picture}" style="width:100%;height:100%;object-fit:cover;image-rendering:-webkit-optimize-contrast;" /></div>` : 
+      `<div class="c-avatar ${currentTab==='caretakers'?'amber':''}">${currentTab==='doctors'?ICON.stetho:ICON.heart}</div>`;
+
     return `
       <div class="card">
         <div class="card-top">
-          <div class="c-avatar ${currentTab==='caretakers'?'amber':''}">${currentTab==='doctors'?ICON.stetho:ICON.heart}</div>
+          ${avatarHtml}
           <div>
             <div class="c-name">${name}</div>
             <div class="c-code">${code}</div>
@@ -332,9 +428,9 @@ function renderList(){
           ${currentTab==='doctors' ? 
             (availStatus === 'On Leave Today' ?
               `<button class="btn-sm secondary" style="opacity:0.65;cursor:not-allowed;" onclick="alert('${name.replace(/'/g, "\\'")} is currently on leave today.')">On Leave</button>` :
-              `<button class="btn-sm primary" onclick="bookDoctor(${item.user_id || item.id})">Book</button>`
+              `<button class="btn-sm primary" style="background:#1E90FF;color:#fff;border:none;" onclick="bookDoctor(${item.user_id || item.id})">Book</button>`
             ) :
-            `<button class="btn-sm primary" onclick="requestCaretaker(${item.user_id || item.id})">Request</button>`
+            `<button class="btn-sm primary" style="background:#6A5ACD;color:#fff;border:none;" onclick="requestCaretaker(${item.user_id || item.id})">Request</button>`
           }
           <button class="btn-sm secondary" onclick="openReviewModal('${currentTab==='doctors'?'doctor':'caretaker'}', ${item.id}, '${name.replace(/'/g, "\\'")}')">Star ★</button>
         </div>
@@ -390,7 +486,44 @@ async function bookDoctor(docUserId){
     try { userRole = JSON.parse(userRaw).role || 'patient'; } catch(e){}
   }
 
-  let selectedPatientId = null;
+  const docObj = (doctorsList || []).find(d => (d.user_id || d.id) == docUserId || d.user == docUserId);
+  const docName = docObj ? (docObj.full_name || docObj.username || 'Doctor') : 'Doctor';
+  const docCode = docObj ? (docObj.doctor_code || 'DOC') : 'DOC';
+  const hoursStr = docObj ? (docObj.available_hours || '09:00 AM - 05:00 PM') : '09:00 AM - 05:00 PM';
+  const status = docObj ? (docObj.availability_status || 'Active Today') : 'Active Today';
+
+  document.getElementById('bookModalDocUserId').value = docUserId;
+  document.getElementById('modalDocSub').innerHTML = `Specialist: <b>${docName}</b> (${docCode}) · Status: <span style="color:var(--pine-deep);font-weight:700;">${status}</span>`;
+  document.getElementById('bookHoursHelper').textContent = `⏱️ Doctor's Available Duty Hours: ${hoursStr}`;
+
+  function formatYMD(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  }
+  const today = new Date();
+  const maxDate = new Date(today);
+  maxDate.setDate(today.getDate() + 7);
+
+  const todayStr = formatYMD(today);
+  const maxStr = formatYMD(maxDate);
+
+  const dateInput = document.getElementById('bookDateInput');
+  dateInput.min = todayStr;
+  dateInput.max = maxStr;
+  dateInput.value = todayStr;
+
+  const alertBox = document.getElementById('bookingModalAlert');
+  alertBox.style.display = 'none';
+  alertBox.className = '';
+  alertBox.textContent = '';
+
+  const patientGroup = document.getElementById('bookPatientGroup');
+  const patientSelect = document.getElementById('bookPatientSelect');
+  patientGroup.style.display = 'none';
+  patientSelect.innerHTML = '';
+
   if(userRole === 'caretaker'){
     try {
       const pRes = await fetch('/api/auth/caretaker/patients', { headers: getAuthHeader() });
@@ -398,47 +531,43 @@ async function bookDoctor(docUserId){
         const data = await pRes.json();
         const assignedPatients = data.active || (Array.isArray(data) ? data : []);
         if(!assignedPatients || assignedPatients.length === 0){
-          alert('You have no assigned patients under your care. Accept a patient care request first before booking a doctor appointment.');
-          return;
-        }
-        let patMsg = 'Select Patient to book appointment for:\n\n';
-        assignedPatients.forEach((p, idx) => {
-          patMsg += `${idx + 1}. ${p.full_name} (${p.patient_code}) — Enter ID: ${p.patient_id}\n`;
-        });
-        const chosenIdStr = prompt(patMsg + '\nEnter Patient ID:');
-        if(!chosenIdStr) return;
-        selectedPatientId = parseInt(chosenIdStr.trim());
-        const validPat = assignedPatients.find(p => p.patient_id == selectedPatientId);
-        if(!validPat){
-          alert('Invalid Patient ID selected. Please select a valid patient under your care.');
-          return;
+          alertBox.style.display = 'block';
+          alertBox.style.background = '#FEF3C7';
+          alertBox.style.color = '#92400E';
+          alertBox.style.border = '1px solid #FDE68A';
+          alertBox.textContent = '⚠️ Warning: You have no active patients under your care. Accept a patient care request first before booking a doctor.';
+        } else {
+          patientGroup.style.display = 'block';
+          patientSelect.innerHTML = assignedPatients.map(p => 
+            `<option value="${p.patient_id}">${p.full_name} (${p.patient_code})</option>`
+          ).join('');
         }
       }
-    } catch(err){ alert(err.message); return; }
+    } catch(err){ console.log(err); }
   }
 
-  const today = new Date();
-  const dayOfWeek = today.getDay();
-  const distanceToMon = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
-  const monDate = new Date(today);
-  monDate.setDate(today.getDate() + distanceToMon);
-  const sunDate = new Date(monDate);
-  sunDate.setDate(monDate.getDate() + 6);
+  document.getElementById('bookingModal').classList.add('open');
+}
 
-  const monStr = monDate.toISOString().split('T')[0];
-  const sunStr = sunDate.toISOString().split('T')[0];
+function closeBookingModal(){
+  document.getElementById('bookingModal').classList.remove('open');
+}
 
-  const appDate = prompt(`Enter appointment date (YYYY-MM-DD).\nNote: Appointments can only be booked for the current week (${monStr} to ${sunStr}):`, monStr);
-  if(!appDate) return;
+async function submitDoctorBooking(e){
+  e.preventDefault();
+  const alertBox = document.getElementById('bookingModalAlert');
+  alertBox.style.display = 'none';
 
-  const appTime = prompt('Enter appointment time slot (e.g. 10:00 AM, 02:30 PM):', '10:00 AM');
-  if(!appTime) return;
-  
-  const appTypeChoice = prompt('Enter appointment type:\n1. Online (Video Call)\n2. Offline (In-Person)\n\nType 1 or 2:', '1');
-  if(!appTypeChoice) return;
-  const appType = (appTypeChoice.trim() === '2') ? 'offline' : 'online';
+  const docUserId = document.getElementById('bookModalDocUserId').value;
+  const appDate = document.getElementById('bookDateInput').value;
+  const appTime = document.getElementById('bookTimeInput').value;
+  const appType = document.getElementById('bookTypeSelect').value;
+  const reason = document.getElementById('bookReasonInput').value;
+  const patientSelect = document.getElementById('bookPatientSelect');
 
-  const reason = prompt('Enter reason for appointment:');
+  const userRaw = localStorage.getItem('beacon_user');
+  let userRole = 'patient';
+  if(userRaw){ try { userRole = JSON.parse(userRaw).role || 'patient'; } catch(err){} }
 
   const payload = {
     doctor_id: docUserId,
@@ -448,9 +577,22 @@ async function bookDoctor(docUserId){
     appointment_type: appType,
     booked_by: (userRole === 'caretaker' ? 'caretaker' : 'patient')
   };
-  if(selectedPatientId){
-    payload.patient_id = selectedPatientId;
+
+  if(userRole === 'caretaker'){
+    if(!patientSelect.value){
+      alertBox.style.display = 'block';
+      alertBox.style.background = '#FEE2E2';
+      alertBox.style.color = '#991B1B';
+      alertBox.style.border = '1px solid #FCA5A5';
+      alertBox.textContent = '⚠️ Please select a valid patient under your care.';
+      return;
+    }
+    payload.patient_id = parseInt(patientSelect.value);
   }
+
+  const submitBtn = document.getElementById('btnSubmitBooking');
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Booking...';
 
   try {
     const res = await fetch('/api/auth/appointments/book', {
@@ -458,9 +600,69 @@ async function bookDoctor(docUserId){
       headers: getAuthHeader(),
       body: JSON.stringify(payload)
     });
-    if(res.ok){ alert('Appointment request sent to doctor! Status: Waiting for confirmation.'); }
-    else { const d = await res.json(); alert(d.detail || 'Booking failed.'); }
-  } catch(e){ alert(e.message); }
+    if(res.ok){
+      alertBox.style.display = 'block';
+      alertBox.style.background = '#D1FAE5';
+      alertBox.style.color = '#065F46';
+      alertBox.style.border = '1px solid #A7F3D0';
+      alertBox.innerHTML = '✓ <b>Success:</b> Appointment request sent to doctor! Status: Waiting for confirmation.';
+      setTimeout(() => {
+        closeBookingModal();
+        fetchDirectory();
+      }, 1400);
+    } else {
+      const d = await res.json();
+      alertBox.style.display = 'block';
+      alertBox.style.background = '#FEE2E2';
+      alertBox.style.color = '#991B1B';
+      alertBox.style.border = '1px solid #FCA5A5';
+      alertBox.innerHTML = `⚠️ <b>Booking Warning:</b> ${d.detail || 'Could not complete appointment booking.'}`;
+    }
+  } catch(err){
+    alertBox.style.display = 'block';
+    alertBox.style.background = '#FEE2E2';
+    alertBox.style.color = '#991B1B';
+    alertBox.style.border = '1px solid #FCA5A5';
+    alertBox.textContent = '⚠️ Error: ' + err.message;
+  } finally {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Confirm Booking';
+  }
+}
+function showCustomAlert(message, title = 'Notification', icon = '💡') {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('customAlertModal');
+    if (!modal) { alert(message); resolve(); return; }
+    document.getElementById('customAlertIcon').textContent = icon;
+    document.getElementById('customAlertTitle').textContent = title;
+    document.getElementById('customAlertMessage').innerHTML = message;
+    const cancelBtn = document.getElementById('customAlertCancelBtn');
+    const confirmBtn = document.getElementById('customAlertConfirmBtn');
+    cancelBtn.style.display = 'none';
+    confirmBtn.textContent = 'OK';
+    confirmBtn.style.background = 'var(--pine)';
+    confirmBtn.onclick = () => { modal.classList.remove('open'); resolve(true); };
+    modal.classList.add('open');
+  });
+}
+
+function showCustomConfirm(message, title = 'Confirm Action', icon = '⚠️', confirmText = 'Confirm', confirmColor = '#DC2626') {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('customAlertModal');
+    if (!modal) { resolve(confirm(message)); return; }
+    document.getElementById('customAlertIcon').textContent = icon;
+    document.getElementById('customAlertTitle').textContent = title;
+    document.getElementById('customAlertMessage').innerHTML = message;
+    const cancelBtn = document.getElementById('customAlertCancelBtn');
+    const confirmBtn = document.getElementById('customAlertConfirmBtn');
+    cancelBtn.style.display = 'inline-block';
+    cancelBtn.textContent = 'Cancel';
+    confirmBtn.textContent = confirmText;
+    confirmBtn.style.background = confirmColor;
+    cancelBtn.onclick = () => { modal.classList.remove('open'); resolve(false); };
+    confirmBtn.onclick = () => { modal.classList.remove('open'); resolve(true); };
+    modal.classList.add('open');
+  });
 }
 
 async function requestCaretaker(careUserId){
@@ -470,9 +672,9 @@ async function requestCaretaker(careUserId){
       headers: getAuthHeader(),
       body: JSON.stringify({ caretaker_id: careUserId })
     });
-    if(res.ok){ alert('Caretaker care request sent successfully!'); }
-    else { const d = await res.json(); alert(d.detail || 'Request failed.'); }
-  } catch(e){ alert(e.message); }
+    if(res.ok){ await showCustomAlert('Caretaker care request sent successfully!', 'Request Sent', '✓'); }
+    else { const d = await res.json(); await showCustomAlert(d.detail || 'Request failed.', 'Request Failed', '⚠️'); }
+  } catch(e){ await showCustomAlert(e.message, 'Error', '⚠️'); }
 }
 
 function goToMyDashboard(){
@@ -491,6 +693,24 @@ document.addEventListener('DOMContentLoaded', () => {
   if(userRaw){
     try {
       const u = JSON.parse(userRaw);
+      const root = document.documentElement;
+      if(u.role === 'doctor'){
+        root.style.setProperty('--pine', '#1E90FF');
+        root.style.setProperty('--pine-deep', '#0056B3');
+        root.style.setProperty('--paper', '#F0F6FF');
+        root.style.setProperty('--line', '#CCE0FF');
+      } else if(u.role === 'caretaker'){
+        root.style.setProperty('--pine', '#6A5ACD');
+        root.style.setProperty('--pine-deep', '#483D8B');
+        root.style.setProperty('--paper', '#F5F3FF');
+        root.style.setProperty('--line', '#DDD6FE');
+      } else if(u.role === 'patient'){
+        root.style.setProperty('--pine', '#FF8C00');
+        root.style.setProperty('--pine-deep', '#D96B00');
+        root.style.setProperty('--paper', '#FFF8F0');
+        root.style.setProperty('--line', '#FFE0B2');
+      }
+
       if(u.role === 'patient' || u.role === 'admin'){
         const btn = document.getElementById('sidebarTimelineBtn');
         if(btn) btn.style.display = 'flex';

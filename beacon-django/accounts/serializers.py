@@ -118,6 +118,7 @@ class PatientProfileSerializer(serializers.ModelSerializer):
             'languages': c_profile.languages if c_profile else 'Not provided',
             'available_hours': c_profile.available_hours if c_profile else '24/7 Available',
             'license_number': c_profile.license_number if c_profile else 'Not provided',
+            'profile_picture': c_user.profile_picture,
         }
 
     def get_past_caretakers_history(self, obj):
@@ -132,7 +133,8 @@ class PatientProfileSerializer(serializers.ModelSerializer):
                 'full_name': c_profile.full_name if (c_profile and c_profile.full_name) else c_user.username,
                 'phone_number': (c_profile.phone_number if c_profile else c_user.mobile_number) or 'Not provided',
                 'location': c_profile.location if c_profile else 'Not provided',
-                'unlinked_at': str(r.created_at).split(' ')[0]
+                'unlinked_at': str(r.created_at).split(' ')[0],
+                'profile_picture': c_user.profile_picture,
             })
         return past_list
 
@@ -155,7 +157,8 @@ class PatientProfileSerializer(serializers.ModelSerializer):
                 'phone_number': (c_profile.phone_number if c_profile else c_user.mobile_number) or 'Not provided',
                 'location': c_profile.location if c_profile else 'Not provided',
                 'created_at': str(r.created_at).split(' ')[0],
-                'status': r.status
+                'status': r.status,
+                'profile_picture': c_user.profile_picture,
             }
             if r.status in result:
                 result[r.status].append(c_data)
@@ -170,10 +173,18 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     email = serializers.CharField(source='user.email', read_only=True)
     mobile_number = serializers.CharField(source='user.mobile_number', read_only=True)
+    profile_picture = serializers.CharField(source='user.profile_picture', read_only=True)
 
     class Meta:
         model = DoctorProfile
         fields = '__all__'
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not data.get('email') and instance.user.email:
+            data['email'] = instance.user.email
+        data['profile_picture'] = instance.user.profile_picture
+        return data
 
 
 class CaretakerProfileSerializer(serializers.ModelSerializer):
@@ -181,10 +192,18 @@ class CaretakerProfileSerializer(serializers.ModelSerializer):
     username = serializers.CharField(source='user.username', read_only=True)
     email = serializers.CharField(source='user.email', read_only=True)
     mobile_number = serializers.CharField(source='user.mobile_number', read_only=True)
+    profile_picture = serializers.CharField(source='user.profile_picture', read_only=True)
 
     class Meta:
         model = CaretakerProfile
         fields = '__all__'
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if not data.get('email') and instance.user.email:
+            data['email'] = instance.user.email
+        data['profile_picture'] = instance.user.profile_picture
+        return data
 
 
 class MedicalDocumentSerializer(serializers.ModelSerializer):
@@ -239,4 +258,11 @@ class AppointmentSerializer(serializers.ModelSerializer):
             p_prof = PatientProfile.objects.filter(user=obj.patient).first()
             return p_prof.patient_code if p_prof else None
         return None
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data['doctor_profile_picture'] = instance.doctor.profile_picture if instance.doctor else None
+        data['patient_profile_picture'] = instance.patient.profile_picture if instance.patient else None
+        data['caretaker_profile_picture'] = instance.caretaker.profile_picture if instance.caretaker else None
+        return data
 
