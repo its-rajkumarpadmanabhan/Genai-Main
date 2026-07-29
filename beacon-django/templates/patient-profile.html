@@ -151,8 +151,10 @@
       <div><div class="brand-name">Carewell</div><div class="brand-sub">PATIENT PORTAL</div></div>
     </div>
     <nav>
-      <a href="/patient-profile" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>My Profile</span></a>
+      <a href="/patient-profile" class="active" id="navProfileBtn" onclick="switchPatientTab('profile'); return false;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>My Profile</span></a>
       <a href="/doctor-caretaker-list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Find Caretaker / Doctor</span></a>
+      <a href="#sec-past-connections" id="navPastConnBtn" onclick="switchPatientTab('past-connections'); return false;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><span>Past Connections</span></a>
+      <a href="/patient-appointments"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span>Appointments</span></a>
       <a href="/app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Voice AI Engine</span></a>
       <a href="/voice-timeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>Voice AI Health Timeline</span></a>
       <a href="#" onclick="localStorage.clear(); window.location.href='/login';"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></a>
@@ -173,98 +175,136 @@
       </div>
     </div>
 
-    <div class="grid-cols">
-      <div>
-        <!-- Profile Card -->
-        <div class="profile-card">
-          <div class="profile-top">
-            <div class="profile-id">
-              <div class="avatar-photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7"/></svg></div>
-              <div>
-                <div class="p-name"><span id="pName">Loading profile...</span> <span class="p-code-badge" id="pCode">PAT-000000</span></div>
-                <div class="p-condition" id="pNotes">No medical condition specified yet</div>
+    <div id="sec-overview">
+      <div class="grid-cols">
+        <div>
+          <!-- Profile Card -->
+          <div class="profile-card">
+            <div class="profile-top">
+              <div class="profile-id">
+                <div class="avatar-photo" id="pAvatarContainer" style="position:relative;cursor:pointer;" title="Click to upload profile photo" onclick="document.getElementById('profilePicInput').click()">
+                  <input type="file" id="profilePicInput" accept="image/*" style="display:none;" onchange="uploadProfilePicture(event)">
+                  <div id="avatarContent" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7"/></svg>
+                  </div>
+                  <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.55);color:#fff;font-size:9.5px;text-align:center;padding:2px 0;font-weight:700;">📷 Photo</div>
+                </div>
+                <div>
+                  <div class="p-name"><span id="pName">Loading profile...</span> <span class="p-code-badge" id="pCode">PAT-000000</span></div>
+                  <div class="p-condition" id="pNotes">No medical condition specified yet</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-meta">
+              <div><div class="k">Date of Birth</div><div class="v" id="pDob">Not provided</div></div>
+              <div><div class="k">Gender</div><div class="v" id="pGender">Not provided</div></div>
+              <div><div class="k">Email Address</div><div class="v" id="pEmail">Not provided</div></div>
+              <div><div class="k">Marital Status</div><div class="v" id="pMarital">Not provided</div></div>
+              <div><div class="k">Location</div><div class="v" id="pLocation">Not provided</div></div>
+              <div><div class="k">Languages</div><div class="v" id="pLang">Not provided</div></div>
+              <div><div class="k">Phone Number</div><div class="v" id="pPhone">Not provided</div></div>
+              <div><div class="k">Insurance</div><div class="v" id="pInsurance">Not provided</div></div>
+              <div><div class="k">Emergency Contact</div><div class="v" id="pEmergency">Not provided</div></div>
+            </div>
+          </div>
+
+          <!-- CARETAKER CONNECTIONS & REQUESTS -->
+          <div class="section-box" style="margin-top:16px;">
+            <div class="section-head">
+              <h2>Caretaker Connections & Requests</h2>
+              <a href="/doctor-caretaker-list" class="btn-action" style="padding:6px 11px;font-size:11.5px;">Find Caretaker</a>
+            </div>
+
+            <!-- Category Tabs -->
+            <div style="display:flex;gap:8px;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:12px;flex-wrap:wrap;">
+              <button id="careTabActive" onclick="switchCareCategory('accepted')" style="background:var(--pine);color:#fff;border:none;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Active / Accepted (0)</button>
+              <button id="careTabPending" onclick="switchCareCategory('pending')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Pending / Sent (0)</button>
+              <button id="careTabRejected" onclick="switchCareCategory('rejected')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Rejected (0)</button>
+            </div>
+
+            <div id="careRequestsContainer">
+              <div class="empty-box">No caretaker requests or connections found.</div>
+            </div>
+          </div>
+
+          <!-- Appointments Section -->
+          <div class="section-box">
+            <div class="section-head">
+              <h2>My Appointments</h2>
+              <a href="/doctor-caretaker-list" class="btn-action" style="padding:6px 11px;font-size:11.5px;">Book Appointment</a>
+            </div>
+
+            <!-- Category Tabs (Today, Upcoming, Past) -->
+            <div style="display:flex;gap:10px;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:12px;">
+              <button id="patTabToday" onclick="switchPatAptCategory('today')" style="background:var(--pine);color:#fff;border:none;padding:5px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;">Today (0)</button>
+              <button id="patTabUpcoming" onclick="switchPatAptCategory('upcoming')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;">Upcoming (0)</button>
+              <button id="patTabPast" onclick="switchPatAptCategory('past')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;">Past (0)</button>
+            </div>
+
+            <div id="patApptContainer">
+              <div class="empty-box">No appointments found.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Documents & Quick Actions -->
+        <div>
+          <!-- Medical Documents Box -->
+          <div class="section-box">
+            <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;">
+              <h2>Medical Documents</h2>
+              <span class="p-code-badge" id="docCountBadge" style="background:var(--pine-soft);color:var(--pine-deep);font-weight:700;">0 Files</span>
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">Upload medical prescriptions, lab reports, or health summaries.</div>
+            
+            <div id="medicalDocsList" style="margin-bottom:12px;">
+              <div class="empty-box" style="padding:14px;">No medical documents uploaded.</div>
+            </div>
+
+            <div style="border-top:1px dashed var(--line);padding-top:10px;margin-top:10px;">
+              <div class="field" style="margin-bottom:6px;"><label>Document Title</label><input type="text" id="docTitleInput" placeholder="e.g. Blood Test Report 2026"></div>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <input type="file" id="docFileInput" accept=".pdf,image/*" style="font-size:11px;">
+                <button class="btn-action" style="padding:6px 12px;font-size:12px;white-space:nowrap;" onclick="uploadMedicalDocument()">Upload</button>
               </div>
             </div>
           </div>
 
-          <div class="p-meta">
-            <div><div class="k">Date of Birth</div><div class="v" id="pDob">Not provided</div></div>
-            <div><div class="k">Gender</div><div class="v" id="pGender">Not provided</div></div>
-            <div><div class="k">Email Address</div><div class="v" id="pEmail">Not provided</div></div>
-            <div><div class="k">Marital Status</div><div class="v" id="pMarital">Not provided</div></div>
-            <div><div class="k">Location</div><div class="v" id="pLocation">Not provided</div></div>
-            <div><div class="k">Languages</div><div class="v" id="pLang">Not provided</div></div>
-            <div><div class="k">Phone Number</div><div class="v" id="pPhone">Not provided</div></div>
-            <div><div class="k">Insurance</div><div class="v" id="pInsurance">Not provided</div></div>
-            <div><div class="k">Emergency Contact</div><div class="v" id="pEmergency">Not provided</div></div>
-          </div>
-        </div>
-
-        <!-- CARETAKER CONNECTIONS & REQUESTS -->
-        <div class="section-box" style="margin-top:16px;">
-          <div class="section-head">
-            <h2>Caretaker Connections & Requests</h2>
-            <a href="/doctor-caretaker-list" class="btn-action" style="padding:6px 11px;font-size:11.5px;">Find Caretaker</a>
-          </div>
-
-          <!-- Category Tabs -->
-          <div style="display:flex;gap:8px;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:12px;flex-wrap:wrap;">
-            <button id="careTabActive" onclick="switchCareCategory('accepted')" style="background:var(--pine);color:#fff;border:none;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Active / Accepted (0)</button>
-            <button id="careTabPending" onclick="switchCareCategory('pending')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Pending / Sent (0)</button>
-            <button id="careTabRejected" onclick="switchCareCategory('rejected')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Rejected (0)</button>
-            <button id="careTabUnlinked" onclick="switchCareCategory('unlinked')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Past Connections (0)</button>
-          </div>
-
-          <div id="careRequestsContainer">
-            <div class="empty-box">No caretaker requests or connections found.</div>
-          </div>
-        </div>
-
-        <!-- Appointments Section -->
-        <div class="section-box">
-          <div class="section-head">
-            <h2>My Appointments</h2>
-            <a href="/doctor-caretaker-list" class="btn-action" style="padding:6px 11px;font-size:11.5px;">Book Appointment</a>
-          </div>
-
-          <!-- Category Tabs (Today, Upcoming, Past) -->
-          <div style="display:flex;gap:10px;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:12px;">
-            <button id="patTabToday" onclick="switchPatAptCategory('today')" style="background:var(--pine);color:#fff;border:none;padding:5px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;">Today (0)</button>
-            <button id="patTabUpcoming" onclick="switchPatAptCategory('upcoming')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;">Upcoming (0)</button>
-            <button id="patTabPast" onclick="switchPatAptCategory('past')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;">Past (0)</button>
-          </div>
-
-          <div id="apptContainer">
-            <div class="empty-box">No appointments scheduled yet.</div>
+          <!-- Quick Calendar / Activity Card -->
+          <div class="section-box" style="margin-top:16px;">
+            <div class="section-head">
+              <h2>Quick Actions</h2>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <a href="/doctor-caretaker-list" class="btn-action secondary" style="justify-content:center;">🩺 Find Caretaker / Doctor</a>
+              <a href="/patient-appointments" class="btn-action secondary" style="justify-content:center;">📅 View Appointments</a>
+              <a href="/app" class="btn-action secondary" style="justify-content:center;">🎙️ Voice AI Engine</a>
+            </div>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Right Column: Documents -->
-      <div>
-        <div class="section-box">
-          <div class="section-head">
-            <h2>Medical Documents</h2>
-            <button class="btn-action secondary" onclick="openDocModal()" style="padding:6px 11px;font-size:11.5px;">+ Add Files</button>
+    <!-- DEDICATED PAST CONNECTIONS PAGE TAB (BELOW FIND CARETAKER / DOCTOR) -->
+    <div id="sec-past-connections" style="display:none;">
+      <div class="section-box">
+        <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:42px;height:42px;border-radius:12px;background:var(--pine-soft);color:var(--pine-deep);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;">📁</div>
+            <div>
+              <h2 style="margin:0;">Past Connections Directory (Caretakers Folder)</h2>
+              <span style="font-size:12.5px;color:var(--muted);font-weight:500;">History of past caretaker connections and care assignments</span>
+            </div>
           </div>
-          <div id="docContainer">
-            <div class="empty-box">No medical records uploaded yet. Click "+ Add Files" to upload prescriptions, lab reports, or records.</div>
+          <div class="table-search" style="margin:0;max-width:280px;background:var(--paper);border-radius:10px;padding:6px 12px;display:flex;align-items:center;border:1px solid var(--line);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;color:var(--muted);margin-right:8px;"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input type="text" id="searchPastConnPageInput" placeholder="Search past caretakers..." oninput="renderPastCaretakersFolderUI()" style="border:none;background:transparent;font-size:13px;outline:none;width:100%;">
           </div>
         </div>
 
-        <!-- Appointment Calendar -->
-        <div class="section-box" style="margin-top:16px;">
-          <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-            <h2>Appointment Calendar</h2>
-            <div style="display:flex;gap:10px;align-items:center;">
-              <button onclick="prevMonth()" style="background:none;border:none;color:var(--pine);font-size:20px;font-weight:bold;cursor:pointer;padding:0 5px;line-height:1;">&lsaquo;</button>
-              <span id="calendarMonthYear" style="font-weight:700;font-size:13.5px;color:var(--ink);"></span>
-              <button onclick="nextMonth()" style="background:none;border:none;color:var(--pine);font-size:20px;font-weight:bold;cursor:pointer;padding:0 5px;line-height:1;">&rsaquo;</button>
-            </div>
-          </div>
-          <div id="calendarGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;text-align:center;font-size:12.5px;">
-            <!-- Rendered dynamically by JS -->
-          </div>
+        <div id="pastCaretakersPageFolderGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:16px;margin-top:18px;">
+          <div class="empty-box">Loading past caretaker connections folder...</div>
         </div>
       </div>
     </div>
@@ -337,6 +377,30 @@ function getAuthHeader(){
 
 let profileData = {};
 
+async function uploadProfilePicture(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e){
+    const base64Img = e.target.result;
+    try {
+      const res = await fetch('/api/auth/profile/picture', {
+        method: 'POST',
+        headers: getAuthHeader(),
+        body: JSON.stringify({ profile_picture: base64Img })
+      });
+      if(res.ok){
+        document.getElementById('avatarContent').innerHTML = `<img src="${base64Img}" style="width:100%;height:100%;object-fit:cover;" />`;
+        alert('Profile picture updated successfully!');
+      } else {
+        const err = await res.json();
+        alert(err.detail || 'Failed to upload profile picture.');
+      }
+    } catch(err){ alert(err.message); }
+  };
+  reader.readAsDataURL(file);
+}
+
 async function loadPatientProfile(){
   try {
     const res = await fetch('/api/auth/patient/profile', { headers: getAuthHeader() });
@@ -354,6 +418,10 @@ async function loadPatientProfile(){
       document.getElementById('pLang').textContent = profileData.languages || 'Not provided';
       document.getElementById('pPhone').textContent = profileData.phone_number || profileData.mobile_number || 'Not provided';
       document.getElementById('pInsurance').textContent = profileData.insurance_details || 'Not provided';
+
+      if(profileData.profile_picture){
+        document.getElementById('avatarContent').innerHTML = `<img src="${profileData.profile_picture}" style="width:100%;height:100%;object-fit:cover;" />`;
+      }
       
       const em = (profileData.emergency_contact_name || '') + (profileData.emergency_contact_phone ? ' (' + profileData.emergency_contact_phone + ')' : '');
       document.getElementById('pEmergency').textContent = em || 'Not provided';
@@ -444,6 +512,8 @@ function renderCaretakerRequestsCategorized(){
   if(btnRejected) btnRejected.textContent = `Rejected (${cats.rejected ? cats.rejected.length : 0})`;
   if(btnUnlinked) btnUnlinked.textContent = `Past Connections (${cats.unlinked ? cats.unlinked.length : 0})`;
 
+  renderPastCaretakersFolderUI();
+
   const list = cats[careActiveCategory] || [];
   const container = document.getElementById('careRequestsContainer');
   if(!container) return;
@@ -489,6 +559,74 @@ function renderCaretakerRequestsCategorized(){
   }).join('');
 }
 
+function switchPatientTab(tabName){
+  const secOverview = document.getElementById('sec-overview');
+  const secPastConn = document.getElementById('sec-past-connections');
+  const navProfile = document.getElementById('navProfileBtn');
+  const navPastConn = document.getElementById('navPastConnBtn');
+
+  if(tabName === 'past-connections'){
+    if(secOverview) secOverview.style.display = 'none';
+    if(secPastConn) secPastConn.style.display = 'block';
+    if(navProfile) navProfile.classList.remove('active');
+    if(navPastConn) navPastConn.classList.add('active');
+    renderPastCaretakersFolderUI();
+  } else {
+    if(secOverview) secOverview.style.display = 'block';
+    if(secPastConn) secPastConn.style.display = 'none';
+    if(navProfile) navProfile.classList.add('active');
+    if(navPastConn) navPastConn.classList.remove('active');
+  }
+}
+
+function renderPastCaretakersFolderUI(){
+  const cats = profileData.caretaker_requests_categorized || { accepted: [], pending: [], rejected: [], unlinked: [] };
+  const unlinkedList = cats.unlinked || [];
+  const searchQ = (document.getElementById('searchPastCaretakersInput')?.value || document.getElementById('searchPastConnPageInput')?.value || '').trim().toLowerCase();
+
+  let filtered = unlinkedList;
+  if(searchQ){
+    filtered = filtered.filter(c => 
+      (c.full_name || '').toLowerCase().includes(searchQ) || 
+      (c.location || '').toLowerCase().includes(searchQ) || 
+      (c.phone_number || '').toLowerCase().includes(searchQ)
+    );
+  }
+
+  const htmlContent = (!filtered || filtered.length === 0) ? 
+    '<div class="empty-box" style="grid-column:1/-1;">No past caretaker connections found in folder.</div>' :
+    filtered.map(c => `
+      <div class="caretaker-folder-card" style="background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 4px 12px rgba(0,0,0,0.04);position:relative;">
+        <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:38px;height:38px;border-radius:10px;background:var(--slate-soft);color:var(--slate);display:flex;align-items:center;justify-content:center;font-weight:700;">📁</div>
+            <div>
+              <div style="font-family:'Fraunces',serif;font-weight:600;font-size:15px;color:var(--ink);">${c.full_name}</div>
+              <div style="font-size:11.5px;color:var(--muted);">Past Caretaker Connection</div>
+            </div>
+          </div>
+          <span style="font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:6px;background:var(--paper);color:var(--muted);">UNLINKED</span>
+        </div>
+
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">
+          <b>🗓️ Connection Date:</b> <span style="color:var(--ink);font-weight:600;">${c.created_at || 'Recent'}</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">
+          <b>📍 Location:</b> <span style="color:var(--ink);font-weight:600;">${c.location || 'Not specified'}</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:6px;">
+          <b>📞 Phone:</b> <span style="color:var(--ink);font-weight:600;">${c.phone_number || 'Not specified'}</span>
+        </div>
+      </div>
+    `).join('');
+
+  const c1 = document.getElementById('pastCaretakersFolderGrid');
+  if(c1) c1.innerHTML = htmlContent;
+
+  const c2 = document.getElementById('pastCaretakersPageFolderGrid');
+  if(c2) c2.innerHTML = htmlContent;
+}
+
 async function removeAssignedCaretaker(){
   if(!profileData.assigned_caretaker_details) return;
   const cName = profileData.assigned_caretaker_details.full_name;
@@ -529,7 +667,25 @@ function getStatusBadgeHtml(st){
   else if (st === 'rejected') { bg = '#FEE2E2'; fg = '#991B1B'; border = '#FCA5A5'; label = '✕ REJECTED'; }
   else if (st === 'missed') { bg = '#FFEDD5'; fg = '#9A3412'; border = '#FED7AA'; label = '⚠ MISSED'; }
   else if (st === 'cancelled_by_doctor') { bg = '#FEE2E2'; fg = '#EF4444'; border = '#FCA5A5'; label = '✕ CANCELLED BY DOCTOR'; }
+  else if (st === 'cancelled_by_patient') { bg = '#FEE2E2'; fg = '#991B1B'; border = '#FCA5A5'; label = '✕ CANCELLED BY PATIENT'; }
   return `<span style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;background:${bg};color:${fg};border:1px solid ${border};">${label}</span>`;
+}
+
+async function cancelPatientAppointment(aptId){
+  if(!confirm('Are you sure you want to cancel this appointment booking?')) return;
+  try {
+    const res = await fetch(`/api/auth/appointments/${aptId}/cancel`, {
+      method: 'POST',
+      headers: getAuthHeader()
+    });
+    if(res.ok){
+      alert('Appointment cancelled successfully.');
+      loadPatientAppointments();
+    } else {
+      const err = await res.json();
+      alert(err.detail || 'Failed to cancel appointment.');
+    }
+  } catch(e){ alert(e.message); }
 }
 
 function switchPatAptCategory(cat){
@@ -665,7 +821,7 @@ function renderPatientAppointments(){
   (patAllAppointments || []).forEach(a => {
     const aptDate = a.appointment_date;
     const st = (a.status || '').toLowerCase();
-    if (st === 'completed' || st === 'missed' || st === 'rejected' || st === 'cancelled_by_doctor' || (aptDate && aptDate < todayStr)) {
+    if (st === 'completed' || st === 'missed' || st === 'rejected' || st === 'cancelled_by_doctor' || st === 'cancelled_by_patient' || (aptDate && aptDate < todayStr)) {
       pastList.push(a);
     } else if (!aptDate || aptDate === todayStr) {
       todayList.push(a);
@@ -685,7 +841,8 @@ function renderPatientAppointments(){
   if(patActiveCategory === 'upcoming') activeList = upcomingList;
   if(patActiveCategory === 'past') activeList = pastList;
 
-  const container = document.getElementById('apptContainer');
+  const container = document.getElementById('patApptContainer') || document.getElementById('apptContainer');
+  if(!container) return;
   if(!activeList || activeList.length === 0){
     container.innerHTML = `<div class="empty-box">No ${patActiveCategory} appointments scheduled.</div>`;
     return;
@@ -716,6 +873,11 @@ function renderPatientAppointments(){
               <span style="font-size:11px;color:var(--muted);font-style:italic;">Waiting for doctor to start call...</span>
             `
           ) : ''}
+          ${(a.status === 'pending' || a.status === 'accepted') ? `
+            <button onclick="cancelPatientAppointment(${a.id})" class="btn-sm" style="display:inline-flex;align-items:center;gap:4px;background:var(--brick);color:white;border:none;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+              ✕ Cancel Booking
+            </button>
+          ` : ''}
         </div>
       </div>
       ${getStatusBadgeHtml(a.status)}
@@ -728,6 +890,8 @@ async function loadMedicalDocuments(){
     const res = await fetch('/api/auth/patient/documents', { headers: getAuthHeader() });
     if(res.ok){
       const docs = await res.json();
+      const badge = document.getElementById('docTotalBadge');
+      if(badge) badge.textContent = `(${docs ? docs.length : 0})`;
       const container = document.getElementById('docContainer');
       if(!docs || docs.length === 0){
         container.innerHTML = '<div class="empty-box">No medical records uploaded yet. Click "+ Add Files" to upload prescriptions, lab reports, or records.</div>';

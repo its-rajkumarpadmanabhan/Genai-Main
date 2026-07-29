@@ -78,13 +78,14 @@ class ResetPasswordSerializer(serializers.Serializer):
 class CustomUserSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
-        fields = ['id', 'username', 'email', 'mobile_number', 'role', 'is_active', 'created_at']
+        fields = ['id', 'username', 'email', 'mobile_number', 'role', 'profile_picture', 'is_active', 'created_at']
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(source='user.id', read_only=True)
     username = serializers.CharField(source='user.username', read_only=True)
     mobile_number = serializers.CharField(source='user.mobile_number', read_only=True)
+    profile_picture = serializers.CharField(source='user.profile_picture', read_only=True)
     assigned_caretaker_details = serializers.SerializerMethodField()
     past_caretakers_history = serializers.SerializerMethodField()
     caretaker_requests_categorized = serializers.SerializerMethodField()
@@ -97,6 +98,7 @@ class PatientProfileSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         if not data.get('email') and instance.user.email:
             data['email'] = instance.user.email
+        data['profile_picture'] = instance.user.profile_picture
         return data
 
     def get_assigned_caretaker_details(self, obj):

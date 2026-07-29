@@ -254,6 +254,29 @@
         </div>
       </div>
 
+      <!-- MONTHLY DOCTOR PATIENT VOLUME SECTION -->
+      <div class="section-card" style="margin-top:20px;">
+        <div class="table-head">
+          <div class="section-head" style="margin:0;">
+            <h2>Monthly Doctor Patient Volume</h2>
+            <span style="font-size:12px;color:var(--muted);font-weight:500;">Track total unique patients & appointments per doctor per month</span>
+          </div>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <select id="docMonthSelect" onchange="renderDoctorMonthlyPatients()" style="padding:7px 12px;border-radius:8px;border:1px solid var(--line);font-size:12.5px;font-weight:600;background:var(--paper);color:var(--ink);">
+              <option value="latest">Current Month (Jul 2026)</option>
+              <option value="all">All 6 Months Trend</option>
+            </select>
+            <div class="table-search" style="margin:0;max-width:220px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+              <input type="text" id="searchDocVolume" placeholder="Search doctor or dept…" oninput="renderDoctorMonthlyPatients()">
+            </div>
+          </div>
+        </div>
+        <div id="docMonthlyVolumeContainer" style="max-height:360px;overflow-y:auto;">
+          <div class="empty-note">Loading monthly doctor patient volume...</div>
+        </div>
+      </div>
+
       <div class="stat-grid" style="margin-top:20px;">
         <div class="stat-card"><div class="top"><div class="icon bg-amber"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 17.3l-6.2 3.6 1.6-7L2 9.2l7.1-.6L12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7z"/></svg></div></div><div class="num" id="statAvgRating">4.8</div><div class="lbl">Average rating</div></div>
         <div class="stat-card"><div class="top"><div class="icon bg-slate"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div></div><div class="num" id="statTotalReviews">12</div><div class="lbl">Total reviews</div></div>
@@ -333,6 +356,19 @@
   </div>
 </div>
 
+<!-- USER PROFILE VIEW MODAL -->
+<div class="modal-backdrop" id="userProfileModal">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-head">
+      <h3 id="uProfModalTitle">User Profile Details</h3>
+      <button class="modal-close" onclick="closeUserProfileModal()">✕</button>
+    </div>
+    <div id="uProfModalContent">
+      <div class="empty-note">Loading user profile...</div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -341,7 +377,8 @@ const ICON = {
   stetho: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>',
   heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.5 1-1a5.5 5.5 0 0 0 0-7.9z"/></svg>',
   edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>',
-  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>'
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
+  eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>'
 };
 
 let allUsers = [];
@@ -353,21 +390,31 @@ function getAuthHeader(){
   return token ? { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
 }
 
+let adminStatsData = {};
+
 async function fetchAdminData(){
   try {
-    const res = await fetch('/api/auth/admin/users', { headers: getAuthHeader() });
-    if(res.ok){
-      allUsers = await res.json();
-      renderOverview();
-      renderAnalytics();
-      renderReviews();
-      renderPatients();
-      renderDoctors();
-      renderCaretakers();
-    } else if(res.status === 401 || res.status === 403){
+    const [uRes, sRes] = await Promise.all([
+      fetch('/api/auth/admin/users', { headers: getAuthHeader() }),
+      fetch('/api/admin/stats', { headers: getAuthHeader() })
+    ]);
+
+    if(uRes.ok){
+      allUsers = await uRes.json();
+    }
+    if(sRes.ok){
+      adminStatsData = await sRes.json();
+    } else if(uRes.status === 401 || uRes.status === 403){
       localStorage.clear();
       window.location.href = '/login';
     }
+
+    renderOverview();
+    renderAnalytics();
+    renderReviews();
+    renderPatients();
+    renderDoctors();
+    renderCaretakers();
   } catch(e){ console.log(e); }
 }
 
@@ -390,10 +437,10 @@ function renderOverview(){
   const caretakers = allUsers.filter(u => u.role === 'caretaker');
   const inactive = allUsers.filter(u => !u.is_active);
 
-  document.getElementById('statPatients').textContent = patients.length;
-  document.getElementById('statDoctors').textContent = doctors.length;
-  document.getElementById('statCaretakers').textContent = caretakers.length;
-  document.getElementById('statInactive').textContent = inactive.length;
+  document.getElementById('statPatients').textContent = adminStatsData.patients_count !== undefined ? adminStatsData.patients_count : patients.length;
+  document.getElementById('statDoctors').textContent = adminStatsData.doctors_count !== undefined ? adminStatsData.doctors_count : doctors.length;
+  document.getElementById('statCaretakers').textContent = adminStatsData.caretakers_count !== undefined ? adminStatsData.caretakers_count : caretakers.length;
+  document.getElementById('statInactive').textContent = adminStatsData.inactive_count !== undefined ? adminStatsData.inactive_count : inactive.length;
   
   document.getElementById('navCountPatients').textContent = patients.length;
   document.getElementById('navCountDoctors').textContent = doctors.length;
@@ -405,135 +452,68 @@ function renderOverview(){
       <span class="dot"></span>
       <span style="font-weight:600;">${u.username}</span>
       <span style="color:var(--muted);">· ${u.email}</span>
-      <span class="t">${u.role.toUpperCase()}</span>
+      <span class="t" style="display:flex;align-items:center;gap:8px;">
+        <span>${u.role.toUpperCase()}</span>
+        <button class="icon-action" onclick="viewUserProfile(${u.id})" title="View Full Profile" style="width:24px;height:24px;">${ICON.eye}</button>
+      </span>
     </div>
   `).join('') : '<div class="empty-note">No registered users found.</div>';
+
+  renderDoctorMonthlyPatients();
 }
 
-/* ================= ANALYTICS ================= */
-const signupData = {
-  months: ['Feb','Mar','Apr','May','Jun','Jul'],
-  patients: [4, 6, 5, 8, 7, 14],
-  doctors:  [2, 3, 2, 4, 3, 14],
-  caretakers:[1, 2, 3, 2, 4, 14],
-};
-const apptWeekData = {
-  labels: ['Wk 1','Wk 2','Wk 3','Wk 4','Wk 5'],
-  values: [14, 19, 16, 22, 28],
-};
+function renderDoctorMonthlyPatients(){
+  const list = adminStatsData.doctor_monthly_patients || [];
+  const monthSel = document.getElementById('docMonthSelect')?.value || 'latest';
+  const searchQ = (document.getElementById('searchDocVolume')?.value || '').trim().toLowerCase();
 
-function renderAnalytics(){
-  renderGroupedBars('chartSignups', signupData.months, [
-    {values: signupData.patients, color:'var(--pine)'},
-    {values: signupData.doctors, color:'var(--slate)'},
-    {values: signupData.caretakers, color:'var(--amber)'},
-  ]);
-  renderSingleBars('chartAppointments', apptWeekData.labels, apptWeekData.values, 'var(--slate)');
-
-  const doctors = allUsers.filter(u => u.role === 'doctor');
-  const byDept = { Cardiology: 3, Geriatrics: 2, Neurology: 2, 'General Medicine': 3, Orthopedics: 1, Pediatrics: 1 };
-  doctors.forEach(d => {
-    const dept = d.username.includes('Mehta') ? 'Cardiology' : (d.username.includes('Thomas') ? 'Geriatrics' : 'General Medicine');
-    byDept[dept] = (byDept[dept]||0) + 1;
-  });
-
-  renderHBars('chartSpecialty', Object.entries(byDept).map(([label,value]) => ({label, value, color:'var(--pine)'})));
-
-  const locationCounts = [
-    {label:'Kochi', value:8, color:'var(--pine)'},
-    {label:'Kottayam', value:5, color:'var(--slate)'},
-    {label:'Kozhikode', value:4, color:'var(--amber)'},
-    {label:'Thiruvananthapuram', value:3, color:'var(--brick)'},
-  ];
-  renderHBars('chartLocation', locationCounts);
-}
-
-function renderGroupedBars(containerId, labels, series){
-  const max = Math.max(1, ...series.flatMap(s => s.values));
-  const html = labels.map((lab, i) => `
-    <div class="bar-group">
-      <div class="bar-set">
-        ${series.map(s => {
-          const h = Math.round((s.values[i]/max)*140) || 2;
-          return `<div class="bar" style="height:${h}px;background:${s.color};"><span class="bar-value">${s.values[i]}</span></div>`;
-        }).join('')}
-      </div>
-      <div class="bar-label">${lab}</div>
-    </div>
-  `).join('');
-  document.getElementById(containerId).innerHTML = `<div class="bar-chart">${html}</div>`;
-}
-function renderSingleBars(containerId, labels, values, color){
-  const max = Math.max(1, ...values);
-  const html = labels.map((lab, i) => {
-    const h = Math.round((values[i]/max)*140) || 2;
-    return `<div class="bar-group"><div class="bar-set"><div class="bar bar-single" style="height:${h}px;background:${color};"><span class="bar-value">${values[i]}</span></div></div><div class="bar-label">${lab}</div></div>`;
-  }).join('');
-  document.getElementById(containerId).innerHTML = `<div class="bar-chart">${html}</div>`;
-}
-function renderHBars(containerId, data){
-  const max = Math.max(1, ...data.map(d => d.value));
-  document.getElementById(containerId).innerHTML = data.map(d => `
-    <div class="hbar-row">
-      <div class="hbar-label">${d.label}</div>
-      <div class="hbar-track"><div class="hbar-fill" style="width:${Math.round((d.value/max)*100)}%;background:${d.color};"></div></div>
-      <div class="hbar-value">${d.value}</div>
-    </div>
-  `).join('');
-}
-
-/* ================= REVIEWS ================= */
-let reviews = [
-  {id:'r1', reviewer:'Aarav Sharma', targetType:'doctor', target:'Dr. Amit Kapoor', rating:5, text:'Extremely patient with my father, explained the cardiology test results clearly.', date:'26 Jul 2026'},
-  {id:'r2', reviewer:'Priya Nair', targetType:'caretaker', target:'Suresh Pillai', rating:5, text:'Suresh has been reliable and genuinely caring — always punctual for home check-ins.', date:'25 Jul 2026'},
-  {id:'r3', reviewer:'Rahul Verma', targetType:'doctor', target:'Dr. Neha Thomas', rating:5, text:'Excellent geriatrics consultation for elderly care.', date:'24 Jul 2026'},
-  {id:'r4', reviewer:'Sneha Reddy', targetType:'caretaker', target:'Lakshmi Devi', rating:4, text:'Attentive and communicates very well with family members.', date:'23 Jul 2026'},
-  {id:'r5', reviewer:'Joseph Thomas', targetType:'doctor', target:'Dr. Rohan Mehta', rating:5, text:'Very thorough examination and accurate prescription.', date:'22 Jul 2026'},
-];
-let reviewFilter = 'all';
-
-function starIcons(rating){
-  let out = '';
-  for(let i=1;i<=5;i++){
-    out += i<=rating
-      ? '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 17.3l-6.2 3.6 1.6-7L2 9.2l7.1-.6L12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7z"/></svg>'
-      : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 17.3l-6.2 3.6 1.6-7L2 9.2l7.1-.6L12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7z"/></svg>';
+  let filtered = list;
+  if(searchQ){
+    filtered = filtered.filter(d => 
+      d.doctor_name.toLowerCase().includes(searchQ) || 
+      d.major_department.toLowerCase().includes(searchQ) || 
+      d.hospital_name.toLowerCase().includes(searchQ)
+    );
   }
-  return out;
-}
-function avg(list){ return list.length ? (list.reduce((s,r) => s+r.rating,0)/list.length) : 0; }
 
-function filterReviews(type){
-  reviewFilter = type;
-  document.querySelectorAll('[data-rf]').forEach(b => b.classList.toggle('active', b.dataset.rf === type));
-  renderReviews();
-}
-function renderReviews(){
-  document.getElementById('statAvgRating').textContent = avg(reviews).toFixed(1);
-  document.getElementById('statTotalReviews').textContent = reviews.length;
-  document.getElementById('statDoctorAvg').textContent = avg(reviews.filter(r => r.targetType==='doctor')).toFixed(1);
-  document.getElementById('statCaretakerAvg').textContent = avg(reviews.filter(r => r.targetType==='caretaker')).toFixed(1);
+  const container = document.getElementById('docMonthlyVolumeContainer');
+  if(!container) return;
+  if(!filtered || filtered.length === 0){
+    container.innerHTML = '<div class="empty-note">No doctor monthly patient volume records available.</div>';
+    return;
+  }
 
-  const q = document.getElementById('searchReviews').value.trim().toLowerCase();
-  const list = reviews.filter(r => {
-    if(reviewFilter !== 'all' && r.targetType !== reviewFilter) return false;
-    if(q && !(r.reviewer.toLowerCase().includes(q) || r.target.toLowerCase().includes(q) || r.text.toLowerCase().includes(q))) return false;
-    return true;
-  });
+  container.innerHTML = filtered.map(d => {
+    const latestStat = (d.monthly_stats && d.monthly_stats.length > 0) ? d.monthly_stats[d.monthly_stats.length - 1] : { unique_patients: 0, total_appointments: 0, month_label: 'Jul 2026' };
+    const monthText = monthSel === 'latest' ? latestStat.month_label : 'All 6 Months Trend';
 
-  document.getElementById('reviewList').innerHTML = list.length ? list.map(r => `
-    <div class="review-card">
-      <div class="review-top">
-        <div class="review-who">
-          <div class="t-avatar ${r.targetType==='doctor'?'brick':'amber'}">${ICON.person}</div>
-          <div><div class="review-name">${r.target}</div><div class="review-sub">Reviewed by ${r.reviewer} · ${r.targetType==='doctor'?'Doctor':'Caretaker'}</div></div>
+    let patientCountDisplay = latestStat.unique_patients;
+    let aptCountDisplay = latestStat.total_appointments;
+
+    if (monthSel === 'all') {
+      patientCountDisplay = d.total_unique_patients_all_time;
+      aptCountDisplay = d.monthly_stats.reduce((acc, m) => acc + m.total_appointments, 0);
+    }
+
+    return `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border-bottom:1px solid var(--line);background:var(--surface);border-radius:10px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="t-avatar brick">${ICON.stetho}</div>
+          <div>
+            <div style="font-weight:700;font-size:13.5px;color:var(--ink);">${d.doctor_name} <span class="p-code-badge" style="background:var(--paper);padding:2px 6px;border-radius:4px;font-size:10.5px;color:var(--muted);">${d.doctor_code}</span></div>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">🩺 ${d.major_department} · 🏥 ${d.hospital_name} (${d.location})</div>
+          </div>
         </div>
-        <span class="stars">${starIcons(r.rating)}</span>
+        <div style="display:flex;align-items:center;gap:16px;">
+          <div style="text-align:right;">
+            <div style="font-size:14.5px;font-weight:700;color:var(--pine-deep);">${patientCountDisplay} ${patientCountDisplay === 1 ? 'patient' : 'patients'}</div>
+            <div style="font-size:11px;color:var(--muted);">${aptCountDisplay} appointments (${monthText})</div>
+          </div>
+          <button class="icon-action" onclick="viewUserProfile(${d.doctor_id})" title="View Doctor Profile">${ICON.eye}</button>
+        </div>
       </div>
-      <div class="review-text">${r.text}</div>
-      <div class="review-date" style="margin-top:6px;">${r.date}</div>
-    </div>
-  `).join('') : '<div class="empty-note">No reviews match this filter.</div>';
+    `;
+  }).join('');
 }
 
 function renderPatients(){
@@ -549,8 +529,9 @@ function renderPatients(){
       <td>Patient</td>
       <td><span class="status-pill ${u.is_active?'active':'inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
       <td><div class="row-actions">
-        <button class="icon-action" onclick="openModal('patient', ${u.id})">${ICON.edit}</button>
-        <button class="icon-action danger" onclick="deleteRecord('patient', ${u.id})">${ICON.trash}</button>
+        <button class="icon-action" onclick="viewUserProfile(${u.id})" title="View Full Profile">${ICON.eye}</button>
+        <button class="icon-action" onclick="openModal('patient', ${u.id})" title="Edit User">${ICON.edit}</button>
+        <button class="icon-action danger" onclick="deleteRecord('patient', ${u.id})" title="Delete User">${ICON.trash}</button>
       </div></td>
     </tr>
   `).join('') : '<tr><td colspan="7"><div class="empty-note">No patients found.</div></td></tr>';
@@ -562,15 +543,16 @@ function renderDoctors(){
 
   document.getElementById('tbodyDoctors').innerHTML = doctors.length ? doctors.map(u => `
     <tr>
-      <td><div class="name-cell"><div class="t-avatar brick">${ICON.stetho}</div><div><div class="t-name">${u.username.startsWith('Dr.') ? u.username : 'Dr. ' + u.username}</div><div class="t-sub mono">ID: #${u.id}</div></div></div></td>
+      <td><div class="name-cell"><div class="t-avatar brick">${ICON.stetho}</div><div><div class="t-name">${u.username}</div><div class="t-sub mono">ID: #${u.id}</div></div></div></td>
       <td>${u.email}</td>
       <td>${u.mobile_number || 'Not provided'}</td>
       <td><code class="mono" style="background:var(--paper);padding:3px 7px;border-radius:6px;font-size:12px;color:var(--pine-deep);">${u.password || '••••••••'}</code></td>
       <td>Doctor</td>
       <td><span class="status-pill ${u.is_active?'active':'inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
       <td><div class="row-actions">
-        <button class="icon-action" onclick="openModal('doctor', ${u.id})">${ICON.edit}</button>
-        <button class="icon-action danger" onclick="deleteRecord('doctor', ${u.id})">${ICON.trash}</button>
+        <button class="icon-action" onclick="viewUserProfile(${u.id})" title="View Full Profile">${ICON.eye}</button>
+        <button class="icon-action" onclick="openModal('doctor', ${u.id})" title="Edit User">${ICON.edit}</button>
+        <button class="icon-action danger" onclick="deleteRecord('doctor', ${u.id})" title="Delete User">${ICON.trash}</button>
       </div></td>
     </tr>
   `).join('') : '<tr><td colspan="7"><div class="empty-note">No doctors found.</div></td></tr>';
@@ -589,11 +571,88 @@ function renderCaretakers(){
       <td>Caretaker</td>
       <td><span class="status-pill ${u.is_active?'active':'inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
       <td><div class="row-actions">
-        <button class="icon-action" onclick="openModal('caretaker', ${u.id})">${ICON.edit}</button>
-        <button class="icon-action danger" onclick="deleteRecord('caretaker', ${u.id})">${ICON.trash}</button>
+        <button class="icon-action" onclick="viewUserProfile(${u.id})" title="View Full Profile">${ICON.eye}</button>
+        <button class="icon-action" onclick="openModal('caretaker', ${u.id})" title="Edit User">${ICON.edit}</button>
+        <button class="icon-action danger" onclick="deleteRecord('caretaker', ${u.id})" title="Delete User">${ICON.trash}</button>
       </div></td>
     </tr>
   `).join('') : '<tr><td colspan="7"><div class="empty-note">No caretakers found.</div></td></tr>';
+}
+
+async function viewUserProfile(userId){
+  const modal = document.getElementById('userProfileModal');
+  const container = document.getElementById('uProfModalContent');
+  modal.classList.add('open');
+  container.innerHTML = '<div class="empty-note">Fetching complete user profile details...</div>';
+
+  try {
+    const res = await fetch(`/api/admin/users/${userId}/profile`, { headers: getAuthHeader() });
+    if(res.ok){
+      const u = await res.json();
+      const details = u.profile_details || {};
+      
+      const avatarHtml = u.profile_picture 
+        ? `<img src="${u.profile_picture}" style="width:54px;height:54px;border-radius:50%;object-fit:cover;border:2px solid var(--line);" />`
+        : `<div class="avatar-photo" style="width:54px;height:54px;border-radius:50%;background:var(--pine-soft);color:var(--pine-deep);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;">${(u.username||'U').charAt(0).toUpperCase()}</div>`;
+
+      let roleSpecificHtml = '';
+      if(u.role === 'patient'){
+        roleSpecificHtml = `
+          <div style="background:var(--paper);border-radius:12px;padding:14px;margin-top:14px;font-size:12.5px;display:flex;flex-direction:column;gap:6px;">
+            <div><b>Patient Code:</b> ${details.patient_code || 'PAT-000'}</div>
+            <div><b>Date of Birth:</b> ${details.dob || 'Not provided'} · <b>Gender:</b> ${details.gender || 'Not provided'}</div>
+            <div><b>Marital Status:</b> ${details.marital_status || 'Not provided'}</div>
+            <div><b>Location:</b> ${details.location || 'Not provided'} · <b>Languages:</b> ${details.languages || 'Not provided'}</div>
+            <div><b>Insurance Details:</b> ${details.insurance_details || 'None'}</div>
+            <div><b>Emergency Contact:</b> ${(details.emergency_contact_name || '')} ${(details.emergency_contact_phone ? '(' + details.emergency_contact_phone + ')' : '')}</div>
+            <div><b>Medical History / Notes:</b> ${details.medical_history_notes || 'No notes specified.'}</div>
+          </div>
+        `;
+      } else if(u.role === 'doctor'){
+        roleSpecificHtml = `
+          <div style="background:var(--paper);border-radius:12px;padding:14px;margin-top:14px;font-size:12.5px;display:flex;flex-direction:column;gap:6px;">
+            <div><b>Doctor Code:</b> ${details.doctor_code || 'DOC-000'} · <b>License:</b> ${details.license_number || 'N/A'}</div>
+            <div><b>Department / Specialization:</b> ${details.major_department || 'General Medicine'}</div>
+            <div><b>Experience:</b> ${details.experience_years || 0} Years · <b>Consultation Fee:</b> ₹${details.consultation_fee || '0'}</div>
+            <div><b>Hospital:</b> ${details.hospital_name || 'Clinic'} · <b>Location:</b> ${details.location || 'Not provided'}</div>
+            <div><b>Available Hours:</b> ${details.available_hours || '09:00 AM - 05:00 PM'}</div>
+            <div><b>Rating Average:</b> ⭐ ${details.rating_avg || '5.0'} (${details.reviews_count || 0} reviews)</div>
+            <div><b>Availability Status:</b> ${details.availability_status || 'Active Today'}</div>
+          </div>
+        `;
+      } else if(u.role === 'caretaker'){
+        roleSpecificHtml = `
+          <div style="background:var(--paper);border-radius:12px;padding:14px;margin-top:14px;font-size:12.5px;display:flex;flex-direction:column;gap:6px;">
+            <div><b>Caretaker Code:</b> ${details.caretaker_code || 'CAR-000'} · <b>License/Cert:</b> ${details.license_number || 'N/A'}</div>
+            <div><b>Experience:</b> ${details.experience_years || 0} Years · <b>Daily Fee:</b> ₹${details.consultation_fee || '0'}</div>
+            <div><b>Location:</b> ${details.location || 'Not provided'} · <b>Languages:</b> ${details.languages || 'Not provided'}</div>
+            <div><b>Available Hours:</b> ${details.available_hours || '24/7 Available'}</div>
+            <div><b>Rating Average:</b> ⭐ ${details.rating_avg || '5.0'} (${details.reviews_count || 0} reviews)</div>
+          </div>
+        `;
+      }
+
+      container.innerHTML = `
+        <div style="display:flex;align-items:center;gap:14px;padding-bottom:14px;border-bottom:1px solid var(--line);">
+          ${avatarHtml}
+          <div>
+            <h4 style="margin:0;font-family:'Fraunces',serif;font-size:18px;">${u.username} <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--pine-soft);color:var(--pine-deep);text-transform:uppercase;">${u.role}</span></h4>
+            <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">📧 ${u.email} · 📱 ${u.mobile_number || 'No phone'}</div>
+            <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">🔑 Password: <code style="background:var(--paper);padding:2px 6px;border-radius:4px;color:var(--pine-deep);">${u.plain_password}</code> · Account Created: ${u.created_at ? u.created_at.split('T')[0] : 'N/A'}</div>
+          </div>
+        </div>
+        ${roleSpecificHtml}
+      `;
+    } else {
+      container.innerHTML = '<div class="empty-note">Failed to load user profile.</div>';
+    }
+  } catch(err){
+    container.innerHTML = `<div class="empty-note">Error: ${err.message}</div>`;
+  }
+}
+
+function closeUserProfileModal(){
+  document.getElementById('userProfileModal').classList.remove('open');
 }
 
 function openModal(roleType, userId){

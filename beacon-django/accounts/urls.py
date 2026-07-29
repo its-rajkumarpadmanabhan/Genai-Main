@@ -8,13 +8,17 @@ from .views import (
     ResetPasswordView,
     SignupView,
     DeleteSelfProfileView,
+    UserProfilePictureUploadView,
+    PatientVisitedDoctorsView,
     AdminStatsView,
     AdminUsersView,
+    AdminUserProfileView,
     PatientProfileView,
     MedicalDocumentView,
     DirectoryListView,
     CaretakerRequestView,
     AppointmentBookingView,
+    AppointmentCancelView,
     DoctorProfileView,
     DoctorAppointmentsView,
     DoctorPatientsListView,
@@ -45,16 +49,19 @@ urlpatterns = [
     path('reset-password', ResetPasswordView.as_view(), name='auth-reset-password'),
     path('check-availability', CheckAvailabilityView.as_view(), name='auth-check-availability'),
     path('profile/delete', DeleteSelfProfileView.as_view(), name='auth-profile-delete'),
+    path('profile/picture', UserProfilePictureUploadView.as_view(), name='auth-profile-picture'),
 
     # Admin
     path('admin/stats', AdminStatsView.as_view(), name='admin-stats'),
     path('admin/users', AdminUsersView.as_view(), name='admin-users'),
+    path('admin/users/<int:user_id>/profile', AdminUserProfileView.as_view(), name='admin-user-profile'),
 
     # Patient
     path('patient/profile', PatientProfileView.as_view(), name='patient-profile-api'),
     path('patient/documents', MedicalDocumentView.as_view(), name='patient-documents-api'),
     path('patient/documents/<int:doc_id>', MedicalDocumentView.as_view(), name='patient-document-delete'),
     path('patient/appointments', PatientAppointmentsView.as_view(), name='patient-appointments-api'),
+    path('patient/visited-doctors', PatientVisitedDoctorsView.as_view(), name='patient-visited-doctors'),
     path('patient/caretaker-request', CaretakerRequestView.as_view(), name='patient-caretaker-request'),
 
     # Doctor
@@ -74,6 +81,7 @@ urlpatterns = [
     # Shared / Directory / Appointments / Reviews
     path('directory/search', DirectoryListView.as_view(), name='directory-search'),
     path('appointments/book', AppointmentBookingView.as_view(), name='appointments-book'),
+    path('appointments/<int:apt_id>/cancel', AppointmentCancelView.as_view(), name='appointment-cancel'),
     path('appointments/<int:apt_id>/start-call', AppointmentStartCallView.as_view(), name='appointment-start-call'),
     path('appointments/<int:apt_id>/end-call', AppointmentEndCallView.as_view(), name='appointment-end-call'),
     path('appointments/<int:apt_id>/toggle-caretaker-call', AppointmentToggleCaretakerCallView.as_view(), name='appointment-toggle-caretaker-call'),

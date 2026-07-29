@@ -116,8 +116,9 @@
     </div>
 
     <nav>
-      <a href="/caretaker-dashboard" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Overview</span></a>
+      <a href="/caretaker-dashboard" class="active" id="navOverviewBtn" onclick="switchCaretakerTab('overview'); return false;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Overview</span></a>
       <a href="/doctor-caretaker-list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Directory</span></a>
+      <a href="#sec-patients" id="navPatientsBtn" onclick="switchCaretakerTab('patients'); return false;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><span>Patients List</span></a>
       <a href="/app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Voice AI Engine</span></a>
       <a href="#" onclick="localStorage.clear(); window.location.href='/login';"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></a>
     </nav>
@@ -137,63 +138,104 @@
       </div>
     </div>
 
-    <div class="grid-cols">
-      <div>
-        <!-- Profile Card -->
-        <div class="profile-card">
-          <div class="profile-top">
-            <div class="profile-id">
-              <div class="avatar-photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7"/></svg></div>
-              <div>
-                <div class="p-name"><span id="cName">Loading profile...</span> <span class="p-code-badge" id="cCode">CAR-000000</span></div>
-                <div class="p-condition" id="cHours">Available 08:00 AM - 08:00 PM</div>
+    <div id="sec-overview">
+      <div class="grid-cols">
+        <div>
+          <!-- Profile Card -->
+          <div class="profile-card">
+            <div class="profile-top">
+              <div class="profile-id">
+                <div class="avatar-photo" id="cAvatarContainer" style="position:relative;cursor:pointer;" title="Click to upload profile photo" onclick="document.getElementById('profilePicInput').click()">
+                  <input type="file" id="profilePicInput" accept="image/*" style="display:none;" onchange="uploadProfilePicture(event)">
+                  <div id="avatarContent" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7"/></svg>
+                  </div>
+                  <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.55);color:#fff;font-size:9.5px;text-align:center;padding:2px 0;font-weight:700;">📷 Photo</div>
+                </div>
+                <div>
+                  <div class="p-name"><span id="cName">Loading profile...</span> <span class="p-code-badge" id="cCode">CAR-000000</span></div>
+                  <div class="p-condition" id="cHours">Available 08:00 AM - 08:00 PM</div>
+                </div>
               </div>
+            </div>
+
+            <div class="p-meta">
+              <div><div class="k">Experience</div><div class="v" id="cExp">0 Years</div></div>
+              <div><div class="k">Daily Fee</div><div class="v" id="cFee">₹0</div></div>
+              <div><div class="k">Email Address</div><div class="v" id="cEmail">Not provided</div></div>
+              <div><div class="k">Phone Number</div><div class="v" id="cPhone">Not provided</div></div>
+              <div><div class="k">Location</div><div class="v" id="cLocation">Not provided</div></div>
+              <div><div class="k">Languages</div><div class="v" id="cLang">Not provided</div></div>
+              <div><div class="k">License / Cert</div><div class="v" id="cLicense">Not provided</div></div>
+              <div><div class="k">Available Hours</div><div class="v" id="cAvailableHours">08:00 AM - 08:00 PM</div></div>
+              <div><div class="k">Gender</div><div class="v" id="cGender">Not provided</div></div>
             </div>
           </div>
 
-          <div class="p-meta">
-            <div><div class="k">Experience</div><div class="v" id="cExp">0 Years</div></div>
-            <div><div class="k">Daily Fee</div><div class="v" id="cFee">₹0</div></div>
-            <div><div class="k">Email Address</div><div class="v" id="cEmail">Not provided</div></div>
-            <div><div class="k">Phone Number</div><div class="v" id="cPhone">Not provided</div></div>
-            <div><div class="k">Location</div><div class="v" id="cLocation">Not provided</div></div>
-            <div><div class="k">Languages</div><div class="v" id="cLang">Not provided</div></div>
-            <div><div class="k">License / Cert</div><div class="v" id="cLicense">Not provided</div></div>
-            <div><div class="k">Available Hours</div><div class="v" id="cAvailableHours">08:00 AM - 08:00 PM</div></div>
-            <div><div class="k">Gender</div><div class="v" id="cGender">Not provided</div></div>
+          <!-- Care Requests Section -->
+          <div class="section-box">
+            <div class="section-head">
+              <h2>Patient Care Requests & Appointments</h2>
+            </div>
+
+            <!-- Category Tabs -->
+            <div style="display:flex;gap:8px;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:12px;flex-wrap:wrap;">
+              <button id="ctTabAppointments" onclick="switchCtCategory('appointments')" style="background:var(--pine);color:#fff;border:none;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Doctor Appointments (0)</button>
+              <button id="ctTabPending" onclick="switchCtCategory('pending')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Pending Requests (0)</button>
+              <button id="ctTabAccepted" onclick="switchCtCategory('accepted')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Accepted Care (0)</button>
+              <button id="ctTabRejected" onclick="switchCtCategory('rejected')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Rejected / Past (0)</button>
+            </div>
+
+            <div id="reqContainer">
+              <div class="empty-box">No requests or appointments found.</div>
+            </div>
           </div>
         </div>
 
-        <!-- Care Requests Section -->
-        <div class="section-box">
-          <div class="section-head">
-            <h2>Patient Care Requests & Appointments</h2>
-          </div>
-
-          <!-- Category Tabs -->
-          <div style="display:flex;gap:8px;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:12px;flex-wrap:wrap;">
-            <button id="ctTabAppointments" onclick="switchCtCategory('appointments')" style="background:var(--pine);color:#fff;border:none;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Doctor Appointments (0)</button>
-            <button id="ctTabPending" onclick="switchCtCategory('pending')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Pending Requests (0)</button>
-            <button id="ctTabAccepted" onclick="switchCtCategory('accepted')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Accepted Care (0)</button>
-            <button id="ctTabRejected" onclick="switchCtCategory('rejected')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Rejected / Past (0)</button>
-          </div>
-
-          <div id="reqContainer">
-            <div class="empty-box">No requests or appointments found.</div>
+        <!-- Right Column: Assigned Patients -->
+        <div>
+          <div class="section-box">
+            <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;">
+              <h2>My Patients</h2>
+              <button id="btnPastPatients" class="btn-action secondary" style="padding:4px 10px;font-size:11.5px;display:none;" onclick="openPastPatientsModal()">📜 Past Connections</button>
+            </div>
+            <div id="patientsContainer">
+              <div class="empty-box">No patients currently under your care.</div>
+            </div>
           </div>
         </div>
       </div>
+    </div>
 
-      <!-- Right Column: Assigned Patients -->
-      <div>
-        <div class="section-box">
-          <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;">
-            <h2>My Patients</h2>
-            <button id="btnPastPatients" class="btn-action secondary" style="padding:4px 10px;font-size:11.5px;display:none;" onclick="openPastPatientsModal()">📜 Past Connections</button>
+    <!-- PATIENTS LIST TAB (BELOW DIRECTORY) -->
+    <div id="sec-patients" style="display:none;">
+      <!-- ACTIVE PATIENT CARD -->
+      <div class="section-box">
+        <div class="section-head">
+          <div>
+            <h2 style="margin:0;">Active Patient Under Care</h2>
+            <span style="font-size:12px;color:var(--muted);font-weight:500;">Maximum 1 active patient allowed under your care at a time</span>
           </div>
-          <div id="patientsContainer">
-            <div class="empty-box">No patients currently under your care.</div>
+        </div>
+        <div id="activePatientCardContent">
+          <div class="empty-box">Loading active patient...</div>
+        </div>
+      </div>
+
+      <!-- PAST PATIENTS FOLDER GRID -->
+      <div class="section-box" style="margin-top:20px;">
+        <div class="section-head">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:22px;height:22px;color:var(--pine-deep);"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <h2 style="margin:0;">Past Patients Folder</h2>
           </div>
+          <div class="table-search" style="margin:0;max-width:240px;background:var(--paper);border-radius:8px;padding:4px 10px;display:flex;align-items:center;border:1px solid var(--line);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;color:var(--muted);margin-right:6px;"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <input type="text" id="searchPastPatientsInput" placeholder="Search past patients..." oninput="renderPastPatientsFolderUI()" style="border:none;background:transparent;font-size:12px;outline:none;width:100%;">
+          </div>
+        </div>
+        <div id="pastPatientsFolderGrid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(320px, 1fr));gap:16px;margin-top:14px;">
+          <div class="empty-box">Loading past patients folder...</div>
         </div>
       </div>
     </div>
@@ -287,6 +329,30 @@ function getAuthHeader(){
 let profileData = {};
 let currentAssignedPatients = [];
 
+async function uploadProfilePicture(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e){
+    const base64Img = e.target.result;
+    try {
+      const res = await fetch('/api/auth/profile/picture', {
+        method: 'POST',
+        headers: getAuthHeader(),
+        body: JSON.stringify({ profile_picture: base64Img })
+      });
+      if(res.ok){
+        document.getElementById('avatarContent').innerHTML = `<img src="${base64Img}" style="width:100%;height:100%;object-fit:cover;" />`;
+        alert('Profile picture updated successfully!');
+      } else {
+        const err = await res.json();
+        alert(err.detail || 'Failed to upload profile picture.');
+      }
+    } catch(err){ alert(err.message); }
+  };
+  reader.readAsDataURL(file);
+}
+
 async function loadCaretakerProfile(){
   try {
     const res = await fetch('/api/auth/caretaker/profile', { headers: getAuthHeader() });
@@ -305,6 +371,10 @@ async function loadCaretakerProfile(){
       document.getElementById('cAvailableHours').textContent = profileData.available_hours || '08:00 AM - 08:00 PM';
       document.getElementById('cHours').textContent = profileData.available_hours || '08:00 AM - 08:00 PM';
       document.getElementById('cGender').textContent = profileData.gender || 'Not provided';
+
+      if(profileData.profile_picture){
+        document.getElementById('avatarContent').innerHTML = `<img src="${profileData.profile_picture}" style="width:100%;height:100%;object-fit:cover;" />`;
+      }
 
       const beaconUserRaw = localStorage.getItem('beacon_user');
       if (beaconUserRaw) {
@@ -583,6 +653,11 @@ function renderCaretakerRequests(){
                     <div style="font-size:11px;color:var(--muted);font-style:italic;">Waiting for doctor to start call...</div>
                   `
                 ) : ''}
+                ${(r.status === 'pending' || r.status === 'accepted') ? `
+                  <button onclick="cancelCaretakerAppointment(${r.id})" class="btn-sm" style="display:inline-flex;align-items:center;gap:4px;background:var(--brick);color:white;border:none;padding:5px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;">
+                    ✕ Cancel Booking
+                  </button>
+                ` : ''}
               </div>
             </div>
             ${getStatusBadgeHtml(r.status)}
@@ -615,6 +690,23 @@ function renderCaretakerRequests(){
   }).join('');
 }
 
+async function cancelCaretakerAppointment(aptId){
+  if(!confirm('Are you sure you want to cancel this patient appointment booking?')) return;
+  try {
+    const res = await fetch(`/api/auth/appointments/${aptId}/cancel`, {
+      method: 'POST',
+      headers: getAuthHeader()
+    });
+    if(res.ok){
+      alert('Appointment cancelled successfully.');
+      loadCaretakerRequests();
+    } else {
+      const err = await res.json();
+      alert(err.detail || 'Failed to cancel appointment.');
+    }
+  } catch(e){ alert(e.message); }
+}
+
 async function updateCaretakerRequest(reqId, st){
   try {
     const res = await fetch('/api/auth/caretaker/requests', {
@@ -634,6 +726,92 @@ async function updateCaretakerRequest(reqId, st){
 
 let pastPatientsList = [];
 
+function switchCaretakerTab(tabName){
+  const secOverview = document.getElementById('sec-overview');
+  const secPatients = document.getElementById('sec-patients');
+  const navOverview = document.getElementById('navOverviewBtn');
+  const navPatients = document.getElementById('navPatientsBtn');
+
+  if(tabName === 'patients'){
+    if(secOverview) secOverview.style.display = 'none';
+    if(secPatients) secPatients.style.display = 'block';
+    if(navOverview) navOverview.classList.remove('active');
+    if(navPatients) navPatients.classList.add('active');
+    renderPastPatientsFolderUI();
+  } else {
+    if(secOverview) secOverview.style.display = 'block';
+    if(secPatients) secPatients.style.display = 'none';
+    if(navOverview) navOverview.classList.add('active');
+    if(navPatients) navPatients.classList.remove('active');
+  }
+}
+
+function renderPastPatientsFolderUI(){
+  const searchQ = (document.getElementById('searchPastPatientsInput')?.value || '').trim().toLowerCase();
+  let filtered = pastPatientsList || [];
+
+  if(searchQ){
+    filtered = filtered.filter(p => 
+      (p.full_name || '').toLowerCase().includes(searchQ) || 
+      (p.patient_code || '').toLowerCase().includes(searchQ) || 
+      (p.email || '').toLowerCase().includes(searchQ) || 
+      (p.medical_history_notes || '').toLowerCase().includes(searchQ)
+    );
+  }
+
+  const container = document.getElementById('pastPatientsFolderGrid');
+  if(!container) return;
+
+  if(!filtered || filtered.length === 0){
+    container.innerHTML = '<div class="empty-box" style="grid-column:1/-1;">No past patients found in folder.</div>';
+    return;
+  }
+
+  container.innerHTML = filtered.map(p => {
+    const docList = p.visited_doctors || [];
+    const docListHtml = docList.length ? docList.map(d => `
+      <div style="font-size:12px;color:var(--ink);padding:4px 0;border-bottom:1px dashed var(--line);display:flex;justify-content:space-between;align-items:center;">
+        <div><b>${d.doctor_name}</b> <span style="font-size:11px;color:var(--muted);">(${d.major_department})</span></div>
+        <span class="p-code-badge" style="background:var(--pine-soft);color:var(--pine-deep);font-weight:700;">${d.total_appointments} ${d.total_appointments === 1 ? 'visit' : 'visits'}</span>
+      </div>
+    `).join('') : '<div style="font-size:12px;color:var(--muted);font-style:italic;">No doctor visits recorded.</div>';
+
+    return `
+      <div class="patient-folder-card" style="background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 4px 12px rgba(0,0,0,0.04);position:relative;">
+        <div style="display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:10px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:38px;height:38px;border-radius:10px;background:var(--amber-soft);color:var(--amber);display:flex;align-items:center;justify-content:center;font-weight:700;">📁</div>
+            <div>
+              <div style="font-family:'Fraunces',serif;font-weight:600;font-size:15px;color:var(--ink);">${p.full_name}</div>
+              <div style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;">${p.patient_code}</div>
+            </div>
+          </div>
+          <span style="font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:6px;background:var(--paper);color:var(--muted);">Past Patient</span>
+        </div>
+
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
+          <b>🗓️ Last Working Date:</b> <span style="color:var(--ink);font-weight:600;">${p.last_working_date || 'Recent'}</span>
+        </div>
+
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">
+          <b>🩺 Visited Doctors & Appointments:</b>
+          <div style="background:var(--paper);border-radius:8px;padding:8px 10px;margin-top:4px;max-height:110px;overflow-y:auto;">
+            ${docListHtml}
+          </div>
+        </div>
+
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
+          <b>📋 Medical Notes:</b> ${p.medical_history_notes}
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:10px;">
+          <button class="btn-action secondary" style="width:100%;font-size:12px;padding:7px 10px;justify-content:center;" onclick="viewPatientMedicalRecords(${p.patient_id}, '${p.full_name.replace(/'/g, "\\'")}')">View Medical Records</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 async function loadCaretakerPatients(){
   try {
     const res = await fetch('/api/auth/caretaker/patients', { headers: getAuthHeader() });
@@ -651,6 +829,39 @@ async function loadCaretakerPatients(){
           pastBtn.style.display = 'none';
         }
       }
+
+      const activeCardBox = document.getElementById('activePatientCardContent');
+      if(activeCardBox){
+        if(!currentAssignedPatients || currentAssignedPatients.length === 0){
+          activeCardBox.innerHTML = '<div class="empty-box">No active patient currently under your care. You can accept a new patient request from the Directory or Care Requests.</div>';
+        } else {
+          const ap = currentAssignedPatients[0];
+          activeCardBox.innerHTML = `
+            <div style="border:1px solid var(--line);border-radius:14px;padding:18px;background:var(--paper);box-shadow:0 2px 8px rgba(0,0,0,0.03);">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line);">
+                <div>
+                  <div style="font-weight:700;font-size:16.5px;color:var(--ink);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    ${ap.full_name}
+                    <span class="mono" style="font-size:11px;color:var(--pine-deep);background:var(--pine-soft);padding:2px 8px;border-radius:12px;font-weight:600;">${ap.patient_code}</span>
+                    <span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;background:#D1FAE5;color:#065F46;border:1px solid #A7F3D0;">✓ ACTIVE PATIENT</span>
+                  </div>
+                  <div style="font-size:12.5px;color:var(--muted);margin-top:4px;">📍 ${ap.location || 'Location Not Provided'} · 📱 ${ap.mobile_number}</div>
+                </div>
+                <button class="btn-action danger" style="padding:7px 14px;font-size:12.5px;" onclick="removeAssignedPatient(${ap.patient_id}, '${ap.full_name.replace(/'/g, "\\'")}')">🗑 Remove Patient</button>
+              </div>
+
+              <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:10px 14px;font-size:12.5px;background:var(--surface);padding:14px;border-radius:10px;border:1px solid var(--line);">
+                <div><span style="color:var(--muted);font-weight:500;">DOB:</span> <b style="color:var(--ink);">${ap.dob}</b></div>
+                <div><span style="color:var(--muted);font-weight:500;">Gender:</span> <b style="color:var(--ink);">${ap.gender}</b></div>
+                <div style="grid-column:span 2;word-break:break-word;"><span style="color:var(--muted);font-weight:500;">Emergency Contact:</span> <b style="color:var(--ink);">${ap.emergency_contact}</b></div>
+                <div style="grid-column:span 2;word-break:break-word;padding-top:8px;border-top:1px dashed var(--line);"><span style="color:var(--muted);font-weight:500;">Medical History / Notes:</span> <div style="color:var(--ink);margin-top:3px;font-weight:500;line-height:1.45;">${ap.medical_history_notes}</div></div>
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      renderPastPatientsFolderUI();
 
       const container = document.getElementById('patientsContainer');
       if(!currentAssignedPatients || currentAssignedPatients.length === 0){

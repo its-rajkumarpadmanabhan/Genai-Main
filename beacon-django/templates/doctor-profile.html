@@ -140,8 +140,10 @@
       <div><div class="brand-name">Carewell</div><div class="brand-sub">DOCTOR PORTAL</div></div>
     </div>
     <nav>
-      <a href="/doctor-profile" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Doctor Profile</span></a>
+      <a href="/doctor-profile" class="active" id="navProfileBtn" onclick="switchDoctorTab('profile'); return false;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Doctor Profile</span></a>
+      <a href="/doctor-patients-list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Patients List</span></a>
       <a href="/doctor-caretaker-list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Directory</span></a>
+      <a href="#sec-reviews" id="navReviewsBtn" onclick="switchDoctorTab('reviews'); return false;"><svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 17.3l-6.2 3.6 1.6-7L2 9.2l7.1-.6L12 2l2.9 6.6 7.1.6-5.4 4.7 1.6 7z"/></svg><span>Reviews & Feedback</span></a>
       <a href="/app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Voice AI Engine</span></a>
       <a href="#" onclick="localStorage.clear(); window.location.href='/login';"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></a>
     </nav>
@@ -165,92 +167,131 @@
       </div>
     </div>
 
-    <div class="grid-cols">
-      <div>
-        <!-- Profile Card -->
-        <div class="profile-card">
-          <div class="profile-top">
-            <div class="profile-id">
-              <div class="avatar-photo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7"/></svg></div>
-              <div>
-                <div class="p-name"><span id="dName">Loading profile...</span> <span class="p-code-badge" id="dCode">DOC-000000</span></div>
-                <div class="p-condition" id="dDept">General Medicine</div>
-                <div style="margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                  <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Today's Availability:</span>
-                  <select id="quickAvailability" onchange="updateQuickAvailability()" style="padding:5px 10px;border-radius:8px;border:1px solid var(--line);font-size:12px;font-weight:600;background:var(--paper);color:var(--ink);cursor:pointer;">
-                    <option value="Active Today">🟢 Active Today</option>
-                    <option value="On Leave Today">🔴 On Leave Today</option>
-                    <option value="On Break">🟡 On Break</option>
-                    <option value="Off Duty">⚪ Off Duty</option>
-                  </select>
+    <div id="sec-overview">
+      <div class="grid-cols">
+        <div>
+          <!-- Profile Card -->
+          <div class="profile-card">
+            <div class="profile-top">
+              <div class="profile-id">
+                <div class="avatar-photo" id="dAvatarContainer" style="position:relative;cursor:pointer;" title="Click to upload profile photo" onclick="document.getElementById('profilePicInput').click()">
+                  <input type="file" id="profilePicInput" accept="image/*" style="display:none;" onchange="uploadProfilePicture(event)">
+                  <div id="avatarContent" style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7"/></svg>
+                  </div>
+                  <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,0.55);color:#fff;font-size:9.5px;text-align:center;padding:2px 0;font-weight:700;">📷 Photo</div>
+                </div>
+                <div>
+                  <div class="p-name"><span id="dName">Loading profile...</span> <span class="p-code-badge" id="dCode">DOC-000000</span></div>
+                  <div class="p-condition" id="dDept">General Medicine</div>
+                  <div style="margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                    <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Today's Availability:</span>
+                    <select id="quickAvailability" onchange="updateQuickAvailability()" style="padding:5px 10px;border-radius:8px;border:1px solid var(--line);font-size:12px;font-weight:600;background:var(--paper);color:var(--ink);cursor:pointer;">
+                      <option value="Active Today">🟢 Active Today</option>
+                      <option value="On Leave Today">🔴 On Leave Today</option>
+                      <option value="On Break">🟡 On Break</option>
+                      <option value="Off Duty">⚪ Off Duty</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div class="p-meta">
-            <div><div class="k">Gender</div><div class="v" id="dGender">Not provided</div></div>
-            <div><div class="k">Email Address</div><div class="v" id="dEmail">Not provided</div></div>
-            <div><div class="k">License No.</div><div class="v mono" id="dLicense">Not provided</div></div>
-            <div><div class="k">Experience</div><div class="v" id="dExp">0 Years</div></div>
-            <div><div class="k">Consultation Fee</div><div class="v" id="dFee">₹0</div></div>
-            <div><div class="k">Available Hours</div><div class="v" id="dHours">09:00 AM - 05:00 PM</div></div>
-            <div><div class="k">Hospital Name</div><div class="v" id="dHospital">Not provided</div></div>
-            <div><div class="k">Location</div><div class="v" id="dLocation">Not provided</div></div>
-            <div><div class="k">State</div><div class="v" id="dState">Not provided</div></div>
-            <div><div class="k">Languages</div><div class="v" id="dLang">Not provided</div></div>
-            <div><div class="k">Phone Number</div><div class="v" id="dPhone">Not provided</div></div>
-            <div><div class="k">Specialization</div><div class="v" id="dSpecialized">Not provided</div></div>
-          </div>
-        </div>
-
-        <!-- Appointments Section -->
-        <div class="section-box">
-          <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-            <h2 style="margin:0;">Patient Appointments</h2>
-            <span style="font-size:11.5px;color:var(--pine-deep);background:var(--pine-soft);padding:3px 10px;border-radius:12px;font-weight:600;">First Come First Served</span>
-          </div>
-
-          <!-- Category Tabs -->
-          <div style="display:flex;gap:8px;margin-top:14px;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:10px;">
-            <button id="tabToday" class="apt-tab active" onclick="switchAptCategory('today')" style="padding:7px 14px;border-radius:20px;border:1px solid var(--line);background:var(--pine);color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;">Today (<span id="cntToday">0</span>)</button>
-            <button id="tabUpcoming" class="apt-tab" onclick="switchAptCategory('upcoming')" style="padding:7px 14px;border-radius:20px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:12.5px;font-weight:600;cursor:pointer;">Upcoming (<span id="cntUpcoming">0</span>)</button>
-            <button id="tabPast" class="apt-tab" onclick="switchAptCategory('past')" style="padding:7px 14px;border-radius:20px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:12.5px;font-weight:600;cursor:pointer;">Past (<span id="cntPast">0</span>)</button>
-          </div>
-
-          <!-- Search & Status Filter -->
-          <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
-            <div style="flex:1;min-width:200px;position:relative;">
-              <input id="aptSearchInput" type="text" placeholder="🔍 Search by patient name or patient ID..." oninput="renderDoctorAppointments()" style="width:100%;padding:9px 14px 9px 14px;border:1px solid var(--line);border-radius:10px;font-size:12.5px;background:var(--paper);color:var(--ink);font-family:inherit;outline:none;" />
+            <div class="p-meta">
+              <div><div class="k">Gender</div><div class="v" id="dGender">Not provided</div></div>
+              <div><div class="k">Email Address</div><div class="v" id="dEmail">Not provided</div></div>
+              <div><div class="k">License No.</div><div class="v mono" id="dLicense">Not provided</div></div>
+              <div><div class="k">Experience</div><div class="v" id="dExp">0 Years</div></div>
+              <div><div class="k">Consultation Fee</div><div class="v" id="dFee">₹0</div></div>
+              <div><div class="k">Available Hours</div><div class="v" id="dHours">09:00 AM - 05:00 PM</div></div>
+              <div><div class="k">Hospital Name</div><div class="v" id="dHospital">Not provided</div></div>
+              <div><div class="k">Location</div><div class="v" id="dLocation">Not provided</div></div>
+              <div><div class="k">State</div><div class="v" id="dState">Not provided</div></div>
+              <div><div class="k">Languages</div><div class="v" id="dLang">Not provided</div></div>
+              <div><div class="k">Phone Number</div><div class="v" id="dPhone">Not provided</div></div>
+              <div><div class="k">Specialization</div><div class="v" id="dSpecialized">Not provided</div></div>
             </div>
-            <select id="aptStatusFilter" onchange="renderDoctorAppointments()" style="padding:9px 14px;border:1px solid var(--line);border-radius:10px;font-size:12.5px;background:var(--paper);color:var(--ink);font-family:inherit;cursor:pointer;min-width:160px;">
-              <option value="all">All Statuses</option>
-              <option value="pending">⏳ Pending / Waiting</option>
-              <option value="accepted">✅ Accepted</option>
-              <option value="completed">✓ Completed</option>
-              <option value="rejected">❌ Rejected</option>
-              <option value="missed">⚠ Missed</option>
-            </select>
           </div>
 
-          <div id="apptContainer">
-            <div class="empty-box">No patient appointment requests received yet.</div>
+          <!-- Appointments Section -->
+          <div class="section-box">
+            <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+              <h2 style="margin:0;">Patient Appointments</h2>
+              <span style="font-size:11.5px;color:var(--pine-deep);background:var(--pine-soft);padding:3px 10px;border-radius:12px;font-weight:600;">First Come First Served</span>
+            </div>
+
+            <!-- Category Tabs -->
+            <div style="display:flex;gap:8px;margin-top:14px;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:10px;">
+              <button id="tabToday" class="apt-tab active" onclick="switchAptCategory('today')" style="padding:7px 14px;border-radius:20px;border:1px solid var(--line);background:var(--pine);color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;">Today (<span id="cntToday">0</span>)</button>
+              <button id="tabUpcoming" class="apt-tab" onclick="switchAptCategory('upcoming')" style="padding:7px 14px;border-radius:20px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:12.5px;font-weight:600;cursor:pointer;">Upcoming (<span id="cntUpcoming">0</span>)</button>
+              <button id="tabPast" class="apt-tab" onclick="switchAptCategory('past')" style="padding:7px 14px;border-radius:20px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font-size:12.5px;font-weight:600;cursor:pointer;">Past (<span id="cntPast">0</span>)</button>
+            </div>
+
+            <!-- Search & Status Filter -->
+            <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
+              <div style="flex:1;min-width:200px;position:relative;">
+                <input id="aptSearchInput" type="text" placeholder="🔍 Search by patient name or patient ID..." oninput="renderDoctorAppointments()" style="width:100%;padding:9px 14px 9px 14px;border:1px solid var(--line);border-radius:10px;font-size:12.5px;background:var(--paper);color:var(--ink);font-family:inherit;outline:none;" />
+              </div>
+              <select id="aptStatusFilter" onchange="renderDoctorAppointments()" style="padding:9px 14px;border:1px solid var(--line);border-radius:10px;font-size:12.5px;background:var(--paper);color:var(--ink);font-family:inherit;cursor:pointer;min-width:160px;">
+                <option value="all">All Statuses</option>
+                <option value="pending">⏳ Pending / Waiting</option>
+                <option value="accepted">✅ Accepted</option>
+                <option value="completed">✓ Completed</option>
+                <option value="rejected">❌ Rejected</option>
+                <option value="missed">⚠ Missed</option>
+              </select>
+            </div>
+
+            <div id="apptContainer">
+              <div class="empty-box">No patient appointment requests received yet.</div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Right Column: Assigned Patients -->
-      <div>
-        <div class="section-box">
-          <div class="section-head">
-            <h2>Assigned Patients</h2>
-          </div>
-          <div id="patientsContainer">
-            <div class="empty-box">No assigned patients currently.</div>
+        <!-- Right Column: Assigned Patients -->
+        <div>
+          <div class="section-box">
+            <div class="section-head">
+              <h2>Assigned Patients</h2>
+            </div>
+            <div id="patientsContainer">
+              <div class="empty-box">No assigned patients currently.</div>
+            </div>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- REVIEWS & FEEDBACK TAB (BELOW DIRECTORY) -->
+    <div id="sec-reviews" style="display:none;">
+      <div class="section-box">
+        <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
+          <div>
+            <h2 style="margin:0;">Patient Reviews & Feedback</h2>
+            <span style="font-size:12.5px;color:var(--muted);font-weight:500;">Real feedback submitted by patients after completed consultations</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:8px 16px;text-align:right;">
+              <span style="font-size:18px;font-weight:800;color:var(--amber);" id="dReviewAvgBadge">⭐ 5.0</span>
+              <span style="font-size:12px;color:var(--muted);font-weight:600;margin-left:4px;" id="dReviewCountBadge">(0 Reviews)</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter Buttons -->
+        <div style="display:flex;gap:8px;margin-top:14px;margin-bottom:16px;border-bottom:1px solid var(--line);padding-bottom:12px;flex-wrap:wrap;">
+          <button id="rfTabAll" onclick="filterDoctorReviews('all')" style="background:var(--pine);color:#fff;border:none;padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">All Reviews</button>
+          <button id="rfTab5" onclick="filterDoctorReviews(5)" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">5 Stars ★★★★★</button>
+          <button id="rfTab4" onclick="filterDoctorReviews(4)" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:6px 16px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">4 Stars ★★★★☆</button>
+        </div>
+
+        <!-- Reviews List Container -->
+        <div id="doctorReviewsListContainer" style="display:flex;flex-direction:column;gap:12px;">
+          <div class="empty-box">Loading patient reviews...</div>
+        </div>
+      </div>
+    </div>
+
   </main>
 </div>
 
@@ -330,6 +371,30 @@ function getAuthHeader(){
 
 let profileData = {};
 
+async function uploadProfilePicture(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = async function(e){
+    const base64Img = e.target.result;
+    try {
+      const res = await fetch('/api/auth/profile/picture', {
+        method: 'POST',
+        headers: getAuthHeader(),
+        body: JSON.stringify({ profile_picture: base64Img })
+      });
+      if(res.ok){
+        document.getElementById('avatarContent').innerHTML = `<img src="${base64Img}" style="width:100%;height:100%;object-fit:cover;" />`;
+        alert('Profile picture updated successfully!');
+      } else {
+        const err = await res.json();
+        alert(err.detail || 'Failed to upload profile picture.');
+      }
+    } catch(err){ alert(err.message); }
+  };
+  reader.readAsDataURL(file);
+}
+
 async function loadDoctorProfile(){
   try {
     const res = await fetch('/api/auth/doctor/profile', { headers: getAuthHeader() });
@@ -337,8 +402,15 @@ async function loadDoctorProfile(){
       const banner = document.getElementById('roleWarningBanner');
       if(banner) banner.style.display = 'none';
       profileData = await res.json();
+      docReviewsData = profileData.reviews || [];
+
+      const avgBadge = document.getElementById('dReviewAvgBadge');
+      const countBadge = document.getElementById('dReviewCountBadge');
+      if(avgBadge) avgBadge.textContent = `⭐ ${profileData.rating_avg || 5.0}`;
+      if(countBadge) countBadge.textContent = `(${profileData.reviews_count || docReviewsData.length} Reviews)`;
+
       const rawName = profileData.full_name || profileData.username || 'Doctor';
-      const docName = rawName.startsWith('Dr.') ? rawName : 'Dr. ' + rawName;
+      const docName = rawName;
       document.getElementById('dName').textContent = docName;
       document.getElementById('bcDocName').textContent = docName;
       document.getElementById('dCode').textContent = profileData.doctor_code || 'DOC-NEW';
@@ -357,6 +429,9 @@ async function loadDoctorProfile(){
       document.getElementById('dSpecialized').textContent = profileData.specialized_details || 'Not provided';
       if(profileData.availability_status){
         document.getElementById('quickAvailability').value = profileData.availability_status;
+      }
+      if(profileData.profile_picture){
+        document.getElementById('avatarContent').innerHTML = `<img src="${profileData.profile_picture}" style="width:100%;height:100%;object-fit:cover;" />`;
       }
 
       const beaconUserRaw = localStorage.getItem('beacon_user');

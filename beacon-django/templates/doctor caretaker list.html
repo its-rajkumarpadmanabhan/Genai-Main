@@ -331,7 +331,7 @@ function renderList(){
         <div class="c-actions">
           ${currentTab==='doctors' ? 
             (availStatus === 'On Leave Today' ?
-              `<button class="btn-sm secondary" style="opacity:0.65;cursor:not-allowed;" onclick="alert('Dr. ${name.replace(/'/g, "\\'")} is currently on leave today.')">On Leave</button>` :
+              `<button class="btn-sm secondary" style="opacity:0.65;cursor:not-allowed;" onclick="alert('${name.replace(/'/g, "\\'")} is currently on leave today.')">On Leave</button>` :
               `<button class="btn-sm primary" onclick="bookDoctor(${item.user_id || item.id})">Book</button>`
             ) :
             `<button class="btn-sm primary" onclick="requestCaretaker(${item.user_id || item.id})">Request</button>`
@@ -417,7 +417,18 @@ async function bookDoctor(docUserId){
     } catch(err){ alert(err.message); return; }
   }
 
-  const appDate = prompt('Enter appointment date (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+  const today = new Date();
+  const dayOfWeek = today.getDay();
+  const distanceToMon = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
+  const monDate = new Date(today);
+  monDate.setDate(today.getDate() + distanceToMon);
+  const sunDate = new Date(monDate);
+  sunDate.setDate(monDate.getDate() + 6);
+
+  const monStr = monDate.toISOString().split('T')[0];
+  const sunStr = sunDate.toISOString().split('T')[0];
+
+  const appDate = prompt(`Enter appointment date (YYYY-MM-DD).\nNote: Appointments can only be booked for the current week (${monStr} to ${sunStr}):`, monStr);
   if(!appDate) return;
 
   const appTime = prompt('Enter appointment time slot (e.g. 10:00 AM, 02:30 PM):', '10:00 AM');

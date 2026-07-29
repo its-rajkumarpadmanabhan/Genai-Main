@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carewell — Doctor's Patients List</title>
+<script>
+  (function(){
+    const token = localStorage.getItem('beacon_token') || localStorage.getItem('access_token');
+    const userRaw = localStorage.getItem('beacon_user');
+    if(!token || !userRaw){ window.location.href = '/login'; return; }
+    try {
+      const user = JSON.parse(userRaw);
+      if(user.role !== 'doctor' && user.role !== 'admin'){
+        const target = user.role === 'caretaker' ? '/caretaker-dashboard' : '/patient-profile';
+        window.location.href = target;
+      }
+    } catch(e){ window.location.href = '/login'; }
+  })();
+  document.addEventListener('contextmenu', event => {
+    event.preventDefault();
+  });
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1E2A22; --paper:#EAF0EC; --surface:#FFFFFF; --line:#D7DFD9;
+    --pine:#33604F; --pine-deep:#25473A; --pine-soft:#E2ECE7; --brick:#AE4436; --brick-soft:#F3DFDA;
+    --slate:#4A6E8C; --slate-soft:#DCE7EF; --muted:#6E7D75; --amber:#B9873A; --amber-soft:#F1E3CB;
+    --radius:16px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+
+  .app{display:grid;grid-template-columns:220px 1fr;max-width:1440px;margin:0 auto;min-height:100vh;}
+  .sidebar{background:var(--pine-deep);color:#EFF3F0;padding:28px 20px;display:flex;flex-direction:column;gap:26px;}
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand-mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(160deg,#4C8A72,#2C5344);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:600;font-size:17px;flex-shrink:0;}
+  .brand-name{font-family:'Fraunces',serif;font-size:17px;font-weight:600;}
+  .brand-sub{font-size:11px;color:#9FB6AB;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;}
+  nav{display:flex;flex-direction:column;gap:3px;}
+  nav a{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:9px;color:#D7E4DE;text-decoration:none;font-size:13.5px;font-weight:500;position:relative;}
+  nav a svg{width:16px;height:16px;flex-shrink:0;}
+  nav a.active{background:#EFF3F0;color:var(--pine-deep);}
+  nav a:not(.active):hover{background:rgba(255,255,255,.08);}
+  .sidebar-foot{margin-top:auto;}
+  
+  .help-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:var(--radius);padding:14px;font-size:12.5px;color:#C7DACF;}
+  .help-card b{display:block;font-family:'Fraunces',serif;font-size:14px;color:#EFF3F0;margin-bottom:4px;}
+
+  main{padding:24px 26px;}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:14px;}
+  .breadcrumb{font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:var(--muted);}
+  .breadcrumb span{color:var(--ink);}
+  
+  /* Filter & Controls Bar */
+  .control-bar{display:flex;gap:14px;margin-bottom:24px;flex-wrap:wrap;align-items:center;background:var(--surface);padding:16px;border-radius:var(--radius);border:1px solid var(--line);box-shadow:0 2px 8px rgba(0,0,0,0.02);}
+  .search-wrapper{flex:1;min-width:240px;position:relative;}
+  .search-wrapper input{width:100%;padding:11px 16px 11px 40px;border:1px solid var(--line);border-radius:12px;font-size:13px;background:var(--paper);color:var(--ink);font-family:inherit;outline:none;transition:border-color 0.2s ease;}
+  .search-wrapper input:focus{border-color:var(--pine);background:#fff;}
+  .search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);width:17px;height:17px;pointer-events:none;}
+
+  .select-wrapper select{padding:10px 14px;border:1px solid var(--line);border-radius:12px;font-size:13px;background:var(--paper);color:var(--ink);font-family:inherit;cursor:pointer;outline:none;}
+  
+  .badge-count{background:var(--pine-soft);color:var(--pine-deep);font-weight:700;font-size:12px;padding:6px 14px;border-radius:20px;border:1px solid rgba(51,96,79,0.2);}
+
+  /* Folder Grid Layout */
+  .folder-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(310px, 1fr));gap:22px;}
+
+  /* Folder Card Styling (Matching Reference Image Aesthetics) */
+  .folder-card {
+    position: relative;
+    border-radius: 20px;
+    padding: 22px;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    border: 1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    min-height: 310px;
+  }
+  .folder-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+  }
+
+  /* Distinct Folder Tab Top Header */
+  .folder-tab-accent {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 110px;
+    height: 12px;
+    border-bottom-left-radius: 12px;
+    background: rgba(0, 0, 0, 0.06);
+  }
+
+  /* Dynamic Pastel Color Schemes for Folders */
+  .folder-card.pastel-pink { background: #FDE8E8; color: #4A1D1D; }
+  .folder-card.pastel-purple { background: #ECE6F8; color: #2A1D4A; }
+  .folder-card.pastel-yellow { background: #FEF08A; color: #4A3E00; }
+  .folder-card.pastel-mint { background: #D1FAE5; color: #064E3B; }
+  .folder-card.pastel-cyan { background: #CFFAFE; color: #164E63; }
+  .folder-card.pastel-orange { background: #FFEDD5; color: #431407; }
+  .folder-card.pastel-white { background: #FFFFFF; color: var(--ink); border: 1px solid var(--line); }
+
+  .folder-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  
+  .folder-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.65);
+    backdrop-filter: blur(4px);
+    letter-spacing: 0.5px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+
+  .folder-menu-btn {
+    background: rgba(255,255,255,0.7);
+    border: none;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: currentColor;
+    transition: background 0.2s ease;
+  }
+  .folder-menu-btn:hover { background: #ffffff; }
+
+  /* Patient Identity Section */
+  .patient-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .patient-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: 19px;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .patient-details h3 {
+    margin: 0;
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+  .patient-details p {
+    margin: 2px 0 0 0;
+    font-size: 12px;
+    opacity: 0.8;
+  }
+
+  /* Segmented Visual Progress Line (from reference image) */
+  .folder-progress-bar {
+    display: flex;
+    gap: 4px;
+    margin: 12px 0 16px 0;
+    height: 5px;
+  }
+  .progress-segment {
+    height: 100%;
+    border-radius: 3px;
+    background: currentColor;
+    opacity: 0.2;
+    flex: 1;
+  }
+  .progress-segment.active { opacity: 0.85; }
+
+  /* Stats List */
+  .folder-stats {
+    background: rgba(255,255,255,0.55);
+    backdrop-filter: blur(6px);
+    border-radius: 12px;
+    padding: 12px;
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12px;
+    border: 1px solid rgba(255,255,255,0.4);
+  }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .stat-label {
+    opacity: 0.85;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .stat-val {
+    font-weight: 700;
+  }
+  .stat-pill {
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 10px;
+    background: rgba(0,0,0,0.06);
+  }
+
+  /* Bottom Actions */
+  .folder-actions {
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px dashed rgba(0,0,0,0.12);
+  }
+  .btn-view-profile {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 16px;
+    border-radius: 12px;
+    border: none;
+    background: var(--pine-deep);
+    color: #ffffff;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 3px 8px rgba(37,71,58,0.2);
+    width: 100%;
+    justify-content: center;
+  }
+  .btn-view-profile:hover {
+    background: var(--pine);
+    transform: translateY(-1px);
+    box-shadow: 0 5px 12px rgba(37,71,58,0.3);
+  }
+  .btn-view-profile svg { width: 16px; height: 16px; }
+
+  .empty-box{padding:40px 20px;text-align:center;color:var(--muted);font-size:14px;background:var(--surface);border-radius:var(--radius);border:1px dashed var(--line);grid-column:1 / -1;}
+
+  /* Modal Backdrop */
+  .modal-backdrop{display:none;position:fixed;inset:0;background:rgba(30,42,34,.55);align-items:center;justify-content:center;z-index:90;padding:20px;backdrop-filter:blur(3px);}
+  .modal-backdrop.open{display:flex;}
+  .modal{background:var(--surface);border-radius:20px;max-width:620px;width:100%;padding:24px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+  .modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;}
+  .modal-head h3{font-family:'Fraunces',serif;font-size:19px;margin:0;color:var(--ink);}
+  .modal-close{border:none;background:var(--paper);width:32px;height:32px;border-radius:9px;cursor:pointer;color:var(--muted);font-size:16px;font-weight:700;}
+
+  @media (max-width:980px){ .app{grid-template-columns:1fr;} .sidebar{flex-direction:row;overflow-x:auto;align-items:center;gap:16px;} .sidebar nav{flex-direction:row;} .sidebar-foot,.brand-sub{display:none;} }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">C</div>
+      <div><div class="brand-name">Carewell</div><div class="brand-sub">DOCTOR PORTAL</div></div>
+    </div>
+    <nav>
+      <a href="/doctor-profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Doctor Profile</span></a>
+      <a href="/doctor-patients-list" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>Patients List</span></a>
+      <a href="/doctor-caretaker-list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Directory</span></a>
+      <a href="/app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Voice AI Engine</span></a>
+      <a href="#" onclick="localStorage.clear(); window.location.href='/login';"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="help-card"><b>Need help?</b>Reach clinician support any time.</div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <main>
+    <div class="topbar">
+      <div class="breadcrumb">Doctor Portal › <span>Patients Directory & Folders</span></div>
+      <div class="badge-count" id="patientTotalBadge">0 Patients Assigned</div>
+    </div>
+
+    <!-- FILTER & SEARCH BAR -->
+    <div class="control-bar">
+      <div class="search-wrapper">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="patientSearchInput" placeholder="Search patients by name, code, condition, phone or location..." oninput="filterPatients()">
+      </div>
+      <div class="select-wrapper">
+        <select id="typeFilter" onchange="filterPatients()">
+          <option value="all">All Appointment Types</option>
+          <option value="online">🟢 Online (Video) Patients</option>
+          <option value="offline">📍 Offline (In-Person) Patients</option>
+        </select>
+      </div>
+      <div class="select-wrapper">
+        <select id="sortFilter" onchange="filterPatients()">
+          <option value="name">Sort: Name (A-Z)</option>
+          <option value="appointments">Sort: Most Appointments</option>
+          <option value="upcoming">Sort: Upcoming Appointments</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- FOLDER CARDS GRID -->
+    <div class="folder-grid" id="patientsFolderContainer">
+      <div class="empty-box">Loading patient folders...</div>
+    </div>
+  </main>
+</div>
+
+<!-- PATIENT FULL PROFILE MODAL (FOR DOCTOR) -->
+<div class="modal-backdrop" id="patientFullProfileModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="modalPatientTitle">Patient Profile Details</h3>
+      <button class="modal-close" onclick="closePatientProfileModal()">✕</button>
+    </div>
+    <div id="patientFullModalBody" style="margin-top:14px;max-height:75vh;overflow-y:auto;">
+      <div class="empty-box">Loading patient profile details...</div>
+    </div>
+  </div>
+</div>
+
+<!-- DOCUMENT PREVIEW MODAL (FOR DOCTOR) -->
+<div class="modal-backdrop" id="documentViewerModal">
+  <div class="modal" style="max-width:92vw;width:960px;">
+    <div class="modal-head">
+      <h3 id="docPreviewTitle">Medical Document Preview</h3>
+      <button class="modal-close" onclick="closeDocumentPreviewModal()">✕</button>
+    </div>
+    <div id="docPreviewBody" style="margin-top:14px;max-height:80vh;overflow-y:auto;">
+      <div class="empty-box">Select a document to preview...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function getAuthHeader(){
+  const token = localStorage.getItem('access_token') || localStorage.getItem('beacon_token');
+  return token ? { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+}
+
+let allPatients = [];
+
+// Palette themes for physical folder cards (matching the user's reference image aesthetic)
+const pastelThemes = [
+  'pastel-pink',
+  'pastel-purple',
+  'pastel-yellow',
+  'pastel-mint',
+  'pastel-cyan',
+  'pastel-orange',
+  'pastel-white'
+];
+
+async function loadPatientsList(){
+  try {
+    const res = await fetch('/api/auth/doctor/patients', { headers: getAuthHeader() });
+    if(res.ok){
+      allPatients = await res.json();
+      filterPatients();
+    } else if(res.status === 401){
+      localStorage.clear();
+      window.location.href = '/login';
+    } else {
+      document.getElementById('patientsFolderContainer').innerHTML = '<div class="empty-box">Failed to load patient records. Please log in with a doctor account.</div>';
+    }
+  } catch(e){
+    console.error(e);
+    document.getElementById('patientsFolderContainer').innerHTML = `<div class="empty-box">Error loading patients: ${e.message}</div>`;
+  }
+}
+
+function filterPatients(){
+  const searchQ = (document.getElementById('patientSearchInput')?.value || '').trim().toLowerCase();
+  const typeVal = document.getElementById('typeFilter')?.value || 'all';
+  const sortVal = document.getElementById('sortFilter')?.value || 'name';
+
+  let list = [...allPatients];
+
+  // Apply search query
+  if(searchQ){
+    list = list.filter(p => {
+      const name = (p.full_name || p.username || '').toLowerCase();
+      const code = (p.patient_code || '').toLowerCase();
+      const notes = (p.medical_history_notes || '').toLowerCase();
+      const phone = (p.mobile_number || '').toLowerCase();
+      const email = (p.email || '').toLowerCase();
+      const loc = (p.location || '').toLowerCase();
+      return name.includes(searchQ) || code.includes(searchQ) || notes.includes(searchQ) || phone.includes(searchQ) || email.includes(searchQ) || loc.includes(searchQ);
+    });
+  }
+
+  // Apply appointment type filter
+  if(typeVal === 'online'){
+    list = list.filter(p => (p.online_appointments_count || 0) > 0);
+  } else if(typeVal === 'offline'){
+    list = list.filter(p => (p.offline_appointments_count || 0) > 0);
+  }
+
+  // Sorting
+  if(sortVal === 'name'){
+    list.sort((a,b) => (a.full_name || a.username || '').localeCompare(b.full_name || b.username || ''));
+  } else if(sortVal === 'appointments'){
+    list.sort((a,b) => (b.total_appointments || 0) - (a.total_appointments || 0));
+  } else if(sortVal === 'upcoming'){
+    list.sort((a,b) => (b.upcoming_appointments_count || 0) - (a.upcoming_appointments_count || 0));
+  }
+
+  document.getElementById('patientTotalBadge').textContent = `${list.length} Patients`;
+
+  renderPatientsFolders(list);
+}
+
+function renderPatientsFolders(patients){
+  const container = document.getElementById('patientsFolderContainer');
+  if(!patients || patients.length === 0){
+    container.innerHTML = '<div class="empty-box">No matching patient folders found.</div>';
+    return;
+  }
+
+  container.innerHTML = patients.map((p, idx) => {
+    // Pick theme deterministically based on index
+    const themeClass = pastelThemes[idx % pastelThemes.length];
+    const initial = (p.full_name || p.username || 'P').charAt(0).toUpperCase();
+
+    // Stats
+    const totalApts = p.total_appointments || 0;
+    const onlineApts = p.online_appointments_count || 0;
+    const offlineApts = p.offline_appointments_count || 0;
+    const upcomingApts = p.upcoming_appointments_count || 0;
+    const lastAptStr = p.last_appointment_date_time || 'No prior visits';
+
+    // Segment progress lines (active based on appointment count)
+    const activeSegs = Math.min(totalApts, 4);
+
+    return `
+      <div class="folder-card ${themeClass}">
+        <div class="folder-tab-accent"></div>
+        <div>
+          <!-- Folder Header -->
+          <div class="folder-top">
+            <span class="folder-tag">${p.patient_code || 'PAT-000'}</span>
+            <button class="folder-menu-btn" title="View Patient Details" onclick="openFullPatientModal(${p.patient_id}, '${(p.full_name||'Patient').replace(/'/g, "\\'")}')">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+            </button>
+          </div>
+
+          <!-- Patient Identity -->
+          <div class="patient-info">
+            <div class="patient-avatar">${initial}</div>
+            <div class="patient-details">
+              <h3>${p.full_name || p.username || 'Patient Profile'}</h3>
+              <p>📍 ${p.location || 'Location Not Specified'}</p>
+            </div>
+          </div>
+
+          <!-- Progress Bar Lines (from reference image) -->
+          <div class="folder-progress-bar">
+            <div class="progress-segment ${activeSegs >= 1 ? 'active' : ''}"></div>
+            <div class="progress-segment ${activeSegs >= 2 ? 'active' : ''}"></div>
+            <div class="progress-segment ${activeSegs >= 3 ? 'active' : ''}"></div>
+            <div class="progress-segment ${activeSegs >= 4 ? 'active' : ''}"></div>
+          </div>
+
+          <!-- Details & Appointment Statistics -->
+          <div class="folder-stats">
+            <div class="stat-row">
+              <span class="stat-label">📊 Total Appointments:</span>
+              <span class="stat-val">${totalApts} <span class="stat-pill">🟢 ${onlineApts} | 📍 ${offlineApts}</span></span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">🕒 Last Visit:</span>
+              <span class="stat-val">${lastAptStr}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">📅 Upcoming Bookings:</span>
+              <span class="stat-val" style="color:var(--pine-deep);">${upcomingApts} upcoming</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Folder Actions Footer -->
+        <div class="folder-actions">
+          <button class="btn-view-profile" onclick="openFullPatientModal(${p.patient_id}, '${(p.full_name||'Patient').replace(/'/g, "\\'")}')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>View Full Profile</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function openFullPatientModal(patientId, patientName){
+  let modal = document.getElementById('patientFullProfileModal');
+  const body = document.getElementById('patientFullModalBody');
+  document.getElementById('modalPatientTitle').textContent = `Patient Profile: ${patientName}`;
+  body.innerHTML = '<div class="empty-box">Loading patient profile details...</div>';
+  modal.classList.add('open');
+
+  try {
+    const res = await fetch(`/api/auth/doctor/patients/${patientId}`, { headers: getAuthHeader() });
+    if(res.ok){
+      const p = await res.json();
+      body.innerHTML = `
+        <div style="background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;">
+          <!-- Basic Info -->
+          <div style="display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:12px;border-bottom:1px solid var(--line);margin-bottom:14px;">
+            <div>
+              <div style="font-weight:700;font-size:18px;color:var(--ink);">${p.full_name} <span class="mono" style="font-size:12px;color:var(--muted);font-weight:normal;">(${p.patient_code})</span></div>
+              <div style="font-size:12.5px;color:var(--muted);margin-top:4px;">Mobile: <b>${p.mobile_number}</b> · Email: <b>${p.email}</b></div>
+            </div>
+            <span style="font-size:11px;padding:4px 10px;border-radius:12px;background:var(--pine-soft);color:var(--pine-deep);font-weight:700;text-transform:uppercase;">${p.appointment_status || 'Active'}</span>
+          </div>
+
+          <!-- Key Details Grid -->
+          <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:12px;font-size:13px;background:var(--paper);padding:14px;border-radius:10px;border:1px solid var(--line);">
+            <div><span style="color:var(--muted);">Date of Birth:</span> <b style="color:var(--ink);">${p.dob}</b></div>
+            <div><span style="color:var(--muted);">Gender:</span> <b style="color:var(--ink);">${p.gender}</b></div>
+            <div><span style="color:var(--muted);">Marital Status:</span> <b style="color:var(--ink);">${p.marital_status || 'Not provided'}</b></div>
+            <div><span style="color:var(--muted);">Location:</span> <b style="color:var(--ink);">${p.location}</b></div>
+            <div style="grid-column:span 2;"><span style="color:var(--muted);">Languages:</span> <b style="color:var(--ink);">${p.languages}</b></div>
+            <div style="grid-column:span 2;word-break:break-all;"><span style="color:var(--muted);">Insurance Details:</span> <b style="color:var(--ink);">${p.insurance_details}</b></div>
+            <div style="grid-column:span 2;"><span style="color:var(--muted);">Nearest Emergency Contact:</span> <b style="color:var(--ink);">${p.emergency_contact}</b></div>
+          </div>
+
+          <!-- Medical History -->
+          <div style="margin-top:14px;padding:12px;background:var(--paper);border-radius:10px;border:1px solid var(--line);font-size:13px;">
+            <b style="color:var(--pine-deep);display:block;margin-bottom:4px;">📋 Medical History & Doctor Notes:</b>
+            <div style="color:var(--ink);line-height:1.5;">${p.medical_history_notes}</div>
+          </div>
+
+          <!-- Patient Medical Documents -->
+          <div style="margin-top:14px;padding:12px;background:var(--paper);border-radius:10px;border:1px solid var(--line);font-size:13px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+              <b style="color:var(--pine-deep);">📁 Uploaded Medical Documents:</b>
+            </div>
+            <div id="modalDocContainer_${p.patient_id}">
+              <div class="empty-box" style="font-size:12px;">Loading medical documents...</div>
+            </div>
+          </div>
+
+          <!-- Caretaker Details -->
+          ${p.assigned_caretaker ? `
+            <div style="margin-top:14px;padding:14px;background:#EBF3EF;border:1px solid #D1E4DA;border-radius:10px;font-size:12.5px;">
+              <div style="font-weight:700;color:var(--pine-deep);margin-bottom:8px;font-size:13.5px;">🩺 Assigned Caretaker Details:</div>
+              <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:8px 14px;">
+                <div><b>Full Name:</b> ${p.assigned_caretaker.full_name}</div>
+                <div><b>Mobile Phone:</b> ${p.assigned_caretaker.phone_number}</div>
+                <div><b>Experience:</b> ${p.assigned_caretaker.experience_years} Years</div>
+                <div style="grid-column:span 2;"><b>Location:</b> ${p.assigned_caretaker.location}</div>
+                <div style="grid-column:span 2;"><b>Languages Spoken:</b> ${p.assigned_caretaker.languages}</div>
+              </div>
+            </div>
+          ` : `
+            <div style="margin-top:14px;font-size:12px;color:var(--muted);font-style:italic;">No caretaker currently assigned to this patient.</div>
+          `}
+        </div>
+      `;
+
+      loadModalPatientDocs(p.patient_id);
+    } else {
+      body.innerHTML = '<div class="empty-box">Could not load patient profile details.</div>';
+    }
+  } catch(e){
+    body.innerHTML = `<div class="empty-box">${e.message}</div>`;
+  }
+}
+
+async function loadModalPatientDocs(patientId){
+  const container = document.getElementById(`modalDocContainer_${patientId}`);
+  if(!container) return;
+  try {
+    const res = await fetch(`/api/auth/doctor/patients/${patientId}/records`, { headers: getAuthHeader() });
+    if(res.ok){
+      const docs = await res.json();
+      if(!docs || docs.length === 0){
+        container.innerHTML = '<div class="empty-box" style="font-size:12px;">No medical documents uploaded by this patient yet.</div>';
+      } else {
+        container.innerHTML = docs.map(d => {
+          const fileSource = d.file_data || d.file_url || d.file_path || '#';
+          const fName = d.file_name || d.title || 'Document';
+          const isImg = (fileSource && fileSource.startsWith('data:image')) || /\.(jpg|jpeg|png|webp|gif)$/i.test(fName) || /\.(jpg|jpeg|png|webp|gif)$/i.test(fileSource);
+          const isPdf = (fileSource && fileSource.startsWith('data:application/pdf')) || /\.pdf$/i.test(fName) || /\.pdf$/i.test(fileSource);
+
+          return `
+            <div style="padding:8px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;background:var(--surface);display:flex;justify-content:space-between;align-items:center;font-size:12px;">
+              <div>
+                <b>${d.title}</b>
+                <div style="color:var(--muted);font-size:11px;">${d.notes || d.file_name} · ${new Date(d.uploaded_at).toLocaleDateString()}</div>
+              </div>
+              <button style="background:#0D9488;color:#fff;border:none;padding:4px 10px;border-radius:6px;font-size:11.5px;font-weight:600;cursor:pointer;" onclick="previewMedicalDocument('${d.title.replace(/'/g, "\\'")}', '${fileSource.replace(/'/g, "\\'")}', ${isImg}, ${isPdf}, '${(d.notes||'').replace(/'/g, "\\'")}')">👁 Preview File</button>
+            </div>
+          `;
+        }).join('');
+      }
+    } else {
+      container.innerHTML = '<div class="empty-box" style="font-size:12px;">Could not load medical documents.</div>';
+    }
+  } catch(e){
+    container.innerHTML = `<div class="empty-box" style="font-size:12px;">${e.message}</div>`;
+  }
+}
+
+function closePatientProfileModal(){
+  document.getElementById('patientFullProfileModal').classList.remove('open');
+}
+
+function previewMedicalDocument(title, fileSource, isImg, isPdf, notes){
+  const modal = document.getElementById('documentViewerModal');
+  const titleEl = document.getElementById('docPreviewTitle');
+  const bodyEl = document.getElementById('docPreviewBody');
+  titleEl.textContent = title || 'Medical Record Document';
+
+  if (isImg) {
+    bodyEl.innerHTML = `<div style="text-align:center;"><img src="${fileSource}" style="max-width:100%;max-height:70vh;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.1);"/><p style="margin-top:10px;color:var(--muted);">${notes || ''}</p></div>`;
+  } else if (isPdf) {
+    bodyEl.innerHTML = `<iframe src="${fileSource}" style="width:100%;height:70vh;border:none;border-radius:8px;"></iframe><p style="margin-top:10px;color:var(--muted);">${notes || ''}</p>`;
+  } else {
+    bodyEl.innerHTML = `<div class="empty-box">Cannot preview file directly. <a href="${fileSource}" download target="_blank">Click here to download</a>.</div>`;
+  }
+  modal.classList.add('open');
+}
+
+function closeDocumentPreviewModal(){
+  document.getElementById('documentViewerModal').classList.remove('open');
+}
+
+document.addEventListener('DOMContentLoaded', loadPatientsList);
+</script>
+</body>
+</html>

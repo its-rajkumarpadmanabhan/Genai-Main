@@ -199,22 +199,304 @@ class DeleteSelfProfileView(APIView):
         return Response({'status': 'success', 'message': 'Profile deleted successfully.'})
 
 
+class UserProfilePictureUploadView(APIView):
+    """POST /api/auth/profile/picture — Upload/update profile picture for any authenticated user"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        profile_picture = request.data.get('profile_picture')
+        if not profile_picture:
+            return Response({'detail': 'No profile picture provided.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        request.user.profile_picture = profile_picture
+        request.user.save()
+        return Response({
+            'status': 'success',
+            'message': 'Profile picture updated successfully.',
+            'profile_picture': request.user.profile_picture
+        })
+
+
+class PatientVisitedDoctorsView(APIView):
+    """GET /api/auth/patient/visited-doctors — Returns all doctors visited/booked by patient with stats"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role not in ['patient', 'admin'] and not request.user.is_staff:
+            return Response({'detail': 'Patient access required.'}, status=status.HTTP_403_FORBIDDEN)
+
+        import datetime
+        from .models import Appointment, DoctorProfile
+
+        patient_apts = Appointment.objects.filter(patient=request.user).order_by('-appointment_date', '-created_at')
+
+        results = []
+        seen_doctor_ids = set()
+        today = datetime.date.today()
+
+        for apt in patient_apts:
+            doc_user = apt.doctor
+            if doc_user.id in seen_doctor_ids:
+                continue
+            seen_doctor_ids.add(doc_user.id)
+
+            d_profile = DoctorProfile.objects.filter(user=doc_user).first()
+            
+            # Fetch all appointments for this patient & doctor pair
+            pair_apts = Appointment.objects.filter(patient=request.user, doctor=doc_user)
+            total_visits = pair_apts.filter(status__in=['completed', 'accepted']).count()
+            if total_visits == 0:
+                total_visits = pair_apts.count()
+
+            upcoming_cnt = pair_apts.filter(appointment_date__gte=today, status__in=['pending', 'accepted']).count()
+
+            # Find last visited appointment
+            last_apt = pair_apts.filter(status='completed').order_by('-appointment_date', '-created_at').first()
+            if not last_apt:
+                last_apt = pair_apts.order_by('-appointment_date', '-created_at').first()
+
+            last_visited_str = "No prior visits"
+            if last_apt and last_apt.appointment_date:
+                last_visited_str = f"{last_apt.appointment_date}"
+                if last_apt.time_slot:
+                    last_visited_str += f" at {last_apt.time_slot}"
+
+            raw_name = d_profile.full_name if (d_profile and d_profile.full_name) else doc_user.username
+            doc_name = raw_name
+
+            doc_item = {
+                'doctor_id': doc_user.id,
+                'doctor_profile_id': d_profile.id if d_profile else doc_user.id,
+                'full_name': doc_name,
+                'doctor_code': d_profile.doctor_code if d_profile else 'DOC-000',
+                'major_department': d_profile.major_department if d_profile else 'General Medicine',
+                'hospital_name': d_profile.hospital_name if d_profile else 'Not specified',
+                'location': d_profile.location if d_profile else 'Not specified',
+                'profile_picture': doc_user.profile_picture,
+                'rating_avg': d_profile.rating_avg if d_profile else 5.0,
+                'reviews_count': d_profile.reviews_count if d_profile else 0,
+                'total_visits_count': total_visits,
+                'upcoming_appointments_count': upcoming_cnt,
+                'last_visited_date_time': last_visited_str
+            }
+            results.append(doc_item)
+
+        return Response(results)
+
+
 # ── Admin User Management ────────────────────────────────────────────────────
 class AdminStatsView(APIView):
-    """GET /api/admin/stats"""
+    """GET /api/admin/stats — returns genuine live database metrics & analytics"""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         if request.user.role != 'admin' and not request.user.is_staff:
             return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
         
-        from .models import DoctorProfile, PatientProfile, CaretakerProfile, Appointment
+        import datetime
+        from django.db.models import Avg, Count
+        from .models import CustomUser, DoctorProfile, PatientProfile, CaretakerProfile, Appointment, Review
+
+        patients_count = CustomUser.objects.filter(role='patient').count()
+        doctors_count = CustomUser.objects.filter(role='doctor').count()
+        caretakers_count = CustomUser.objects.filter(role='caretaker').count()
+        inactive_count = CustomUser.objects.filter(is_active=False).count()
+
+        # Signups by month (last 6 months)
+        months = []
+        patient_signups = []
+        doctor_signups = []
+        caretaker_signups = []
+        today = datetime.date.today()
+
+        for i in range(5, -1, -1):
+            m_year = today.year
+            m_month = today.month - i
+            while m_month <= 0:
+                m_month += 12
+                m_year -= 1
+            m_date = datetime.date(m_year, m_month, 1)
+            m_str = m_date.strftime('%b')
+            months.append(m_str)
+
+            p_cnt = CustomUser.objects.filter(role='patient', created_at__year=m_year, created_at__month=m_month).count()
+            d_cnt = CustomUser.objects.filter(role='doctor', created_at__year=m_year, created_at__month=m_month).count()
+            c_cnt = CustomUser.objects.filter(role='caretaker', created_at__year=m_year, created_at__month=m_month).count()
+
+            patient_signups.append(p_cnt)
+            doctor_signups.append(d_cnt)
+            caretaker_signups.append(c_cnt)
+
+        # Appointments per week (last 5 weeks)
+        week_labels = []
+        week_values = []
+        for i in range(4, -1, -1):
+            start_w = today - datetime.timedelta(days=(i+1)*7)
+            end_w = today - datetime.timedelta(days=i*7)
+            w_label = f"Wk {5-i}"
+            w_cnt = Appointment.objects.filter(appointment_date__gte=start_w, appointment_date__lt=end_w).count()
+            week_labels.append(w_label)
+            week_values.append(w_cnt)
+
+        # Doctors by specialty (major_department)
+        dept_qs = DoctorProfile.objects.values('major_department').annotate(cnt=Count('id')).order_by('-cnt')
+        by_dept = {}
+        for item in dept_qs:
+            dept_name = item['major_department'] or 'General Medicine'
+            by_dept[dept_name] = item['cnt']
+        if not by_dept:
+            by_dept = {'General Medicine': doctors_count}
+
+        # Patients by location
+        loc_qs = PatientProfile.objects.values('location').annotate(cnt=Count('id')).order_by('-cnt')[:6]
+        by_location = {}
+        for item in loc_qs:
+            loc_name = item['location'] or 'Not specified'
+            by_location[loc_name] = item['cnt']
+        if not by_location:
+            by_location = {'Primary Location': patients_count}
+
+        # Genuine reviews & ratings
+        reviews_qs = Review.objects.all().order_by('-created_at')
+        reviews_list = []
+        for r in reviews_qs:
+            target_name = "System"
+            target_type = "doctor"
+            if r.doctor:
+                target_name = r.doctor.full_name or r.doctor.user.username
+                target_type = "doctor"
+            elif r.caretaker:
+                target_name = r.caretaker.full_name or r.caretaker.user.username
+                target_type = "caretaker"
+
+            reviews_list.append({
+                'id': r.id,
+                'reviewer': r.user.username,
+                'targetType': target_type,
+                'target': target_name,
+                'rating': r.rating,
+                'text': r.comment or '',
+                'date': r.created_at.strftime('%d %b %Y')
+            })
+
+        avg_rating = Review.objects.aggregate(Avg('rating'))['rating__avg'] or 5.0
+        doc_avg = DoctorProfile.objects.aggregate(Avg('rating_avg'))['rating_avg__avg'] or 5.0
+        car_avg = CaretakerProfile.objects.aggregate(Avg('rating_avg'))['rating_avg__avg'] or 5.0
+
+        # Monthly Patients per Doctor Breakdown (last 6 months)
+        doctor_monthly_patients = []
+        doc_users = CustomUser.objects.filter(role='doctor').order_by('id')[:50]  # Top doctors
+        
+        for d_user in doc_users:
+            d_prof = getattr(d_user, 'doctor_profile', None)
+            d_apts = Appointment.objects.filter(doctor=d_user)
+            total_unique_all_time = d_apts.values('patient_id').distinct().count()
+
+            m_stats = []
+            for i in range(5, -1, -1):
+                m_year = today.year
+                m_month = today.month - i
+                while m_month <= 0:
+                    m_month += 12
+                    m_year -= 1
+                m_date = datetime.date(m_year, m_month, 1)
+                m_label = m_date.strftime('%b %Y')
+
+                m_apts = d_apts.filter(appointment_date__year=m_year, appointment_date__month=m_month)
+                m_unique = m_apts.values('patient_id').distinct().count()
+                m_total = m_apts.count()
+
+                m_stats.append({
+                    'month_label': m_label,
+                    'year': m_year,
+                    'month': m_month,
+                    'unique_patients': m_unique,
+                    'total_appointments': m_total
+                })
+
+            raw_name = d_prof.full_name if (d_prof and d_prof.full_name) else d_user.username
+            doc_name = re.sub(r'^(Dr\.|DR\.|Dr|DR)\s*', '', raw_name, flags=re.IGNORECASE).strip()
+
+            doctor_monthly_patients.append({
+                'doctor_id': d_user.id,
+                'doctor_name': doc_name,
+                'doctor_code': d_prof.doctor_code if d_prof else 'DOC-000',
+                'major_department': d_prof.major_department if d_prof else 'General Medicine',
+                'hospital_name': d_prof.hospital_name if d_prof else 'Hospital / Clinic',
+                'location': d_prof.location if d_prof else 'Not specified',
+                'total_unique_patients_all_time': total_unique_all_time,
+                'monthly_stats': m_stats
+            })
+
         return Response({
-            'doctors_count': DoctorProfile.objects.count(),
-            'patients_count': PatientProfile.objects.count(),
-            'caretakers_count': CaretakerProfile.objects.count(),
+            'patients_count': patients_count,
+            'doctors_count': doctors_count,
+            'caretakers_count': caretakers_count,
+            'inactive_count': inactive_count,
             'appointments_count': Appointment.objects.count(),
+            'signup_data': {
+                'months': months,
+                'patients': patient_signups,
+                'doctors': doctor_signups,
+                'caretakers': caretaker_signups,
+            },
+            'appt_week_data': {
+                'labels': week_labels,
+                'values': week_values,
+            },
+            'by_dept': by_dept,
+            'by_location': by_location,
+            'reviews': reviews_list,
+            'reviews_count': len(reviews_list),
+            'avg_rating': round(float(avg_rating), 1),
+            'doctor_avg_rating': round(float(doc_avg), 1),
+            'caretaker_avg_rating': round(float(car_avg), 1),
+            'doctor_monthly_patients': doctor_monthly_patients
         })
+
+
+class AdminUserProfileView(APIView):
+    """GET /api/admin/users/<int:user_id>/profile — Admin views complete user profile details"""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, user_id):
+        if request.user.role != 'admin' and not request.user.is_staff:
+            return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
+        
+        target_user = CustomUser.objects.filter(id=user_id).first()
+        if not target_user:
+            return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        user_data = {
+            'id': target_user.id,
+            'username': target_user.username,
+            'email': target_user.email,
+            'mobile_number': target_user.mobile_number,
+            'role': target_user.role,
+            'plain_password': target_user.plain_password or '••••••••',
+            'profile_picture': target_user.profile_picture,
+            'is_active': target_user.is_active,
+            'created_at': target_user.created_at.isoformat() if target_user.created_at else None,
+            'profile_details': {}
+        }
+
+        if target_user.role == 'patient':
+            from .serializers import PatientProfileSerializer
+            p_prof = getattr(target_user, 'patient_profile', None)
+            if p_prof:
+                user_data['profile_details'] = PatientProfileSerializer(p_prof).data
+        elif target_user.role == 'doctor':
+            from .serializers import DoctorProfileSerializer
+            d_prof = getattr(target_user, 'doctor_profile', None)
+            if d_prof:
+                user_data['profile_details'] = DoctorProfileSerializer(d_prof).data
+        elif target_user.role == 'caretaker':
+            from .serializers import CaretakerProfileSerializer
+            c_prof = getattr(target_user, 'caretaker_profile', None)
+            if c_prof:
+                user_data['profile_details'] = CaretakerProfileSerializer(c_prof).data
+
+        return Response(user_data)
 
 
 class AdminUsersView(APIView):
@@ -488,6 +770,11 @@ class CaretakerRequestView(APIView):
         if p_profile and p_profile.assigned_caretaker:
             return Response({'detail': 'You already have an active caretaker assigned. You cannot send new requests until you unlink the current caretaker.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        # Check if target caretaker already has an active patient
+        active_patient_for_caretaker = PatientProfile.objects.filter(assigned_caretaker=caretaker).first()
+        if active_patient_for_caretaker:
+            return Response({'detail': 'This caretaker already has an active patient under care. A caretaker can only have 1 active patient at a time.'}, status=status.HTTP_400_BAD_REQUEST)
+
         # Enforce limit of Max 5 pending caretaker requests
         active_and_pending_count = CaretakerRequest.objects.filter(
             patient=request.user,
@@ -539,6 +826,93 @@ class AppointmentBookingView(APIView):
         if booked_by == 'caretaker' and request.data.get('patient_id'):
             patient_user = User.objects.filter(id=request.data.get('patient_id')).first() or request.user
 
+        # Enforce rule: Appointments can only be booked for the current week (Monday to Sunday)
+        if app_date:
+            import datetime
+            today_d = datetime.date.today()
+            start_of_week = today_d - datetime.timedelta(days=today_d.weekday())
+            end_of_week = start_of_week + datetime.timedelta(days=6)
+
+            parsed_d = None
+            if isinstance(app_date, str):
+                try:
+                    parsed_d = datetime.datetime.strptime(app_date, '%Y-%m-%d').date()
+                except ValueError:
+                    parsed_d = None
+            else:
+                parsed_d = app_date
+
+            if parsed_d:
+                if parsed_d < start_of_week or parsed_d > end_of_week:
+                    return Response({
+                        'detail': f'Appointments can only be booked for the current week ({start_of_week.strftime("%d %b %Y")} to {end_of_week.strftime("%d %b %Y")}). Booking for next week, next month, or future years is not allowed.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Enforce rule: 1 active appointment per doctor per day
+        if app_date:
+            active_apt = Appointment.objects.filter(
+                patient=patient_user,
+                doctor=doctor,
+                appointment_date=app_date,
+                status__in=['pending', 'accepted', 'completed']
+            ).first()
+            if active_apt:
+                doc_p = DoctorProfile.objects.filter(user=doctor).first()
+                d_name = doc_p.full_name if (doc_p and doc_p.full_name) else doctor.username
+                return Response({
+                    'detail': f'You already have an active appointment scheduled with Dr. {d_name} on {app_date}. You can only book a new appointment on this day if your current appointment is cancelled or missed.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Enforce rule: Patient cannot attend multiple appointments at exact same date and time slot
+        if app_date and time_slot:
+            patient_time_conflict = Appointment.objects.filter(
+                patient=patient_user,
+                appointment_date=app_date,
+                time_slot=time_slot,
+                status__in=['pending', 'accepted', 'completed']
+            ).first()
+            if patient_time_conflict:
+                return Response({
+                    'detail': f'You already have another appointment scheduled at {time_slot} on {app_date}. A patient cannot attend multiple doctor appointments at the same time.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Enforce rule: Doctor cannot have 2 patients booked at exact same date and time slot
+        if app_date and time_slot:
+            doc_time_conflict = Appointment.objects.filter(
+                doctor=doctor,
+                appointment_date=app_date,
+                time_slot=time_slot,
+                status__in=['pending', 'accepted', 'completed']
+            ).first()
+            if doc_time_conflict:
+                return Response({
+                    'detail': f'This time slot ({time_slot}) is already booked for this doctor on {app_date}. Please choose a different available time slot.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Enforce rule: Patient cannot visit multiple doctors for same medical condition/specialty on same day
+        if app_date:
+            target_doc_prof = DoctorProfile.objects.filter(user=doctor).first()
+            target_dept = (target_doc_prof.major_department or 'General Medicine').strip().lower() if target_doc_prof else 'general medicine'
+
+            same_day_apts = Appointment.objects.filter(
+                patient=patient_user,
+                appointment_date=app_date,
+                status__in=['pending', 'accepted', 'completed']
+            )
+
+            for ex_apt in same_day_apts:
+                ex_doc_prof = DoctorProfile.objects.filter(user=ex_apt.doctor).first()
+                ex_dept = (ex_doc_prof.major_department or 'General Medicine').strip().lower() if ex_doc_prof else 'general medicine'
+
+                same_reason = (reason and ex_apt.reason and reason.strip().lower() == ex_apt.reason.strip().lower())
+                same_dept = (ex_dept == target_dept)
+
+                if same_reason or same_dept:
+                    dept_display = target_doc_prof.major_department if (target_doc_prof and target_doc_prof.major_department) else 'this specialty'
+                    return Response({
+                        'detail': f'You already have an appointment scheduled for {dept_display} on {app_date}. A patient cannot visit multiple doctors for the same medical condition or specialty on the same day.'
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
         apt = Appointment.objects.create(
             patient=patient_user,
             doctor=doctor,
@@ -551,6 +925,41 @@ class AppointmentBookingView(APIView):
             status='pending'
         )
         return Response({'status': 'success', 'appointment_id': apt.id}, status=status.HTTP_201_CREATED)
+
+
+class AppointmentCancelView(APIView):
+    """POST /api/auth/appointments/<int:apt_id>/cancel — Patient or Caretaker cancels an appointment"""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, apt_id):
+        from .models import Appointment, PatientProfile
+        apt = Appointment.objects.filter(id=apt_id).first()
+        if not apt:
+            return Response({'detail': 'Appointment not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        is_patient = (apt.patient == request.user)
+        is_caretaker = (apt.caretaker == request.user)
+        if not is_caretaker:
+            p_prof = PatientProfile.objects.filter(user=apt.patient, assigned_caretaker=request.user).first()
+            if p_prof:
+                is_caretaker = True
+
+        if not (is_patient or is_caretaker or request.user.role in ['admin', 'doctor'] or request.user.is_staff):
+            return Response({'detail': 'You do not have permission to cancel this appointment.'}, status=status.HTTP_403_FORBIDDEN)
+
+        if apt.status in ['cancelled_by_patient', 'cancelled_by_doctor', 'rejected']:
+            return Response({'detail': 'Appointment is already cancelled.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        apt.status = 'cancelled_by_patient'
+        apt.is_call_active = False
+        apt.save()
+
+        return Response({
+            'status': 'success',
+            'message': 'Appointment cancelled successfully.',
+            'appointment_id': apt.id,
+            'new_status': apt.status
+        })
 
 
 # ── Doctor Profile & Appointments ────────────────────────────────────────────
@@ -573,7 +982,20 @@ class DoctorProfileView(APIView):
         if not profile.phone_number and request.user.mobile_number:
             profile.phone_number = request.user.mobile_number
             profile.save()
-        return Response(DoctorProfileSerializer(profile).data)
+        from .models import Review
+        data = DoctorProfileSerializer(profile).data
+        reviews_qs = Review.objects.filter(doctor=profile).order_by('-created_at')
+        rev_list = []
+        for r in reviews_qs:
+            rev_list.append({
+                'id': r.id,
+                'reviewer_name': r.user.username,
+                'rating': r.rating,
+                'comment': r.comment or '',
+                'date': r.created_at.strftime('%d %b %Y') if r.created_at else 'Recent'
+            })
+        data['reviews'] = rev_list
+        return Response(data)
 
     def put(self, request):
         if request.user.role not in ['doctor', 'admin'] and not request.user.is_staff:
@@ -800,25 +1222,23 @@ class AppointmentJoinVideoCallView(APIView):
 
 
 class DoctorPatientsListView(APIView):
-    """GET /api/doctor/patients — Returns patients with accepted or completed appointments for this doctor, with assigned caretaker details."""
+    """GET /api/doctor/patients — Returns patients with appointments for this doctor, with stats and caretaker details."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         if request.user.role not in ['doctor', 'admin'] and not request.user.is_staff:
             return Response({'detail': 'Doctor access required.'}, status=status.HTTP_403_FORBIDDEN)
         
+        import datetime
         from .models import Appointment, PatientProfile, CaretakerProfile
 
-        # Order by registration timestamp ascending (First Come First Served)
-        accepted_apts = Appointment.objects.filter(
-            doctor=request.user,
-            status__in=['accepted', 'completed']
-        ).order_by('created_at', 'appointment_date')
+        all_doc_apts = Appointment.objects.filter(doctor=request.user).order_by('-appointment_date', '-created_at')
 
         results = []
         seen_patient_ids = set()
+        today = datetime.date.today()
 
-        for apt in accepted_apts:
+        for apt in all_doc_apts:
             patient_user = apt.patient
             if patient_user.id in seen_patient_ids:
                 continue
@@ -826,6 +1246,24 @@ class DoctorPatientsListView(APIView):
 
             p_profile = PatientProfile.objects.filter(user=patient_user).first()
             
+            # Fetch all appointments for this specific doctor & patient pair
+            patient_apts = Appointment.objects.filter(doctor=request.user, patient=patient_user)
+            total_apts = patient_apts.count()
+            online_cnt = patient_apts.filter(appointment_type='online').count()
+            offline_cnt = patient_apts.exclude(appointment_type='online').count()
+            upcoming_cnt = patient_apts.filter(appointment_date__gte=today, status__in=['pending', 'accepted']).count()
+
+            # Find last appointment (most recent past or completed appointment, or latest appointment)
+            last_apt = patient_apts.filter(appointment_date__lt=today).order_by('-appointment_date', '-created_at').first()
+            if not last_apt:
+                last_apt = patient_apts.order_by('-appointment_date', '-created_at').first()
+            
+            last_apt_str = "No prior visits"
+            if last_apt and last_apt.appointment_date:
+                last_apt_str = f"{last_apt.appointment_date}"
+                if last_apt.time_slot:
+                    last_apt_str += f" at {last_apt.time_slot}"
+
             caretaker_data = None
             if p_profile and p_profile.assigned_caretaker:
                 c_user = p_profile.assigned_caretaker
@@ -860,6 +1298,11 @@ class DoctorPatientsListView(APIView):
                 'appointment_status': apt.status,
                 'appointment_date': str(apt.appointment_date) if apt.appointment_date else 'TBD',
                 'reason': apt.reason or 'General consultation',
+                'total_appointments': total_apts,
+                'online_appointments_count': online_cnt,
+                'offline_appointments_count': offline_cnt,
+                'upcoming_appointments_count': upcoming_cnt,
+                'last_appointment_date_time': last_apt_str,
                 'assigned_caretaker': caretaker_data
             }
             results.append(patient_item)
@@ -1121,6 +1564,32 @@ class CaretakerPatientsListView(APIView):
 
         past_results = []
         for p in unlinked_profiles:
+            # Last working date: when caretaker request was unlinked
+            creq = CaretakerRequest.objects.filter(caretaker=request.user, patient=p.user, status='unlinked').order_by('-created_at').first()
+            last_work_str = creq.created_at.strftime('%d %b %Y') if (creq and creq.created_at) else 'Recent'
+
+            # Visited doctors with total appointments
+            from django.db.models import Count
+            from .models import Appointment
+            doc_apts = Appointment.objects.filter(patient=p.user).values('doctor').annotate(total_cnt=Count('id')).order_by('-total_cnt')
+            visited_doctors = []
+            for item in doc_apts:
+                d_user = CustomUser.objects.filter(id=item['doctor']).first()
+                if d_user:
+                    d_prof = getattr(d_user, 'doctor_profile', None)
+                    raw_name = d_prof.full_name if (d_prof and d_prof.full_name) else d_user.username
+                    doc_name = re.sub(r'^(Dr\.|DR\.|Dr|DR)\s*', '', raw_name, flags=re.IGNORECASE).strip()
+                    dept = d_prof.major_department if d_prof else 'General Medicine'
+                    last_visit_apt = Appointment.objects.filter(patient=p.user, doctor=d_user).order_by('-appointment_date').first()
+                    last_date_str = str(last_visit_apt.appointment_date) if last_visit_apt else 'N/A'
+                    visited_doctors.append({
+                        'doctor_id': d_user.id,
+                        'doctor_name': doc_name,
+                        'major_department': dept,
+                        'total_appointments': item['total_cnt'],
+                        'last_visit_date': last_date_str
+                    })
+
             past_results.append({
                 'patient_id': p.user.id,
                 'username': p.user.username,
@@ -1136,6 +1605,8 @@ class CaretakerPatientsListView(APIView):
                 'insurance_details': p.insurance_details or 'Not provided',
                 'emergency_contact': f"{p.emergency_contact_name or ''} ({p.emergency_contact_phone or ''})".strip() or 'Not provided',
                 'medical_history_notes': p.medical_history_notes or 'No notes provided',
+                'last_working_date': last_work_str,
+                'visited_doctors': visited_doctors,
                 'assignment_status': 'unlinked'
             })
 
@@ -1332,6 +1803,8 @@ class SubmitReviewView(APIView):
         if target_type == 'doctor':
             doc_profile = DoctorProfile.objects.filter(id=target_id).first()
             if not doc_profile:
+                doc_profile = DoctorProfile.objects.filter(user_id=target_id).first()
+            if not doc_profile:
                 return Response({'detail': 'Doctor not found.'}, status=status.HTTP_404_NOT_FOUND)
             Review.objects.create(user=request.user, doctor=doc_profile, rating=rating, comment=comment)
             
@@ -1346,6 +1819,8 @@ class SubmitReviewView(APIView):
             })
         elif target_type == 'caretaker':
             car_profile = CaretakerProfile.objects.filter(id=target_id).first()
+            if not car_profile:
+                car_profile = CaretakerProfile.objects.filter(user_id=target_id).first()
             if not car_profile:
                 return Response({'detail': 'Caretaker not found.'}, status=status.HTTP_404_NOT_FOUND)
             Review.objects.create(user=request.user, caretaker=car_profile, rating=rating, comment=comment)

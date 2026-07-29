@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Carewell — Patient Appointments & Visited Doctors</title>
+<script>
+  (function(){
+    const token = localStorage.getItem('beacon_token') || localStorage.getItem('access_token');
+    const userRaw = localStorage.getItem('beacon_user');
+    if(!token || !userRaw){ window.location.href = '/login'; return; }
+    try {
+      const user = JSON.parse(userRaw);
+      if(user.role !== 'patient' && user.role !== 'admin'){
+        const target = user.role === 'doctor' ? '/doctor-profile' : '/caretaker-dashboard';
+        window.location.href = target;
+      }
+    } catch(e){ window.location.href = '/login'; }
+  })();
+  document.addEventListener('contextmenu', event => {
+    event.preventDefault();
+  });
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1E2A22; --paper:#EAF0EC; --surface:#FFFFFF; --line:#D7DFD9;
+    --pine:#33604F; --pine-deep:#25473A; --pine-soft:#E2ECE7; --brick:#AE4436; --brick-soft:#F3DFDA;
+    --slate:#4A6E8C; --slate-soft:#DCE7EF; --muted:#6E7D75; --amber:#B9873A; --amber-soft:#F1E3CB;
+    --radius:16px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
+  .mono{font-family:'JetBrains Mono',monospace;}
+
+  .app{display:grid;grid-template-columns:220px 1fr;max-width:1440px;margin:0 auto;min-height:100vh;}
+  .sidebar{background:var(--pine-deep);color:#EFF3F0;padding:28px 20px;display:flex;flex-direction:column;gap:26px;}
+  .brand{display:flex;align-items:center;gap:10px;}
+  .brand-mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(160deg,#4C8A72,#2C5344);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:600;font-size:17px;flex-shrink:0;}
+  .brand-name{font-family:'Fraunces',serif;font-size:17px;font-weight:600;}
+  .brand-sub{font-size:11px;color:#9FB6AB;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;}
+  nav{display:flex;flex-direction:column;gap:3px;}
+  nav a{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:9px;color:#D7E4DE;text-decoration:none;font-size:13.5px;font-weight:500;position:relative;}
+  nav a svg{width:16px;height:16px;flex-shrink:0;}
+  nav a.active{background:#EFF3F0;color:var(--pine-deep);}
+  nav a:not(.active):hover{background:rgba(255,255,255,.08);}
+  .sidebar-foot{margin-top:auto;}
+  .help-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:var(--radius);padding:14px;font-size:12.5px;color:#C7DACF;}
+  .help-card b{display:block;font-family:'Fraunces',serif;font-size:14px;color:#EFF3F0;margin-bottom:4px;}
+
+  main{padding:24px 26px;}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px;flex-wrap:wrap;gap:14px;}
+  .breadcrumb{font-family:'Fraunces',serif;font-size:20px;font-weight:600;color:var(--muted);}
+  .breadcrumb span{color:var(--ink);}
+  
+  /* Filter & Controls Bar */
+  .control-bar{display:flex;gap:14px;margin-bottom:24px;flex-wrap:wrap;align-items:center;background:var(--surface);padding:16px;border-radius:var(--radius);border:1px solid var(--line);box-shadow:0 2px 8px rgba(0,0,0,0.02);}
+  .search-wrapper{flex:1;min-width:240px;position:relative;}
+  .search-wrapper input{width:100%;padding:11px 16px 11px 40px;border:1px solid var(--line);border-radius:12px;font-size:13px;background:var(--paper);color:var(--ink);font-family:inherit;outline:none;transition:border-color 0.2s ease;}
+  .search-wrapper input:focus{border-color:var(--pine);background:#fff;}
+  .search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--muted);width:17px;height:17px;pointer-events:none;}
+
+  .select-wrapper select{padding:10px 14px;border:1px solid var(--line);border-radius:12px;font-size:13px;background:var(--paper);color:var(--ink);font-family:inherit;cursor:pointer;outline:none;}
+  
+  .badge-count{background:var(--pine-soft);color:var(--pine-deep);font-weight:700;font-size:12px;padding:6px 14px;border-radius:20px;border:1px solid rgba(51,96,79,0.2);}
+
+  /* Folder Grid Layout */
+  .folder-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(310px, 1fr));gap:22px;}
+
+  /* Folder Card Styling (Matching Reference Image Aesthetics) */
+  .folder-card {
+    position: relative;
+    border-radius: 20px;
+    padding: 22px;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    border: 1px solid rgba(0,0,0,0.06);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+    min-height: 310px;
+  }
+  .folder-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.08);
+  }
+
+  /* Distinct Folder Tab Top Header */
+  .folder-tab-accent {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 110px;
+    height: 12px;
+    border-bottom-left-radius: 12px;
+    background: rgba(0, 0, 0, 0.06);
+  }
+
+  /* Dynamic Pastel Color Schemes for Folders */
+  .folder-card.pastel-pink { background: #FDE8E8; color: #4A1D1D; }
+  .folder-card.pastel-purple { background: #ECE6F8; color: #2A1D4A; }
+  .folder-card.pastel-yellow { background: #FEF08A; color: #4A3E00; }
+  .folder-card.pastel-mint { background: #D1FAE5; color: #064E3B; }
+  .folder-card.pastel-cyan { background: #CFFAFE; color: #164E63; }
+  .folder-card.pastel-orange { background: #FFEDD5; color: #431407; }
+  .folder-card.pastel-white { background: #FFFFFF; color: var(--ink); border: 1px solid var(--line); }
+
+  .folder-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  
+  .folder-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.65);
+    backdrop-filter: blur(4px);
+    letter-spacing: 0.5px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+
+  .patient-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .patient-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: 20px;
+    flex-shrink: 0;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  }
+  .patient-avatar img { width:100%; height:100%; object-fit:cover; }
+
+  .patient-details h3 {
+    margin: 0;
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+  .patient-details p {
+    margin: 2px 0 0 0;
+    font-size: 12px;
+    opacity: 0.8;
+  }
+
+  .folder-progress-bar {
+    display: flex;
+    gap: 4px;
+    margin: 12px 0 16px 0;
+    height: 5px;
+  }
+  .progress-segment {
+    height: 100%;
+    border-radius: 3px;
+    background: currentColor;
+    opacity: 0.2;
+    flex: 1;
+  }
+  .progress-segment.active { opacity: 0.85; }
+
+  .folder-stats {
+    background: rgba(255,255,255,0.55);
+    backdrop-filter: blur(6px);
+    border-radius: 12px;
+    padding: 12px;
+    margin-top: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 12px;
+    border: 1px solid rgba(255,255,255,0.4);
+  }
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .stat-label {
+    opacity: 0.85;
+    font-weight: 500;
+  }
+  .stat-val {
+    font-weight: 700;
+  }
+
+  .folder-actions {
+    margin-top: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px dashed rgba(0,0,0,0.12);
+  }
+  .btn-book-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 16px;
+    border-radius: 12px;
+    border: none;
+    background: var(--pine-deep);
+    color: #ffffff;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 3px 8px rgba(37,71,58,0.2);
+    width: 100%;
+    justify-content: center;
+    text-decoration: none;
+  }
+  .btn-book-action:hover {
+    background: var(--pine);
+    transform: translateY(-1px);
+  }
+
+  .empty-box{padding:40px 20px;text-align:center;color:var(--muted);font-size:14px;background:var(--surface);border-radius:var(--radius);border:1px dashed var(--line);grid-column:1 / -1;}
+
+  @media (max-width:980px){ .app{grid-template-columns:1fr;} .sidebar{flex-direction:row;overflow-x:auto;align-items:center;gap:16px;} .sidebar nav{flex-direction:row;} .sidebar-foot,.brand-sub{display:none;} }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">C</div>
+      <div><div class="brand-name">Carewell</div><div class="brand-sub">PATIENT PORTAL</div></div>
+    </div>
+    <nav>
+      <a href="/patient-profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>My Profile</span></a>
+      <a href="/doctor-caretaker-list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Find Caretaker / Doctor</span></a>
+      <a href="/patient-appointments" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg><span>Appointments</span></a>
+      <a href="/app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Voice AI Engine</span></a>
+      <a href="/voice-timeline"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>Voice AI Health Timeline</span></a>
+      <a href="#" onclick="localStorage.clear(); window.location.href='/login';"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="help-card"><b>Need help?</b>Reach patient support any time.</div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <main>
+    <div class="topbar">
+      <div class="breadcrumb">Patient Portal › <span>Visited Doctors & Appointments Folders</span></div>
+      <div class="badge-count" id="doctorsTotalBadge">0 Doctors Visited</div>
+    </div>
+
+    <!-- FILTER & SEARCH BAR -->
+    <div class="control-bar">
+      <div class="search-wrapper">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="docSearchInput" placeholder="Search visited doctors by name, department, hospital or location..." oninput="filterDoctors()">
+      </div>
+      <div class="select-wrapper">
+        <select id="sortFilter" onchange="filterDoctors()">
+          <option value="visits">Sort: Most Times Visited</option>
+          <option value="recent">Sort: Most Recent Visit</option>
+          <option value="name">Sort: Name (A-Z)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- VISITED DOCTORS FOLDER GRID -->
+    <div class="folder-grid" id="visitedDoctorsContainer">
+      <div class="empty-box">Loading visited doctor folders...</div>
+    </div>
+  </main>
+</div>
+
+<script>
+function getAuthHeader(){
+  const token = localStorage.getItem('access_token') || localStorage.getItem('beacon_token');
+  return token ? { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+}
+
+let visitedDoctors = [];
+
+const pastelThemes = [
+  'pastel-purple',
+  'pastel-mint',
+  'pastel-pink',
+  'pastel-yellow',
+  'pastel-cyan',
+  'pastel-orange',
+  'pastel-white'
+];
+
+async function loadVisitedDoctors(){
+  try {
+    const res = await fetch('/api/auth/patient/visited-doctors', { headers: getAuthHeader() });
+    if(res.ok){
+      visitedDoctors = await res.json();
+      filterDoctors();
+    } else if(res.status === 401){
+      localStorage.clear();
+      window.location.href = '/login';
+    } else {
+      document.getElementById('visitedDoctorsContainer').innerHTML = '<div class="empty-box">Failed to load visited doctor records.</div>';
+    }
+  } catch(e){
+    console.error(e);
+    document.getElementById('visitedDoctorsContainer').innerHTML = `<div class="empty-box">Error: ${e.message}</div>`;
+  }
+}
+
+function filterDoctors(){
+  const searchQ = (document.getElementById('docSearchInput')?.value || '').trim().toLowerCase();
+  const sortVal = document.getElementById('sortFilter')?.value || 'visits';
+
+  let list = [...visitedDoctors];
+
+  if(searchQ){
+    list = list.filter(d => {
+      const name = (d.full_name || '').toLowerCase();
+      const dept = (d.major_department || '').toLowerCase();
+      const hosp = (d.hospital_name || '').toLowerCase();
+      const loc = (d.location || '').toLowerCase();
+      const code = (d.doctor_code || '').toLowerCase();
+      return name.includes(searchQ) || dept.includes(searchQ) || hosp.includes(searchQ) || loc.includes(searchQ) || code.includes(searchQ);
+    });
+  }
+
+  if(sortVal === 'visits'){
+    list.sort((a,b) => (b.total_visits_count || 0) - (a.total_visits_count || 0));
+  } else if(sortVal === 'name'){
+    list.sort((a,b) => (a.full_name || '').localeCompare(b.full_name || ''));
+  }
+
+  document.getElementById('doctorsTotalBadge').textContent = `${list.length} Doctors Visited`;
+
+  renderDoctorFolders(list);
+}
+
+function renderDoctorFolders(doctors){
+  const container = document.getElementById('visitedDoctorsContainer');
+  if(!doctors || doctors.length === 0){
+    container.innerHTML = '<div class="empty-box">No visited doctor folders found. <br><br><a href="/doctor-caretaker-list" style="color:var(--pine);font-weight:700;">Find & Book a Doctor Now →</a></div>';
+    return;
+  }
+
+  container.innerHTML = doctors.map((d, idx) => {
+    const themeClass = pastelThemes[idx % pastelThemes.length];
+    const initial = (d.full_name || 'D').replace(/^Dr\.\s*/i, '').charAt(0).toUpperCase();
+
+    const avatarHtml = d.profile_picture 
+      ? `<img src="${d.profile_picture}" alt="${d.full_name}"/>` 
+      : initial;
+
+    const totalVisits = d.total_visits_count || 0;
+    const upcomingCount = d.upcoming_appointments_count || 0;
+    const lastVisited = d.last_visited_date_time || 'No prior visits';
+    const activeSegs = Math.min(totalVisits, 4);
+
+    return `
+      <div class="folder-card ${themeClass}">
+        <div class="folder-tab-accent"></div>
+        <div>
+          <!-- Folder Header -->
+          <div class="folder-top">
+            <span class="folder-tag">${d.doctor_code || 'DOC-000'}</span>
+            <span style="font-size:11.5px;font-weight:700;">⭐ ${d.rating_avg || '5.0'} (${d.reviews_count || 0})</span>
+          </div>
+
+          <!-- Doctor Identity -->
+          <div class="patient-info">
+            <div class="patient-avatar">${avatarHtml}</div>
+            <div class="patient-details">
+              <h3>${d.full_name || 'Doctor'}</h3>
+              <p>🩺 ${d.major_department || 'General Medicine'}</p>
+              <p style="font-size:11px;opacity:0.75;margin-top:1px;">🏥 ${d.hospital_name || 'Clinic'} · ${d.location || ''}</p>
+            </div>
+          </div>
+
+          <!-- Folder Progress Line -->
+          <div class="folder-progress-bar">
+            <div class="progress-segment ${activeSegs >= 1 ? 'active' : ''}"></div>
+            <div class="progress-segment ${activeSegs >= 2 ? 'active' : ''}"></div>
+            <div class="progress-segment ${activeSegs >= 3 ? 'active' : ''}"></div>
+            <div class="progress-segment ${activeSegs >= 4 ? 'active' : ''}"></div>
+          </div>
+
+          <!-- Statistics Box -->
+          <div class="folder-stats">
+            <div class="stat-row">
+              <span class="stat-label">📊 Number of Times Visited:</span>
+              <span class="stat-val" style="font-size:13px;color:var(--pine-deep);">${totalVisits} ${totalVisits === 1 ? 'visit' : 'visits'}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">🕒 Last Visited Date & Time:</span>
+              <span class="stat-val">${lastVisited}</span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">📅 Upcoming Appointments:</span>
+              <span class="stat-val" style="color:var(--pine-deep);">${upcomingCount} upcoming</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action Button -->
+        <div class="folder-actions" style="display:flex;gap:8px;">
+          <a href="/doctor-caretaker-list" class="btn-book-action" style="flex:1;">
+            <span>Book Appointment</span>
+          </a>
+          <button class="btn-book-action" style="flex:1;background:var(--amber);box-shadow:none;" onclick="openPatientReviewModal(${d.doctor_profile_id || d.doctor_id}, '${(d.full_name||'Doctor').replace(/'/g, "\\'")}')">
+            <span>⭐ Review</span>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+let patientReviewTarget = null;
+let patientSelectedRating = 5;
+
+function setPatientRating(r){
+  patientSelectedRating = r;
+  document.querySelectorAll('#patientStarPicker span').forEach((s, idx) => {
+    s.style.color = idx < r ? 'var(--amber)' : '#ccc';
+  });
+}
+
+function openPatientReviewModal(id, name){
+  patientReviewTarget = { id, name };
+  setPatientRating(5);
+  document.getElementById('pRevTitle').textContent = 'Write Review for ' + name;
+  document.getElementById('pRevComment').value = '';
+  document.getElementById('patientReviewModal').style.display = 'flex';
+}
+
+function closePatientReviewModal(){
+  document.getElementById('patientReviewModal').style.display = 'none';
+}
+
+async function submitPatientReview(e){
+  e.preventDefault();
+  const comment = document.getElementById('pRevComment').value.trim();
+  try {
+    const res = await fetch('/api/auth/review', {
+      method: 'POST',
+      headers: getAuthHeader(),
+      body: JSON.stringify({
+        target_type: 'doctor',
+        target_id: patientReviewTarget.id,
+        rating: patientSelectedRating,
+        comment: comment
+      })
+    });
+    if(res.ok){
+      closePatientReviewModal();
+      alert('Thank you for rating and reviewing ' + patientReviewTarget.name + '!');
+      loadVisitedDoctors();
+    } else {
+      const err = await res.json();
+      alert(err.detail || 'Could not submit review.');
+    }
+  } catch(err){ alert(err.message); }
+}
+
+document.addEventListener('DOMContentLoaded', loadVisitedDoctors);
+</script>
+
+<!-- PATIENT REVIEW MODAL -->
+<div class="modal-backdrop" id="patientReviewModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:100;padding:16px;">
+  <div style="background:var(--surface);border-radius:20px;max-width:440px;width:100%;padding:24px;box-shadow:0 10px 30px rgba(0,0,0,0.15);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <h3 id="pRevTitle" style="margin:0;font-family:'Fraunces',serif;font-size:18px;">Rate & Review Doctor</h3>
+      <button onclick="closePatientReviewModal()" style="border:none;background:var(--paper);border-radius:8px;width:30px;height:30px;cursor:pointer;">✕</button>
+    </div>
+    <form onsubmit="submitPatientReview(event)">
+      <div style="margin-bottom:16px;text-align:center;">
+        <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px;">Select Star Rating</label>
+        <div id="patientStarPicker" style="font-size:32px;cursor:pointer;user-select:none;">
+          <span onclick="setPatientRating(1)" style="color:var(--amber);">★</span>
+          <span onclick="setPatientRating(2)" style="color:var(--amber);">★</span>
+          <span onclick="setPatientRating(3)" style="color:var(--amber);">★</span>
+          <span onclick="setPatientRating(4)" style="color:var(--amber);">★</span>
+          <span onclick="setPatientRating(5)" style="color:var(--amber);">★</span>
+        </div>
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="display:block;font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:6px;">Your Written Feedback / Review</label>
+        <textarea id="pRevComment" rows="4" style="width:100%;border:1px solid var(--line);border-radius:12px;padding:10px;font-family:inherit;font-size:13px;background:var(--paper);" placeholder="Share your experience with this doctor..."></textarea>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button type="button" onclick="closePatientReviewModal()" style="flex:1;padding:11px;border-radius:12px;border:1px solid var(--line);background:transparent;cursor:pointer;font-weight:600;">Cancel</button>
+        <button type="submit" style="flex:1;padding:11px;border-radius:12px;border:none;background:var(--pine-deep);color:#fff;cursor:pointer;font-weight:700;">Submit Review</button>
+      </div>
+    </form>
+  </div>
+</div>
+</body>
+</html>
