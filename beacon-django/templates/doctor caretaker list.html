@@ -170,6 +170,8 @@
           <option value="">All Genders</option>
           <option value="male">Male</option>
           <option value="female">Female</option>
+          <option value="trans">Trans</option>
+          <option value="other">Other</option>
         </select>
       </div>
       <div class="filter-field" style="width:160px;">
@@ -351,8 +353,10 @@ function renderList(){
     const hospital = (item.hospital_name || '').toLowerCase();
     const gender = (item.gender || '').toLowerCase();
     const expYears = parseInt(item.experience_years || 0);
+    const idStr = String(item.user_id || item.id || '');
+    const phone = (item.phone_number || item.mobile_number || '').toLowerCase();
 
-    const matchesQ = !q || name.includes(q) || code.includes(q) || loc.includes(q) || state.includes(q) || hospital.includes(q) || (item.major_department||'').toLowerCase().includes(q);
+    const matchesQ = !q || name.includes(q) || code.includes(q) || loc.includes(q) || state.includes(q) || hospital.includes(q) || (item.major_department||'').toLowerCase().includes(q) || idStr.includes(q) || phone.includes(q);
     const matchesGender = !filterG || gender === filterG;
     const matchesLoc = !filterLoc || loc.includes(filterLoc) || state.includes(filterLoc) || hospital.includes(filterLoc);
 

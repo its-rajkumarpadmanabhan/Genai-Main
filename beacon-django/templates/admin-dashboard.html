@@ -113,6 +113,8 @@
   .status-pill{font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:99px;display:inline-block;}
   .status-pill.active{background:#DCE9E2;color:var(--pine);}
   .status-pill.inactive{background:var(--brick-soft);color:var(--brick);}
+  .status-pill.warning{background:#FEF3C7;color:#D97706;}
+  .status-pill.off-duty{background:#E5E7EB;color:#4B5563;}
   .row-actions{display:flex;gap:6px;justify-content:flex-end;}
   .icon-action{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--paper);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);}
   .icon-action:hover{color:var(--pine-deep);border-color:var(--pine);}
@@ -321,7 +323,7 @@
           <button class="btn-add" onclick="openModal('patient')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Add patient</button>
         </div>
         <table class="admin-table">
-          <thead><tr><th>Name</th><th>Email ID</th><th>Mobile Number</th><th>Password</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Name</th><th>Email ID</th><th>Mobile Number</th><th>Location</th><th>Gender</th><th>Password</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody id="tbodyPatients"></tbody>
         </table>
       </div>
@@ -335,7 +337,7 @@
           <button class="btn-add" onclick="openModal('doctor')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Add doctor</button>
         </div>
         <table class="admin-table">
-          <thead><tr><th>Name</th><th>Email ID</th><th>Mobile Number</th><th>Password</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Name</th><th>Email ID</th><th>Mobile Number</th><th>Location</th><th>Gender</th><th>Password</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody id="tbodyDoctors"></tbody>
         </table>
       </div>
@@ -349,7 +351,7 @@
           <button class="btn-add" onclick="openModal('caretaker')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Add caretaker</button>
         </div>
         <table class="admin-table">
-          <thead><tr><th>Name</th><th>Email ID</th><th>Mobile Number</th><th>Password</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Name</th><th>Email ID</th><th>Mobile Number</th><th>Location</th><th>Gender</th><th>Password</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
           <tbody id="tbodyCaretakers"></tbody>
         </table>
       </div>
@@ -383,6 +385,8 @@
     </div>
   </div>
 </div>
+
+<div class="toast" id="toast"></div>
 
 <!-- GLOBAL CUSTOM ALERT & CONFIRMATION MODAL -->
 <div class="modal-backdrop" id="customAlertModal" style="z-index:99999;">
@@ -473,22 +477,30 @@ async function fetchAdminData(){
     }
 
     renderOverview();
-    renderAnalytics();
-    renderReviews();
+    if (typeof renderAnalytics === 'function') renderAnalytics();
+    if (typeof renderReviews === 'function') renderReviews();
     renderPatients();
     renderDoctors();
     renderCaretakers();
+
+    const activeSec = localStorage.getItem('admin_active_section') || 'overview';
+    switchSection(activeSec);
   } catch(e){ console.log(e); }
 }
 
 function switchSection(sec){
+  localStorage.setItem('admin_active_section', sec);
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.sec === sec));
   ['overview','patients','doctors','caretakers'].forEach(s => {
     const el = document.getElementById('sec-'+s);
     if(el) el.style.display = s===sec ? 'block' : 'none';
   });
   document.getElementById('bcLabel').textContent = sec.charAt(0).toUpperCase()+sec.slice(1);
-  if(sec==='overview'){ renderOverview(); renderAnalytics(); renderReviews(); }
+  if(sec==='overview'){ 
+    renderOverview(); 
+    if (typeof renderAnalytics === 'function') renderAnalytics(); 
+    if (typeof renderReviews === 'function') renderReviews(); 
+  }
   if(sec==='patients') renderPatients();
   if(sec==='doctors') renderDoctors();
   if(sec==='caretakers') renderCaretakers();
@@ -510,9 +522,13 @@ function renderOverview(){
   document.getElementById('navCountCaretakers').textContent = caretakers.length;
 
   const recent = allUsers.slice(0, 5);
-  document.getElementById('recentList').innerHTML = recent.length ? recent.map(u => `
+  document.getElementById('recentList').innerHTML = recent.length ? recent.map(u => {
+    const avatar = u.profile_picture 
+      ? `<img src="${u.profile_picture}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;border:1px solid var(--line);flex-shrink:0;" />`
+      : `<span class="dot"></span>`;
+    return `
     <div class="recent-row">
-      <span class="dot"></span>
+      ${avatar}
       <span style="font-weight:600;">${u.username}</span>
       <span style="color:var(--muted);">· ${u.email}</span>
       <span class="t" style="display:flex;align-items:center;gap:8px;">
@@ -520,7 +536,8 @@ function renderOverview(){
         <button class="icon-action" onclick="viewUserProfile(${u.id})" title="View Full Profile" style="width:24px;height:24px;">${ICON.eye}</button>
       </span>
     </div>
-  `).join('') : '<div class="empty-note">No registered users found.</div>';
+  `;
+  }).join('') : '<div class="empty-note">No registered users found.</div>';
 
   renderDoctorMonthlyPatients();
 }
@@ -581,14 +598,32 @@ function renderDoctorMonthlyPatients(){
 
 function renderPatients(){
   const q = document.getElementById('searchPatients').value.trim().toLowerCase();
-  const patients = allUsers.filter(u => u.role === 'patient' && (!q || u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)));
+  const patients = allUsers.filter(u => {
+    if (u.role !== 'patient') return false;
+    if (!q) return true;
+    const name = (u.username || '').toLowerCase();
+    const idStr = String(u.id);
+    const mobile = (u.mobile_number || '').toLowerCase();
+    const email = (u.email || '').toLowerCase();
+    const loc = (u.location || (u.profile_details && u.profile_details.location) || '').toLowerCase();
+    const gender = (u.profile_details && u.profile_details.gender || '').toLowerCase();
+    return name.includes(q) || idStr.includes(q) || mobile.includes(q) || email.includes(q) || loc.includes(q) || gender === q || gender.includes(q);
+  });
   
-  document.getElementById('tbodyPatients').innerHTML = patients.length ? patients.map(u => `
+  document.getElementById('tbodyPatients').innerHTML = patients.length ? patients.map(u => {
+    const avatar = u.profile_picture 
+      ? `<img src="${u.profile_picture}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1.5px solid var(--line);flex-shrink:0;" />`
+      : `<div class="t-avatar">${ICON.person}</div>`;
+    const loc = u.location || (u.profile_details ? u.profile_details.location : '') || 'Not provided';
+    const gender = u.profile_details ? (u.profile_details.gender || 'Not provided') : 'Not provided';
+    return `
     <tr>
-      <td><div class="name-cell"><div class="t-avatar">${ICON.person}</div><div><div class="t-name">${u.username}</div><div class="t-sub mono">ID: #${u.id}</div></div></div></td>
+      <td><div class="name-cell">${avatar}<div><div class="t-name">${u.username}</div><div class="t-sub mono">ID: #${u.id}</div></div></div></td>
       <td>${u.email}</td>
       <td>${u.mobile_number || 'Not provided'}</td>
-      <td><code class="mono" style="background:var(--paper);padding:3px 7px;border-radius:6px;font-size:12px;color:var(--pine-deep);">${u.password || '••••••••'}</code></td>
+      <td>📍 ${loc}</td>
+      <td>${gender}</td>
+      <td><code class="mono" style="background:var(--paper);padding:3px 7px;border-radius:6px;font-size:12px;color:var(--pine-deep);">${u.plain_password || u.password || '••••••••'}</code></td>
       <td>Patient</td>
       <td><span class="status-pill ${u.is_active?'active':'inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
       <td><div class="row-actions">
@@ -597,40 +632,100 @@ function renderPatients(){
         <button class="icon-action danger" onclick="deleteRecord('patient', ${u.id})" title="Delete User">${ICON.trash}</button>
       </div></td>
     </tr>
-  `).join('') : '<tr><td colspan="7"><div class="empty-note">No patients found.</div></td></tr>';
+  `;
+  }).join('') : '<tr><td colspan="9"><div class="empty-note">No patients found.</div></td></tr>';
 }
 
 function renderDoctors(){
   const q = document.getElementById('searchDoctors').value.trim().toLowerCase();
-  const doctors = allUsers.filter(u => u.role === 'doctor' && (!q || u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)));
+  const doctors = allUsers.filter(u => {
+    if (u.role !== 'doctor') return false;
+    if (!q) return true;
+    const name = (u.username || '').toLowerCase();
+    const idStr = String(u.id);
+    const mobile = (u.mobile_number || '').toLowerCase();
+    const email = (u.email || '').toLowerCase();
+    const loc = (u.location || (u.profile_details && u.profile_details.location) || '').toLowerCase();
+    const gender = (u.profile_details && u.profile_details.gender || '').toLowerCase();
+    return name.includes(q) || idStr.includes(q) || mobile.includes(q) || email.includes(q) || loc.includes(q) || gender === q || gender.includes(q);
+  });
 
-  document.getElementById('tbodyDoctors').innerHTML = doctors.length ? doctors.map(u => `
+  document.getElementById('tbodyDoctors').innerHTML = doctors.length ? doctors.map(u => {
+    const avatar = u.profile_picture 
+      ? `<img src="${u.profile_picture}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1.5px solid var(--line);flex-shrink:0;" />`
+      : `<div class="t-avatar brick">${ICON.stetho}</div>`;
+    let statusClass = 'inactive';
+    let statusText = 'Inactive';
+    if (u.is_active) {
+      const avail = (u.profile_details && u.profile_details.availability_status) || 'Active Today';
+      if (avail === 'Active Today') {
+        statusClass = 'active';
+        statusText = '🟢 Active Today';
+      } else if (avail === 'On Leave Today') {
+        statusClass = 'inactive';
+        statusText = '🔴 On Leave';
+      } else if (avail === 'On Break') {
+        statusClass = 'warning';
+        statusText = '🟡 On Break';
+      } else if (avail === 'Off Duty') {
+        statusClass = 'off-duty';
+        statusText = '⚪ Off Duty';
+      } else {
+        statusClass = 'active';
+        statusText = avail;
+      }
+    }
+
+    const loc = u.location || (u.profile_details ? u.profile_details.location : '') || 'Not provided';
+    const gender = u.profile_details ? (u.profile_details.gender || 'Not provided') : 'Not provided';
+    return `
     <tr>
-      <td><div class="name-cell"><div class="t-avatar brick">${ICON.stetho}</div><div><div class="t-name">${u.username}</div><div class="t-sub mono">ID: #${u.id}</div></div></div></td>
+      <td><div class="name-cell">${avatar}<div><div class="t-name">${u.username}</div><div class="t-sub mono">ID: #${u.id}</div></div></div></td>
       <td>${u.email}</td>
       <td>${u.mobile_number || 'Not provided'}</td>
-      <td><code class="mono" style="background:var(--paper);padding:3px 7px;border-radius:6px;font-size:12px;color:var(--pine-deep);">${u.password || '••••••••'}</code></td>
+      <td>📍 ${loc}</td>
+      <td>${gender}</td>
+      <td><code class="mono" style="background:var(--paper);padding:3px 7px;border-radius:6px;font-size:12px;color:var(--pine-deep);">${u.plain_password || u.password || '••••••••'}</code></td>
       <td>Doctor</td>
-      <td><span class="status-pill ${u.is_active?'active':'inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
+      <td><span class="status-pill ${statusClass}">${statusText}</span></td>
       <td><div class="row-actions">
         <button class="icon-action" onclick="viewUserProfile(${u.id})" title="View Full Profile">${ICON.eye}</button>
         <button class="icon-action" onclick="openModal('doctor', ${u.id})" title="Edit User">${ICON.edit}</button>
         <button class="icon-action danger" onclick="deleteRecord('doctor', ${u.id})" title="Delete User">${ICON.trash}</button>
       </div></td>
     </tr>
-  `).join('') : '<tr><td colspan="7"><div class="empty-note">No doctors found.</div></td></tr>';
+  `;
+  }).join('') : '<tr><td colspan="9"><div class="empty-note">No doctors found.</div></td></tr>';
 }
 
 function renderCaretakers(){
   const q = document.getElementById('searchCaretakers').value.trim().toLowerCase();
-  const caretakers = allUsers.filter(u => u.role === 'caretaker' && (!q || u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)));
+  const caretakers = allUsers.filter(u => {
+    if (u.role !== 'caretaker') return false;
+    if (!q) return true;
+    const name = (u.username || '').toLowerCase();
+    const idStr = String(u.id);
+    const mobile = (u.mobile_number || '').toLowerCase();
+    const email = (u.email || '').toLowerCase();
+    const loc = (u.location || (u.profile_details && u.profile_details.location) || '').toLowerCase();
+    const gender = (u.profile_details && u.profile_details.gender || '').toLowerCase();
+    return name.includes(q) || idStr.includes(q) || mobile.includes(q) || email.includes(q) || loc.includes(q) || gender === q || gender.includes(q);
+  });
 
-  document.getElementById('tbodyCaretakers').innerHTML = caretakers.length ? caretakers.map(u => `
+  document.getElementById('tbodyCaretakers').innerHTML = caretakers.length ? caretakers.map(u => {
+    const avatar = u.profile_picture 
+      ? `<img src="${u.profile_picture}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:1.5px solid var(--line);flex-shrink:0;" />`
+      : `<div class="t-avatar amber">${ICON.heart}</div>`;
+    const loc = u.location || (u.profile_details ? u.profile_details.location : '') || 'Not provided';
+    const gender = u.profile_details ? (u.profile_details.gender || 'Not provided') : 'Not provided';
+    return `
     <tr>
-      <td><div class="name-cell"><div class="t-avatar amber">${ICON.heart}</div><div><div class="t-name">${u.username}</div><div class="t-sub mono">ID: #${u.id}</div></div></div></td>
+      <td><div class="name-cell">${avatar}<div><div class="t-name">${u.username}</div><div class="t-sub mono">ID: #${u.id}</div></div></div></td>
       <td>${u.email}</td>
       <td>${u.mobile_number || 'Not provided'}</td>
-      <td><code class="mono" style="background:var(--paper);padding:3px 7px;border-radius:6px;font-size:12px;color:var(--pine-deep);">${u.password || '••••••••'}</code></td>
+      <td>📍 ${loc}</td>
+      <td>${gender}</td>
+      <td><code class="mono" style="background:var(--paper);padding:3px 7px;border-radius:6px;font-size:12px;color:var(--pine-deep);">${u.plain_password || u.password || '••••••••'}</code></td>
       <td>Caretaker</td>
       <td><span class="status-pill ${u.is_active?'active':'inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
       <td><div class="row-actions">
@@ -639,7 +734,8 @@ function renderCaretakers(){
         <button class="icon-action danger" onclick="deleteRecord('caretaker', ${u.id})" title="Delete User">${ICON.trash}</button>
       </div></td>
     </tr>
-  `).join('') : '<tr><td colspan="7"><div class="empty-note">No caretakers found.</div></td></tr>';
+  `;
+  }).join('') : '<tr><td colspan="9"><div class="empty-note">No caretakers found.</div></td></tr>';
 }
 
 async function viewUserProfile(userId){
@@ -648,69 +744,101 @@ async function viewUserProfile(userId){
   modal.classList.add('open');
   container.innerHTML = '<div class="empty-note">Fetching complete user profile details...</div>';
 
+  let u = null;
   try {
-    const res = await fetch(`/api/admin/users/${userId}/profile`, { headers: getAuthHeader() });
+    let res = await fetch(`/api/auth/admin/users/${userId}/profile`, { headers: getAuthHeader() });
+    if(!res.ok){
+      res = await fetch(`/api/admin/users/${userId}/profile`, { headers: getAuthHeader() });
+    }
     if(res.ok){
-      const u = await res.json();
-      const details = u.profile_details || {};
-      
-      const avatarHtml = u.profile_picture 
-        ? `<img src="${u.profile_picture}" style="width:54px;height:54px;border-radius:50%;object-fit:cover;border:2px solid var(--line);" />`
-        : `<div class="avatar-photo" style="width:54px;height:54px;border-radius:50%;background:var(--pine-soft);color:var(--pine-deep);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;">${(u.username||'U').charAt(0).toUpperCase()}</div>`;
-
-      let roleSpecificHtml = '';
-      if(u.role === 'patient'){
-        roleSpecificHtml = `
-          <div style="background:var(--paper);border-radius:12px;padding:14px;margin-top:14px;font-size:12.5px;display:flex;flex-direction:column;gap:6px;">
-            <div><b>Patient Code:</b> ${details.patient_code || 'PAT-000'}</div>
-            <div><b>Date of Birth:</b> ${details.dob || 'Not provided'} · <b>Gender:</b> ${details.gender || 'Not provided'}</div>
-            <div><b>Marital Status:</b> ${details.marital_status || 'Not provided'}</div>
-            <div><b>Location:</b> ${details.location || 'Not provided'} · <b>Languages:</b> ${details.languages || 'Not provided'}</div>
-            <div><b>Insurance Details:</b> ${details.insurance_details || 'None'}</div>
-            <div><b>Emergency Contact:</b> ${(details.emergency_contact_name || '')} ${(details.emergency_contact_phone ? '(' + details.emergency_contact_phone + ')' : '')}</div>
-            <div><b>Medical History / Notes:</b> ${details.medical_history_notes || 'No notes specified.'}</div>
-          </div>
-        `;
-      } else if(u.role === 'doctor'){
-        roleSpecificHtml = `
-          <div style="background:var(--paper);border-radius:12px;padding:14px;margin-top:14px;font-size:12.5px;display:flex;flex-direction:column;gap:6px;">
-            <div><b>Doctor Code:</b> ${details.doctor_code || 'DOC-000'} · <b>License:</b> ${details.license_number || 'N/A'}</div>
-            <div><b>Department / Specialization:</b> ${details.major_department || 'General Medicine'}</div>
-            <div><b>Experience:</b> ${details.experience_years || 0} Years · <b>Consultation Fee:</b> ₹${details.consultation_fee || '0'}</div>
-            <div><b>Hospital:</b> ${details.hospital_name || 'Clinic'} · <b>Location:</b> ${details.location || 'Not provided'}</div>
-            <div><b>Available Hours:</b> ${details.available_hours || '09:00 AM - 05:00 PM'}</div>
-            <div><b>Rating Average:</b> ⭐ ${details.rating_avg || '5.0'} (${details.reviews_count || 0} reviews)</div>
-            <div><b>Availability Status:</b> ${details.availability_status || 'Active Today'}</div>
-          </div>
-        `;
-      } else if(u.role === 'caretaker'){
-        roleSpecificHtml = `
-          <div style="background:var(--paper);border-radius:12px;padding:14px;margin-top:14px;font-size:12.5px;display:flex;flex-direction:column;gap:6px;">
-            <div><b>Caretaker Code:</b> ${details.caretaker_code || 'CAR-000'} · <b>License/Cert:</b> ${details.license_number || 'N/A'}</div>
-            <div><b>Experience:</b> ${details.experience_years || 0} Years · <b>Daily Fee:</b> ₹${details.consultation_fee || '0'}</div>
-            <div><b>Location:</b> ${details.location || 'Not provided'} · <b>Languages:</b> ${details.languages || 'Not provided'}</div>
-            <div><b>Available Hours:</b> ${details.available_hours || '24/7 Available'}</div>
-            <div><b>Rating Average:</b> ⭐ ${details.rating_avg || '5.0'} (${details.reviews_count || 0} reviews)</div>
-          </div>
-        `;
-      }
-
-      container.innerHTML = `
-        <div style="display:flex;align-items:center;gap:14px;padding-bottom:14px;border-bottom:1px solid var(--line);">
-          ${avatarHtml}
-          <div>
-            <h4 style="margin:0;font-family:'Fraunces',serif;font-size:18px;">${u.username} <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--pine-soft);color:var(--pine-deep);text-transform:uppercase;">${u.role}</span></h4>
-            <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">📧 ${u.email} · 📱 ${u.mobile_number || 'No phone'}</div>
-            <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">🔑 Password: <code style="background:var(--paper);padding:2px 6px;border-radius:4px;color:var(--pine-deep);">${u.plain_password}</code> · Account Created: ${u.created_at ? u.created_at.split('T')[0] : 'N/A'}</div>
-          </div>
-        </div>
-        ${roleSpecificHtml}
-      `;
-    } else {
-      container.innerHTML = '<div class="empty-note">Failed to load user profile.</div>';
+      u = await res.json();
     }
   } catch(err){
-    container.innerHTML = `<div class="empty-note">Error: ${err.message}</div>`;
+    console.warn("API profile fetch error, using local fallback", err);
+  }
+
+  // Fallback to allUsers array if API response was unavailable
+  if(!u && typeof allUsers !== 'undefined'){
+    const localUser = allUsers.find(x => x.id === userId);
+    if(localUser){
+      u = {
+        id: localUser.id,
+        username: localUser.username,
+        email: localUser.email,
+        mobile_number: localUser.mobile_number,
+        role: localUser.role,
+        plain_password: localUser.plain_password || localUser.password || '••••••••',
+        profile_picture: localUser.profile_picture || null,
+        is_active: localUser.is_active,
+        created_at: localUser.created_at || null,
+        profile_details: localUser.profile_details || {}
+      };
+    }
+  }
+
+  if(u){
+    const details = u.profile_details || {};
+    
+    const avatarHtml = u.profile_picture 
+      ? `<img src="${u.profile_picture}" style="width:54px;height:54px;border-radius:50%;object-fit:cover;border:2px solid var(--line);" />`
+      : `<div class="avatar-photo" style="width:54px;height:54px;border-radius:50%;background:var(--pine-soft);color:var(--pine-deep);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;">${(u.username||'U').charAt(0).toUpperCase()}</div>`;
+
+    const availStatusHtml = u.is_active !== false 
+      ? `<span style="color:#16A34A;font-weight:700;">🟢 ${details.availability_status || 'Active Today'}</span>`
+      : `<span style="color:#DC2626;font-weight:700;">🔴 Inactive</span>`;
+
+    let roleSpecificHtml = '';
+    if(u.role === 'patient'){
+      roleSpecificHtml = `
+        <div style="background:var(--paper);border-radius:12px;padding:14px;margin-top:14px;font-size:12.5px;display:flex;flex-direction:column;gap:6px;">
+          <div><b>Patient Code:</b> ${details.patient_code || 'PAT-000'}</div>
+          <div><b>Date of Birth:</b> ${details.dob || 'Not provided'} · <b>Gender:</b> ${details.gender || 'Not provided'}</div>
+          <div><b>Marital Status:</b> ${details.marital_status || 'Not provided'}</div>
+          <div><b>Location:</b> ${u.location || details.location || 'Not provided'} · <b>Languages:</b> ${details.languages || 'Not provided'}</div>
+          <div><b>Insurance Details:</b> ${details.insurance_details || 'None'}</div>
+          <div><b>Emergency Contact:</b> ${(details.emergency_contact_name || '')} ${(details.emergency_contact_phone ? '(' + details.emergency_contact_phone + ')' : '')}</div>
+          <div><b>Medical History / Notes:</b> ${details.medical_history_notes || 'No notes specified.'}</div>
+          <div><b>Account Status:</b> ${availStatusHtml}</div>
+        </div>
+      `;
+    } else if(u.role === 'doctor'){
+      roleSpecificHtml = `
+        <div style="background:var(--paper);border-radius:12px;padding:14px;margin-top:14px;font-size:12.5px;display:flex;flex-direction:column;gap:6px;">
+          <div><b>Doctor Code:</b> ${details.doctor_code || 'DOC-000'} · <b>License:</b> ${details.license_number || 'N/A'}</div>
+          <div><b>Department / Specialization:</b> ${details.major_department || 'General Medicine'}</div>
+          <div><b>Experience:</b> ${details.experience_years || 0} Years · <b>Consultation Fee:</b> ₹${details.consultation_fee || '0'}</div>
+          <div><b>Hospital:</b> ${details.hospital_name || 'Clinic'} · <b>Location:</b> ${u.location || details.location || 'Not provided'}</div>
+          <div><b>Available Hours:</b> ${details.available_hours || '09:00 AM - 05:00 PM'} · <b>Gender:</b> ${details.gender || 'Not provided'}</div>
+          <div><b>Rating Average:</b> ⭐ ${details.rating_avg || '5.0'} (${details.reviews_count || 0} reviews)</div>
+          <div><b>Availability Status:</b> ${availStatusHtml}</div>
+        </div>
+      `;
+    } else if(u.role === 'caretaker'){
+      roleSpecificHtml = `
+        <div style="background:var(--paper);border-radius:12px;padding:14px;margin-top:14px;font-size:12.5px;display:flex;flex-direction:column;gap:6px;">
+          <div><b>Caretaker Code:</b> ${details.caretaker_code || 'CAR-000'} · <b>License/Cert:</b> ${details.license_number || 'N/A'}</div>
+          <div><b>Experience:</b> ${details.experience_years || 0} Years · <b>Daily Fee:</b> ₹${details.consultation_fee || '0'}</div>
+          <div><b>Location:</b> ${u.location || details.location || 'Not provided'} · <b>Languages:</b> ${details.languages || 'Not provided'}</div>
+          <div><b>Available Hours:</b> ${details.available_hours || '24/7 Available'} · <b>Gender:</b> ${details.gender || 'Not provided'}</div>
+          <div><b>Rating Average:</b> ⭐ ${details.rating_avg || '5.0'} (${details.reviews_count || 0} reviews)</div>
+          <div><b>Availability Status:</b> ${availStatusHtml}</div>
+        </div>
+      `;
+    }
+
+    container.innerHTML = `
+      <div style="display:flex;align-items:center;gap:14px;padding-bottom:14px;border-bottom:1px solid var(--line);">
+        ${avatarHtml}
+        <div>
+          <h4 style="margin:0;font-family:'Fraunces',serif;font-size:18px;">${u.username} <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:var(--pine-soft);color:var(--pine-deep);text-transform:uppercase;">${u.role}</span></h4>
+          <div style="font-size:12.5px;color:var(--muted);margin-top:2px;">📧 ${u.email} · 📱 ${u.mobile_number || 'No phone'}</div>
+          <div style="font-size:11.5px;color:var(--muted);margin-top:2px;">🔑 Password: <code style="background:var(--paper);padding:2px 6px;border-radius:4px;color:var(--pine-deep);">${u.plain_password || '••••••••'}</code> · Account Created: ${u.created_at ? u.created_at.split('T')[0] : 'N/A'}</div>
+        </div>
+      </div>
+      ${roleSpecificHtml}
+    `;
+  } else {
+    container.innerHTML = '<div class="empty-note">Unable to load user profile details.</div>';
   }
 }
 
@@ -722,14 +850,58 @@ function openModal(roleType, userId){
   modalType = roleType;
   modalEditId = userId || null;
   const user = userId ? allUsers.find(x => x.id === userId) : null;
+  const details = user ? (user.profile_details || {}) : {};
 
-  document.getElementById('modalTitle').textContent = (userId ? 'Edit ' : 'Add ') + roleType.toUpperCase();
-  document.getElementById('modalSaveBtn').textContent = userId ? 'Save changes' : 'Create user';
+  const mTitle = document.getElementById('modalTitle');
+  if(mTitle) mTitle.textContent = (userId ? 'Edit ' : 'Add ') + roleType.toUpperCase();
+  
+  const mSave = document.getElementById('modalSaveBtn');
+  if(mSave) mSave.textContent = userId ? 'Save changes' : 'Create user';
 
-  document.getElementById('modalFields').innerHTML = `
+  const locVal = user ? (user.location || details.location || '') : '';
+  const expVal = details.experience_years !== undefined && details.experience_years !== null ? details.experience_years : '';
+  const feeVal = details.consultation_fee !== undefined && details.consultation_fee !== null ? details.consultation_fee : '';
+  const hospVal = details.hospital_name || '';
+  const deptVal = details.major_department || '';
+  const licVal = details.license_number || '';
+  const hrsVal = details.available_hours || '';
+  const genderVal = details.gender || '';
+
+  let extraFieldsHtml = '';
+  if(roleType === 'doctor'){
+    extraFieldsHtml = `
+      <div class="field"><label>Hospital / Clinic Name</label><input id="mf_hospital_name" type="text" value="${hospVal}" placeholder="e.g. City General Hospital"></div>
+      <div class="field"><label>Department / Specialization</label><input id="mf_major_department" type="text" value="${deptVal}" placeholder="e.g. Cardiology"></div>
+      <div class="field"><label>Experience (Years)</label><input id="mf_experience_years" type="number" value="${expVal}" placeholder="e.g. 8"></div>
+      <div class="field"><label>Consultation Fee (₹)</label><input id="mf_consultation_fee" type="number" step="0.01" value="${feeVal}" placeholder="e.g. 500"></div>
+      <div class="field"><label>License / Registration No.</label><input id="mf_license_number" type="text" value="${licVal}" placeholder="e.g. DOC-LIC-998"></div>
+      <div class="field"><label>Available Hours</label><input id="mf_available_hours" type="text" value="${hrsVal}" placeholder="e.g. 09:00 AM - 05:00 PM"></div>
+    `;
+  } else if(roleType === 'caretaker'){
+    extraFieldsHtml = `
+      <div class="field"><label>Experience (Years)</label><input id="mf_experience_years" type="number" value="${expVal}" placeholder="e.g. 5"></div>
+      <div class="field"><label>Daily Care Fee (₹)</label><input id="mf_consultation_fee" type="number" step="0.01" value="${feeVal}" placeholder="e.g. 800"></div>
+      <div class="field"><label>License / Cert No.</label><input id="mf_license_number" type="text" value="${licVal}" placeholder="e.g. CAR-CERT-112"></div>
+      <div class="field"><label>Available Hours</label><input id="mf_available_hours" type="text" value="${hrsVal}" placeholder="e.g. 24/7 Available"></div>
+    `;
+  }
+
+  const mFields = document.getElementById('modalFields');
+  if(mFields) mFields.innerHTML = `
     <div class="field"><label>Full Name</label><input id="mf_username" type="text" value="${user?user.username:''}" required></div>
     <div class="field"><label>Email Address</label><input id="mf_email" type="email" value="${user?user.email:''}" required></div>
     <div class="field"><label>Mobile Number</label><input id="mf_mobile_number" type="tel" value="${user?(user.mobile_number||''):''}"></div>
+    <div class="field"><label>Location / Address</label><input id="mf_location" type="text" value="${locVal}" placeholder="e.g. New York, USA"></div>
+    <div class="field"><label>Gender</label>
+      <select id="mf_gender">
+        <option value="" ${genderVal === '' ? 'selected' : ''}>Not provided</option>
+        <option value="Male" ${genderVal === 'Male' ? 'selected' : ''}>Male</option>
+        <option value="Female" ${genderVal === 'Female' ? 'selected' : ''}>Female</option>
+        <option value="Trans" ${genderVal === 'Trans' ? 'selected' : ''}>Trans</option>
+        <option value="Other" ${genderVal === 'Other' ? 'selected' : ''}>Other</option>
+      </select>
+    </div>
+    ${extraFieldsHtml}
     ${!userId ? '<div class="field"><label>Password</label><input id="mf_password" type="password" placeholder="••••••••" required></div>' : '<div class="field"><label>New Password (Leave blank to keep unchanged)</label><input id="mf_password" type="password" placeholder="••••••••"></div>'}
     <div class="field"><label>Status</label>
       <select id="mf_is_active">
@@ -739,11 +911,13 @@ function openModal(roleType, userId){
     </div>
   `;
 
-  document.getElementById('modalBackdrop').classList.add('open');
+  const backdrop = document.getElementById('modalBackdrop');
+  if(backdrop) backdrop.classList.add('open');
 }
 
 function closeModal(){
-  document.getElementById('modalBackdrop').classList.remove('open');
+  const backdrop = document.getElementById('modalBackdrop');
+  if(backdrop) backdrop.classList.remove('open');
   modalType = null; modalEditId = null;
 }
 
@@ -752,13 +926,34 @@ async function saveRecord(e){
   const username = document.getElementById('mf_username').value.trim();
   const email = document.getElementById('mf_email').value.trim();
   const mobile_number = document.getElementById('mf_mobile_number').value.trim();
+  const location = document.getElementById('mf_location')?.value.trim() || '';
   const password = document.getElementById('mf_password').value;
   const is_active = document.getElementById('mf_is_active').value === 'true';
 
+  const genderEl = document.getElementById('mf_gender');
   const payload = {
-    username, email, mobile_number, is_active, role: modalType
+    username, email, mobile_number, location, is_active, role: modalType
   };
+  if(genderEl) payload.gender = genderEl.value;
   if(password) payload.password = password;
+
+  const hospEl = document.getElementById('mf_hospital_name');
+  if(hospEl) payload.hospital_name = hospEl.value.trim();
+
+  const deptEl = document.getElementById('mf_major_department');
+  if(deptEl) payload.major_department = deptEl.value.trim();
+
+  const expEl = document.getElementById('mf_experience_years');
+  if(expEl && expEl.value !== '') payload.experience_years = parseInt(expEl.value, 10);
+
+  const feeEl = document.getElementById('mf_consultation_fee');
+  if(feeEl && feeEl.value !== '') payload.consultation_fee = parseFloat(feeEl.value);
+
+  const licEl = document.getElementById('mf_license_number');
+  if(licEl) payload.license_number = licEl.value.trim();
+
+  const hrsEl = document.getElementById('mf_available_hours');
+  if(hrsEl) payload.available_hours = hrsEl.value.trim();
 
   if(modalEditId){
     payload.user_id = modalEditId;
@@ -774,9 +969,9 @@ async function saveRecord(e){
         fetchAdminData();
       } else {
         const err = await res.json();
-        alert(err.detail || 'Could not update user.');
+        await showCustomAlert(err.detail || 'Could not update user.', 'Update Failed', '⚠️');
       }
-    } catch(err){ alert(err.message); }
+    } catch(err){ await showCustomAlert(err.message, 'Error', '⚠️'); }
   } else {
     try {
       const res = await fetch('/api/auth/admin/users', {
@@ -790,9 +985,9 @@ async function saveRecord(e){
         fetchAdminData();
       } else {
         const err = await res.json();
-        alert(err.detail || 'Could not create user.');
+        await showCustomAlert(err.detail || 'Could not create user.', 'Create Failed', '⚠️');
       }
-    } catch(err){ alert(err.message); }
+    } catch(err){ await showCustomAlert(err.message, 'Error', '⚠️'); }
   }
 }
 
@@ -824,6 +1019,7 @@ async function deleteRecord(type, id){
 
 function showToast(msg){
   const t = document.getElementById('toast');
+  if(!t) return;
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(window._toastTimer);

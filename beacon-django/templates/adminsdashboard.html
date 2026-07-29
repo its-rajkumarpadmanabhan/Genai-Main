@@ -113,6 +113,8 @@
   .status-pill{font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:99px;display:inline-block;}
   .status-pill.active{background:#DCE9E2;color:var(--pine);}
   .status-pill.inactive{background:var(--brick-soft);color:var(--brick);}
+  .status-pill.warning{background:#FEF3C7;color:#D97706;}
+  .status-pill.off-duty{background:#E5E7EB;color:#4B5563;}
   .row-actions{display:flex;gap:6px;justify-content:flex-end;}
   .icon-action{width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:var(--paper);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted);}
   .icon-action:hover{color:var(--pine-deep);border-color:var(--pine);}
@@ -379,6 +381,9 @@ async function fetchAdminData(){
       renderPatients();
       renderDoctors();
       renderCaretakers();
+      
+      const activeSec = localStorage.getItem('admin_active_section') || 'overview';
+      switchSection(activeSec);
     } else if(res.status === 401 || res.status === 403){
       localStorage.clear();
       window.location.href = '/login';
@@ -387,6 +392,7 @@ async function fetchAdminData(){
 }
 
 function switchSection(sec){
+  localStorage.setItem('admin_active_section', sec);
   document.querySelectorAll('nav button').forEach(b => b.classList.toggle('active', b.dataset.sec === sec));
   ['overview','patients','doctors','caretakers'].forEach(s => {
     const el = document.getElementById('sec-'+s);
@@ -553,7 +559,16 @@ function renderReviews(){
 
 function renderPatients(){
   const q = document.getElementById('searchPatients').value.trim().toLowerCase();
-  const patients = allUsers.filter(u => u.role === 'patient' && (!q || u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)));
+  const patients = allUsers.filter(u => {
+    if (u.role !== 'patient') return false;
+    if (!q) return true;
+    const name = (u.username || '').toLowerCase();
+    const idStr = String(u.id);
+    const mobile = (u.mobile_number || '').toLowerCase();
+    const email = (u.email || '').toLowerCase();
+    const loc = (u.location || (u.profile_details && u.profile_details.location) || '').toLowerCase();
+    return name.includes(q) || idStr.includes(q) || mobile.includes(q) || email.includes(q) || loc.includes(q);
+  });
   
   document.getElementById('tbodyPatients').innerHTML = patients.length ? patients.map(u => `
     <tr>
@@ -572,26 +587,67 @@ function renderPatients(){
 
 function renderDoctors(){
   const q = document.getElementById('searchDoctors').value.trim().toLowerCase();
-  const doctors = allUsers.filter(u => u.role === 'doctor' && (!q || u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)));
+  const doctors = allUsers.filter(u => {
+    if (u.role !== 'doctor') return false;
+    if (!q) return true;
+    const name = (u.username || '').toLowerCase();
+    const idStr = String(u.id);
+    const mobile = (u.mobile_number || '').toLowerCase();
+    const email = (u.email || '').toLowerCase();
+    const loc = (u.location || (u.profile_details && u.profile_details.location) || '').toLowerCase();
+    return name.includes(q) || idStr.includes(q) || mobile.includes(q) || email.includes(q) || loc.includes(q);
+  });
 
-  document.getElementById('tbodyDoctors').innerHTML = doctors.length ? doctors.map(u => `
+  document.getElementById('tbodyDoctors').innerHTML = doctors.length ? doctors.map(u => {
+    let statusClass = 'inactive';
+    let statusText = 'Inactive';
+    if (u.is_active) {
+      const avail = (u.profile_details && u.profile_details.availability_status) || 'Active Today';
+      if (avail === 'Active Today') {
+        statusClass = 'active';
+        statusText = '🟢 Active Today';
+      } else if (avail === 'On Leave Today') {
+        statusClass = 'inactive';
+        statusText = '🔴 On Leave';
+      } else if (avail === 'On Break') {
+        statusClass = 'warning';
+        statusText = '🟡 On Break';
+      } else if (avail === 'Off Duty') {
+        statusClass = 'off-duty';
+        statusText = '⚪ Off Duty';
+      } else {
+        statusClass = 'active';
+        statusText = avail;
+      }
+    }
+    return `
     <tr>
       <td><div class="name-cell"><div class="t-avatar brick">${ICON.stetho}</div><div><div class="t-name">${u.username}</div><div class="t-sub mono">ID: #${u.id}</div></div></div></td>
       <td>${u.email}</td>
       <td>${u.mobile_number || 'Not provided'}</td>
       <td>Doctor</td>
-      <td><span class="status-pill ${u.is_active?'active':'inactive'}">${u.is_active?'Active':'Inactive'}</span></td>
+      <td><span class="status-pill ${statusClass}">${statusText}</span></td>
       <td><div class="row-actions">
         <button class="icon-action" onclick="openModal('doctor', ${u.id})">${ICON.edit}</button>
         <button class="icon-action danger" onclick="deleteRecord('doctor', ${u.id})">${ICON.trash}</button>
       </div></td>
     </tr>
-  `).join('') : '<tr><td colspan="6"><div class="empty-note">No doctors found.</div></td></tr>';
+  `;
+  }).join('') : '<tr><td colspan="6"><div class="empty-note">No doctors found.</div></td></tr>';
 }
 
 function renderCaretakers(){
   const q = document.getElementById('searchCaretakers').value.trim().toLowerCase();
-  const caretakers = allUsers.filter(u => u.role === 'caretaker' && (!q || u.username.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)));
+  const caretakers = allUsers.filter(u => {
+    if (u.role !== 'caretaker') return false;
+    if (!q) return true;
+    const name = (u.username || '').toLowerCase();
+    const idStr = String(u.id);
+    const mobile = (u.mobile_number || '').toLowerCase();
+    const email = (u.email || '').toLowerCase();
+    const loc = (u.location || (u.profile_details && u.profile_details.location) || '').toLowerCase();
+    return name.includes(q) || idStr.includes(q) || mobile.includes(q) || email.includes(q) || loc.includes(q);
+  });
 
   document.getElementById('tbodyCaretakers').innerHTML = caretakers.length ? caretakers.map(u => `
     <tr>
@@ -613,10 +669,14 @@ function openModal(roleType, userId){
   modalEditId = userId || null;
   const user = userId ? allUsers.find(x => x.id === userId) : null;
 
-  document.getElementById('modalTitle').textContent = (userId ? 'Edit ' : 'Add ') + roleType.toUpperCase();
-  document.getElementById('modalSaveBtn').textContent = userId ? 'Save changes' : 'Create user';
+  const mTitle = document.getElementById('modalTitle');
+  if(mTitle) mTitle.textContent = (userId ? 'Edit ' : 'Add ') + roleType.toUpperCase();
+  
+  const mSave = document.getElementById('modalSaveBtn');
+  if(mSave) mSave.textContent = userId ? 'Save changes' : 'Create user';
 
-  document.getElementById('modalFields').innerHTML = `
+  const mFields = document.getElementById('modalFields');
+  if(mFields) mFields.innerHTML = `
     <div class="field"><label>Full Name</label><input id="mf_username" type="text" value="${user?user.username:''}" required></div>
     <div class="field"><label>Email Address</label><input id="mf_email" type="email" value="${user?user.email:''}" required></div>
     <div class="field"><label>Mobile Number</label><input id="mf_mobile_number" type="tel" value="${user?(user.mobile_number||''):''}"></div>
@@ -629,11 +689,13 @@ function openModal(roleType, userId){
     </div>
   `;
 
-  document.getElementById('modalBackdrop').classList.add('open');
+  const backdrop = document.getElementById('modalBackdrop');
+  if(backdrop) backdrop.classList.add('open');
 }
 
 function closeModal(){
-  document.getElementById('modalBackdrop').classList.remove('open');
+  const backdrop = document.getElementById('modalBackdrop');
+  if(backdrop) backdrop.classList.remove('open');
   modalType = null; modalEditId = null;
 }
 
@@ -706,6 +768,7 @@ async function deleteRecord(type, id){
 
 function showToast(msg){
   const t = document.getElementById('toast');
+  if(!t) return;
   t.textContent = msg;
   t.classList.add('show');
   clearTimeout(window._toastTimer);

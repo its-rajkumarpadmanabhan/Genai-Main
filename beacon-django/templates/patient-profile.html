@@ -368,6 +368,7 @@
             <option value="">Select Gender</option>
             <option value="Male">Male</option>
             <option value="Female">Female</option>
+            <option value="Trans">Trans</option>
             <option value="Other">Other</option>
           </select>
         </div>
@@ -556,8 +557,13 @@ async function loadPatientProfile(){
         } catch(e){}
       }
     } else {
+      let detail = 'Your account no longer exists or has been deleted by Admin. Please sign up to create a new profile.';
+      try {
+        const err = await res.json();
+        if (err && err.detail) detail = err.detail;
+      } catch(e){}
       localStorage.clear();
-      alert('Your account no longer exists or has been deleted by Admin. Please sign up to create a new profile.');
+      alert(detail);
       window.location.href = '/login';
     }
   } catch(e){ console.log(e); }

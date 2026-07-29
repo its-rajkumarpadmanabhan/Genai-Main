@@ -164,7 +164,7 @@ class LoginView(APIView):
 
         if not user.is_active:
             return Response(
-                {'detail': 'This account has been deactivated.'},
+                {'detail': 'Your account is inactive. Please contact the administrator.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
@@ -468,7 +468,7 @@ class AdminUserProfileView(APIView):
         if request.user.role != 'admin' and not request.user.is_staff:
             return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
         
-        target_user = CustomUser.objects.filter(id=user_id).first()
+        target_user = User.objects.filter(id=user_id).first()
         if not target_user:
             return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
 
@@ -518,14 +518,46 @@ class AdminUsersView(APIView):
         users = User.objects.all().order_by('-created_at')
         users_data = []
         for u in users:
+            pic = u.profile_picture or None
+            loc = 'Not provided'
+            details = {}
+            if u.role == 'patient':
+                p_prof = getattr(u, 'patient_profile', None)
+                if p_prof:
+                    loc = p_prof.location or 'Not provided'
+                    if not pic and getattr(p_prof, 'profile_picture', None):
+                        pic = p_prof.profile_picture
+                    from .serializers import PatientProfileSerializer
+                    details = PatientProfileSerializer(p_prof).data
+            elif u.role == 'doctor':
+                d_prof = getattr(u, 'doctor_profile', None)
+                if d_prof:
+                    loc = d_prof.location or 'Not provided'
+                    if not pic and getattr(d_prof, 'profile_picture', None):
+                        pic = d_prof.profile_picture
+                    from .serializers import DoctorProfileSerializer
+                    details = DoctorProfileSerializer(d_prof).data
+            elif u.role == 'caretaker':
+                c_prof = getattr(u, 'caretaker_profile', None)
+                if c_prof:
+                    loc = c_prof.location or 'Not provided'
+                    if not pic and getattr(c_prof, 'profile_picture', None):
+                        pic = c_prof.profile_picture
+                    from .serializers import CaretakerProfileSerializer
+                    details = CaretakerProfileSerializer(c_prof).data
+
             users_data.append({
                 'id': u.id,
                 'username': u.username,
                 'email': u.email,
                 'mobile_number': u.mobile_number,
                 'role': u.role,
+                'location': loc,
+                'plain_password': u.plain_password or '••••••••',
+                'profile_picture': pic,
                 'is_active': u.is_active,
                 'created_at': u.created_at.isoformat() if u.created_at else None,
+                'profile_details': details
             })
         return Response(users_data)
 
@@ -538,6 +570,14 @@ class AdminUsersView(APIView):
         mobile = request.data.get('mobile_number', '')
         password = request.data.get('password', 'DefaultPass123!')
         role = request.data.get('role', 'patient')
+        location = request.data.get('location', '')
+        experience_years = request.data.get('experience_years')
+        consultation_fee = request.data.get('consultation_fee')
+        hospital_name = request.data.get('hospital_name', '')
+        major_department = request.data.get('major_department', '')
+        license_number = request.data.get('license_number', '')
+        available_hours = request.data.get('available_hours', '')
+        gender = request.data.get('gender', '')
 
         if User.objects.filter(username__iexact=username).exists():
             return Response({'detail': 'Username already exists.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -545,11 +585,34 @@ class AdminUsersView(APIView):
         u = User.objects.create_user(username=username, email=email, mobile_number=mobile, password=password, role=role)
         from .models import DoctorProfile, PatientProfile, CaretakerProfile
         if role == 'patient':
-            PatientProfile.objects.get_or_create(user=u, defaults={'full_name': username})
+            PatientProfile.objects.get_or_create(user=u, defaults={'full_name': username, 'location': location, 'gender': gender})
         elif role == 'doctor':
-            DoctorProfile.objects.get_or_create(user=u, defaults={'full_name': username})
+            d_prof, _ = DoctorProfile.objects.get_or_create(user=u, defaults={
+                'full_name': username, 'location': location, 'hospital_name': hospital_name or 'City Clinic',
+                'major_department': major_department or 'General Medicine', 'license_number': license_number or 'DOC-LIC-001',
+                'gender': gender
+            })
+            if experience_years is not None:
+                try: d_prof.experience_years = int(experience_years)
+                except (ValueError, TypeError): pass
+            if consultation_fee is not None:
+                try: d_prof.consultation_fee = float(consultation_fee)
+                except (ValueError, TypeError): pass
+            if available_hours: d_prof.available_hours = available_hours
+            d_prof.save()
         elif role == 'caretaker':
-            CaretakerProfile.objects.get_or_create(user=u, defaults={'full_name': username})
+            c_prof, _ = CaretakerProfile.objects.get_or_create(user=u, defaults={
+                'full_name': username, 'location': location, 'license_number': license_number or 'CAR-CERT-001',
+                'gender': gender
+            })
+            if experience_years is not None:
+                try: c_prof.experience_years = int(experience_years)
+                except (ValueError, TypeError): pass
+            if consultation_fee is not None:
+                try: c_prof.consultation_fee = float(consultation_fee)
+                except (ValueError, TypeError): pass
+            if available_hours: c_prof.available_hours = available_hours
+            c_prof.save()
 
         return Response({'status': 'success', 'user_id': u.id}, status=status.HTTP_201_CREATED)
 
@@ -567,6 +630,13 @@ class AdminUsersView(APIView):
         new_username = request.data.get('username')
         new_mobile = request.data.get('mobile_number')
         new_role = request.data.get('role')
+        new_location = request.data.get('location')
+        new_gender = request.data.get('gender')
+
+        if new_gender is not None:
+            PatientProfile.objects.filter(user=user).update(gender=new_gender)
+            DoctorProfile.objects.filter(user=user).update(gender=new_gender)
+            CaretakerProfile.objects.filter(user=user).update(gender=new_gender)
 
         if new_username:
             user.username = new_username
@@ -583,17 +653,67 @@ class AdminUsersView(APIView):
             DoctorProfile.objects.filter(user=user).update(phone_number=new_mobile)
             CaretakerProfile.objects.filter(user=user).update(phone_number=new_mobile)
 
+        if new_location is not None:
+            PatientProfile.objects.filter(user=user).update(location=new_location)
+            DoctorProfile.objects.filter(user=user).update(location=new_location)
+            CaretakerProfile.objects.filter(user=user).update(location=new_location)
+
         if new_role:
             user.role = new_role
             if new_role == 'patient':
-                PatientProfile.objects.get_or_create(user=user, defaults={'full_name': user.username, 'phone_number': user.mobile_number})
+                PatientProfile.objects.get_or_create(user=user, defaults={'full_name': user.username, 'phone_number': user.mobile_number, 'location': new_location or ''})
             elif new_role == 'doctor':
-                DoctorProfile.objects.get_or_create(user=user, defaults={'full_name': user.username, 'phone_number': user.mobile_number})
+                DoctorProfile.objects.get_or_create(user=user, defaults={'full_name': user.username, 'phone_number': user.mobile_number, 'location': new_location or ''})
             elif new_role == 'caretaker':
-                CaretakerProfile.objects.get_or_create(user=user, defaults={'full_name': user.username, 'phone_number': user.mobile_number})
+                CaretakerProfile.objects.get_or_create(user=user, defaults={'full_name': user.username, 'phone_number': user.mobile_number, 'location': new_location or ''})
+
+        # Update Doctor / Caretaker / Patient specific fields if sent
+        if user.role == 'doctor':
+            d_prof, _ = DoctorProfile.objects.get_or_create(user=user)
+            if 'experience_years' in request.data:
+                try: d_prof.experience_years = int(request.data['experience_years'])
+                except (ValueError, TypeError): pass
+            if 'consultation_fee' in request.data:
+                try: d_prof.consultation_fee = float(request.data['consultation_fee'])
+                except (ValueError, TypeError): pass
+            if 'hospital_name' in request.data and request.data['hospital_name']:
+                d_prof.hospital_name = request.data['hospital_name']
+            if 'major_department' in request.data and request.data['major_department']:
+                d_prof.major_department = request.data['major_department']
+            if 'license_number' in request.data and request.data['license_number']:
+                d_prof.license_number = request.data['license_number']
+            if 'available_hours' in request.data and request.data['available_hours']:
+                d_prof.available_hours = request.data['available_hours']
+            if new_location is not None:
+                d_prof.location = new_location
+            d_prof.save()
+
+        elif user.role == 'caretaker':
+            c_prof, _ = CaretakerProfile.objects.get_or_create(user=user)
+            if 'experience_years' in request.data:
+                try: c_prof.experience_years = int(request.data['experience_years'])
+                except (ValueError, TypeError): pass
+            if 'consultation_fee' in request.data:
+                try: c_prof.consultation_fee = float(request.data['consultation_fee'])
+                except (ValueError, TypeError): pass
+            if 'license_number' in request.data and request.data['license_number']:
+                c_prof.license_number = request.data['license_number']
+            if 'available_hours' in request.data and request.data['available_hours']:
+                c_prof.available_hours = request.data['available_hours']
+            if new_location is not None:
+                c_prof.location = new_location
+            c_prof.save()
+
+        elif user.role == 'patient':
+            p_prof, _ = PatientProfile.objects.get_or_create(user=user)
+            if new_location is not None:
+                p_prof.location = new_location
+            p_prof.save()
 
         if 'is_active' in request.data:
             user.is_active = bool(request.data['is_active'])
+            status_str = 'Active Today' if user.is_active else 'Inactive'
+            DoctorProfile.objects.filter(user=user).update(availability_status=status_str)
 
         if 'password' in request.data and request.data['password']:
             user.set_password(request.data['password'])
@@ -643,6 +763,20 @@ class PatientProfileView(APIView):
             if hasattr(profile, k):
                 setattr(profile, k, v)
         profile.save()
+
+        # Sync back to User model
+        sync_user = False
+        if profile.full_name and profile.full_name != request.user.username:
+            request.user.username = profile.full_name
+            sync_user = True
+        if getattr(profile, 'phone_number', None) and profile.phone_number != request.user.mobile_number:
+            request.user.mobile_number = profile.phone_number
+            sync_user = True
+        if getattr(profile, 'email', None) and profile.email != request.user.email:
+            request.user.email = profile.email
+            sync_user = True
+        if sync_user:
+            request.user.save()
         from .serializers import PatientProfileSerializer
         return Response(PatientProfileSerializer(profile).data)
 
@@ -1074,6 +1208,20 @@ class DoctorProfileView(APIView):
             if hasattr(profile, k):
                 setattr(profile, k, v)
         profile.save()
+
+        # Sync back to User model
+        sync_user = False
+        if profile.full_name and profile.full_name != request.user.username:
+            request.user.username = profile.full_name
+            sync_user = True
+        if profile.phone_number and profile.phone_number != request.user.mobile_number:
+            request.user.mobile_number = profile.phone_number
+            sync_user = True
+        if 'email' in request.data:
+            request.user.email = request.data['email']
+            sync_user = True
+        if sync_user:
+            request.user.save()
         
         if old_availability != 'On Leave Today' and profile.availability_status == 'On Leave Today':
             today = datetime.date.today()
@@ -1488,6 +1636,17 @@ class CaretakerProfileView(APIView):
             if hasattr(profile, k):
                 setattr(profile, k, v)
         profile.save()
+
+        # Sync back to User model
+        sync_user = False
+        if profile.full_name and profile.full_name != request.user.username:
+            request.user.username = profile.full_name
+            sync_user = True
+        if getattr(profile, 'phone_number', None) and profile.phone_number != request.user.mobile_number:
+            request.user.mobile_number = profile.phone_number
+            sync_user = True
+        if sync_user:
+            request.user.save()
         return Response(CaretakerProfileSerializer(profile).data)
 
 

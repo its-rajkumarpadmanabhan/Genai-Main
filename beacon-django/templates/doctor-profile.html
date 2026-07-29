@@ -331,6 +331,7 @@
     <form id="editForm" onsubmit="saveProfile(event)">
       <div class="form-grid">
         <div class="field full"><label>Full Name</label><input id="inputName" type="text" placeholder="Full Name" required></div>
+        <div class="field full"><label>Email Address</label><input id="inputEmail" type="email" placeholder="Email Address" required></div>
         <div class="field full"><label>Today's Availability Status</label>
           <select id="inputAvailability">
             <option value="Active Today">🟢 Active / Working Today</option>
@@ -344,7 +345,7 @@
           <select id="inputGender" style="width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-size:13px;background:var(--paper);color:var(--ink);">
             <option value="Male">Male</option>
             <option value="Female">Female</option>
-            <option value="Other">Other</option>
+            <option value="Trans">Trans</option>
           </select>
         </div>
         <div class="field"><label>Experience (Years)</label><input id="inputExp" type="number" placeholder="e.g. 10"></div>
@@ -547,8 +548,13 @@ async function loadDoctorProfile(){
         } catch(e){}
       }
     } else if(res.status === 401){
+      let detail = 'Your login session has expired. Please log in again.';
+      try {
+        const err = await res.json();
+        if (err && err.detail) detail = err.detail;
+      } catch(e){}
       localStorage.clear();
-      alert('Your login session has expired. Please log in again.');
+      alert(detail);
       window.location.href = '/login';
     } else {
       const err = await res.json().catch(() => ({}));
@@ -1044,6 +1050,7 @@ function closeDocumentPreviewModal(){
 
 function openEditModal(){
   document.getElementById('inputName').value = profileData.full_name || '';
+  document.getElementById('inputEmail').value = profileData.email || '';
   document.getElementById('inputAvailability').value = profileData.availability_status || 'Active Today';
   document.getElementById('inputDept').value = profileData.major_department || '';
   document.getElementById('inputGender').value = profileData.gender || 'Male';
@@ -1065,6 +1072,7 @@ async function saveProfile(e){
   e.preventDefault();
   const payload = {
     full_name: document.getElementById('inputName').value,
+    email: document.getElementById('inputEmail').value,
     availability_status: document.getElementById('inputAvailability').value,
     major_department: document.getElementById('inputDept').value,
     gender: document.getElementById('inputGender').value,
