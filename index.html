@@ -961,6 +961,7 @@ footer{
       <a href="#email">Email system</a>
       <a href="#checklist">Function checklist</a>
       <a href="#requirements">Requirements &amp; fixes</a>
+      <a href="#notes">Working notes &amp; walkthrough</a>
       <a href="#seed-accounts">Seed / test accounts</a>
       <a href="#env">Environment</a>
     </nav>
@@ -1634,9 +1635,206 @@ footer{
       </div>
     </section>
 
+    <!-- WORKING NOTES & WALKTHROUGH -->
+    <section id="notes">
+      <div class="section-head reveal"><span class="section-num">09</span><h2>Working notes &amp; walkthrough</h2></div>
+      <p class="section-desc reveal">Raw running notes from the dev diary, plus the status of every implementation plan and test walkthrough written so far — organised by theme, unedited in substance. Two direct conflicts with the formal requirements doc are flagged at the bottom.</p>
+
+      <div class="model-list reveal">
+
+        <details class="model" open>
+          <summary><span>A. Authentication &amp; security — raw notes</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">auth</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <ul class="req-list">
+              <li>Signup sends a 4-digit OTP to the user's email; user must enter the correct OTP before they can log in.</li>
+              <li>Fix flicker on the "add new password and submit" page — should redirect cleanly to login.</li>
+              <li>Forgot password: user clicks "Forgot password?" on the login page → new page asks for registered <b>phone number</b> and <b>email</b> → both are checked against the database. If they don't match the same user record, show "invalid entry." If they match, send the user to reset their password.</li>
+              <li>Once a user logs out, they can't access that account until they re-login — remove any "move backward to access account login" behaviour (i.e. block back-button re-entry).</li>
+              <li>Full security checkup for all users and page-access restriction by role; after logout, users can't access their profile without logging in again.</li>
+              <li>Admin can set a user's <b>status</b> to "inactive" — that user can't log in and sees "contact administrator." Only admin switching status back to "active" restores access.</li>
+              <li>Every account deletion (any role) triggers an "account is deleted" email with user details.</li>
+              <li>Send a login confirmation email each time, and check whether the email on file matches or was updated.</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>B. Appointment booking rules — raw notes</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">core</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <ul class="req-list">
+              <li>A patient/caretaker can book one appointment with one doctor per day; if that appointment is cancelled or missed, they can book again that same day.</li>
+              <li>Add "cancel booking" to appointments on the patient/caretaker profile.</li>
+              <li>A patient/caretaker can book a maximum of <b>3 appointments "today"</b>, and can't double-book the same date + time as an existing appointment.</li>
+              <li>Booking is only allowed within a doctor's posted "Available Hours" — no confirmation past that window.</li>
+              <li>Can't book today's date after the doctor's duty hours are already over — only next-day booking applies then.</li>
+              <li>Patient/caretaker can only book within the <b>current week</b> — not next week, next month, or next year.</li>
+              <li>A patient can't book/visit multiple doctors for the same medical condition at the same day or time; can't reach all doctors on the same day at the same time.</li>
+              <li>Upcoming appointment count should sit between <b>3–5</b> (later note revises this to <b>5–8</b> — see conflicts below) for both patient and caretaker views; also check this window against doctor-side limits.</li>
+              <li>Move "rejected / completed / missed" into a separate category — main view should only show today's <b>accepted</b> appointments.</li>
+              <li>"✓ COMPLETED" appointment info should move into a new "Past" section under Caretaker Connections &amp; Requests.</li>
+              <li>Doctor accept/reject → email to patient + assigned caretaker; accepted mail includes doctor name, time, location, date.</li>
+              <li>Fix: "book" button not working in doctor-caretaker-list appointment flow.</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>C. Caretaker ↔ patient relationship — raw notes</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="status-pill rejected">conflict</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <ul class="req-list">
+              <li>Stated repeatedly, across several passes of notes: <b>one caretaker holds one patient at a time</b>, and <b>one patient holds one caretaker at a time</b> — multiple on either side not allowed.</li>
+              <li>Once a caretaker/patient disconnects, the freed party can choose or accept a new match.</li>
+              <li>Caretaker can only book/see the <b>current</b> patient's appointments — not past connections, unless reconnected. On disconnect, past appointment/booking data becomes invisible to the caretaker unless they reconnect.</li>
+              <li>Caretaker rule restated once more, explicitly: "one patient at a time."</li>
+              <li>Bug: "My Patients" shows "No patients currently under your care" even though "Patient Care Requests &amp; Appointments → Accepted Care (1)" shows an accepted patient — data isn't syncing. "Patients List" is also empty in this state.</li>
+              <li>Update "Active Patient Under Care" and "Past Patients Folder" sections on the caretaker profile to reflect this 1:1 model; add a "Past Connections" folder section to the patient profile too.</li>
+              <li>See <b>Conflicts</b> box below — this directly contradicts the 5-caretaker / 2-patient limit in the formal requirements doc (§3 in the section above).</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>D. Video calls — raw notes</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">calls</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <ul class="req-list">
+              <li>Only a doctor can start a call with a patient; there must be an option to add a caretaker into that call.</li>
+              <li>One doctor + one patient (+ caretaker) at a time in a meeting — no one else can join or be added.</li>
+              <li>When a doctor starts a call, the particular patient and their caretaker get a notification on their profile to join.</li>
+              <li>Remove the "📴 End Video Call Session" button.</li>
+              <li>After "✓ Mark Checkup Completed" is clicked, remove the video call option for that appointment; doctor can additionally pull in another registered doctor from the site for a second opinion via search.</li>
+              <li>Suggested managed video providers considered instead of raw WebRTC/WebSocket signaling: Agora.io, Daily.co, Twilio Video, or a self-hosted Jitsi Meet.</li>
+              <li>Polling on the caretaker dashboard must not visibly reload the page, and must <b>never poll while a video call is active</b> — this applies across doctor/caretaker/patient calls.</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>E. Profile &amp; data fixes — raw notes</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">profiles</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <div class="req-sub-title">Doctor profile</div>
+            <ul class="req-list">
+              <li>Add "State," "Location (city)," and "Hospital Name (matching that state/location)" fields.</li>
+              <li>"Patient Appointments → Today" should show empty state correctly when there's nothing booked; "Assigned Patients" should show "no user selected" rather than a stale preview.</li>
+              <li>Add a new "Patients List" page above the "Directory" section — details per patient: total appointment count split online/offline, last appointment date/time, upcoming appointment count, a "view profile" icon, and a search bar. Styled like a folder view (reference image was supplied separately).</li>
+              <li>"Available Hours" on every doctor profile should be the only bookable window; no confirmation outside it.</li>
+            </ul>
+            <div class="req-sub-title">Patient profile</div>
+            <ul class="req-list">
+              <li>Auto-fill any "Medical History / Notes" left empty.</li>
+              <li>Fix "Medical Documents Upload Failed" bug; update "Medical Documents" to show a total document count.</li>
+              <li>Add a new "Appointments" section below "Find Caretaker / Doctor" — folder view of visited doctors, visit count, last-visited date, upcoming appointment count.</li>
+              <li>Add a "Past Connections" folder section below "Find Caretaker / Doctor" for past caretakers.</li>
+            </ul>
+            <div class="req-sub-title">Caretaker profile</div>
+            <ul class="req-list">
+              <li>Add a "Patients" folder below "Directory" — past patients, last working date, visited doctors' names with total appointment counts.</li>
+              <li>Profile picture uploads (all roles) currently don't persist visually after a page refresh — needs fixing.</li>
+            </ul>
+            <div class="req-sub-title">General / all profiles</div>
+            <ul class="req-list">
+              <li>Add a profile picture upload section to every user type; make every user's profile picture visible to all other users.</li>
+              <li>Replace the current green theme: <b>DodgerBlue</b> for doctors, <b>SlateBlue</b> for caretakers, <b>Orange</b> for patients.</li>
+              <li>If a user updates their own details, that change must also be reflected in search results.</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>F. Seed data requirements — raw notes</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">data</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <ul class="req-list">
+              <li>No fake/placeholder users — every user must be a real record already present in the database.</li>
+              <li>Each doctor: ≥5 different patients, ≥15 past appointments, ≥10 upcoming appointments, ≥12 "today" appointments.</li>
+              <li>Each patient: minimum 2 caretakers in "Past Connections"; patients aged 60+ should show 5–8 in "Past Connections." "Rejected / Past (0)" as the baseline otherwise.</li>
+              <li>Each caretaker: minimum 3–4 connections under "Past."</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>G. UI polish &amp; misc bug fixes — raw notes</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">ui</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <ul class="req-list">
+              <li>Caretaker's "patients preview" report errors out; the preview page goes behind the main window when opening a document preview.</li>
+              <li>Admin dashboard resets to "Overview" on refresh instead of preserving the currently open section.</li>
+              <li>Remove dead text: "📋 Medical History &amp; Doctor Notes: null (DR)."</li>
+              <li>Fix Malayalam translation errors in the Voice AI engine.</li>
+              <li>Fix admin profile error: "User Profile Details Failed to load user profile."</li>
+              <li>Delete the old "doctor's appointment," "Caretaker Connections &amp; Requests," and "Patient Care Requests &amp; Appointments" detail views once the new sectioned layout (Today / Upcoming / Past) is in place under caretaker-dashboard's "Doctor Appointments."</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>H. Implementation status — from the plan &amp; walkthrough docs</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="status-pill missed">check before trusting</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <div class="req-sub-title">Account deletion + login confirmation + email sync</div>
+            <ul class="req-list">
+              <li><code>implementation_plan.md</code> scoped: <code>send_account_deleted_email</code> / <code>trigger_account_deleted_email</code>, <code>send_login_confirmation_email</code> / <code>trigger_login_confirmation_email</code> in <code>emails.py</code>; an <code>extract_user_details</code> helper plus edits to <code>DeleteSelfProfileView</code>, <code>AdminUsersView</code>, and <code>LoginView</code> in <code>views.py</code>.</li>
+              <li><code>walkthrough.md</code> reports this as <span class="status-pill completed">fully built &amp; tested</span> — including the email/profile sync on login, both delete-notification paths, and a passing integration script (<code>test_emails_and_sync.py</code>, 3/3 tests green). It also separately reports the reset-password localStorage flicker fixed.</li>
+              <li><code>task.md</code>'s own checklist disagrees — it still shows the <code>views.py</code> changes and all three verification steps as <b>unchecked</b> <span class="status-pill rejected">unresolved</span>. Only the two <code>emails.py</code> items are marked in-progress.</li>
+            </ul>
+            <div class="req-sub-title">Signup OTP verification</div>
+            <ul class="req-list">
+              <li><code>implementation_plan2</code> scopes a new <code>SignupOTP</code> model, a <code>send_signup_otp_email</code> helper, <code>SignupView</code> changes (create user inactive, generate + email OTP), plus new <code>VerifyOTPView</code> and <code>ResendOTPView</code> endpoints and matching signup-page UI.</li>
+              <li>No <code>task.md</code> or <code>walkthrough.md</code> exists for this plan — build status is unknown; needs a direct check against the current codebase.</li>
+            </ul>
+          </div>
+        </details>
+
+      </div>
+
+      <div class="note reveal">
+        <b>⚠️ Conflicts to resolve before building:</b><br><br>
+        <b>1. Caretaker↔patient cardinality.</b> Raw notes state — repeatedly, and most recently — a strict 1:1 rule (one caretaker per patient, one patient per caretaker). <code>Beacon_Health_Requirements.docx</code> §3 states patients may request up to 5 caretakers and caretakers may accept up to 2 patients. These can't both be implemented; the data model (single FK vs. many-to-many) depends on which one wins.<br><br>
+        <b>2. Upcoming-appointment cap.</b> One note says "3 to 5," a later note says "5 to 8." Needs a single number.<br><br>
+        <b>3. Plan-vs-checklist mismatch.</b> <code>walkthrough.md</code> claims the account-deletion/login-email work is fully tested; <code>task.md</code>'s checklist says the <code>views.py</code> portion is still unchecked. Verify directly against <code>accounts/views.py</code> rather than trusting either document.
+      </div>
+    </section>
+
     <!-- SEED / TEST ACCOUNTS -->
     <section id="seed-accounts">
-      <div class="section-head reveal"><span class="section-num">09</span><h2>Seed / test accounts</h2></div>
+      <div class="section-head reveal"><span class="section-num">10</span><h2>Seed / test accounts</h2></div>
       <p class="section-desc reveal">Appendix A from the requirements doc — dummy accounts for development and QA use only.</p>
       <div class="note reveal">These are dummy accounts with plaintext sample passwords. Remove or rotate all credentials before any staging or production deployment, and do not share this appendix outside the dev team.</div>
 
@@ -1703,7 +1901,7 @@ footer{
 
     <!-- ENVIRONMENT -->
     <section id="env">
-      <div class="section-head reveal"><span class="section-num">10</span><h2>Environment configuration</h2></div>
+      <div class="section-head reveal"><span class="section-num">11</span><h2>Environment configuration</h2></div>
       <p class="section-desc reveal"><code>.env</code> at the project root. Without SMTP configured, emails print to the terminal in dev mode — nothing crashes.</p>
       <div class="env-block reveal">
         <div class="env-topbar"><span></span><span></span><span></span><span class="fname">.env</span></div>
