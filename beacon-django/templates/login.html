@@ -122,6 +122,7 @@
     const msg = document.getElementById('authMsg');
     const btn = document.getElementById('submitBtn');
     msg.textContent = '';
+    msg.className = 'form-msg';
     
     const identifier = document.getElementById('loginId').value.trim();
     const password = document.getElementById('loginPw').value;
@@ -150,6 +151,14 @@
       }
 
       if(!res.ok){
+        // Email not verified — send to signup page to complete OTP step
+        if(data.detail === 'email_not_verified'){
+          msg.className = 'form-msg';
+          msg.innerHTML = '⚠️ Your email is not verified yet. <a href="/signup" style="color:var(--pine);font-weight:600;text-decoration:underline;">Click here to verify your OTP</a>.';
+          btn.disabled = false;
+          btn.textContent = 'Log in';
+          return;
+        }
         throw new Error(data.detail || 'Login failed.');
       }
 
@@ -172,3 +181,4 @@
 </script>
 </body>
 </html>
+

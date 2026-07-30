@@ -751,10 +751,9 @@ async function saveRecord(e){
 async function deleteRecord(type, id){
   if(!confirm(`Delete user account permanently? This cannot be undone.`)) return;
   try {
-    const res = await fetch('/api/auth/admin/users', {
+    const res = await fetch(`/api/auth/admin/users/${id}/`, {
       method: 'DELETE',
       headers: getAuthHeader(),
-      body: JSON.stringify({ user_id: id })
     });
     if(res.ok){
       showToast('User account deleted.');

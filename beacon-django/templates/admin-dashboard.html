@@ -1002,10 +1002,9 @@ async function deleteRecord(type, id){
   if(!confirmed) return;
 
   try {
-    const res = await fetch('/api/auth/admin/users', {
+    const res = await fetch(`/api/auth/admin/users/${id}/`, {
       method: 'DELETE',
       headers: getAuthHeader(),
-      body: JSON.stringify({ user_id: id })
     });
     if(res.ok){
       showToast('User account deleted.');

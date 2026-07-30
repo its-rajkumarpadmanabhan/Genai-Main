@@ -24,7 +24,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .emails import send_password_reset_email, send_welcome_email
+from .emails import (
+    send_password_reset_email,
+    send_welcome_email,
+    trigger_login_confirmation_email,
+    trigger_account_deleted_email,
+)
 from .models import (
     PasswordResetToken, DoctorProfile, PatientProfile, CaretakerProfile,
     Appointment, CaretakerRequest, MedicalDocument, EmergencyAlert
@@ -62,6 +67,83 @@ def _flatten_drf_errors(errors: dict) -> list:
     return detail
 
 
+def extract_user_details(user):
+    """
+    Extract user and profile details into a serializable dict before deletion.
+    """
+    details = {
+        'username': user.username,
+        'email': user.email,
+        'mobile_number': user.mobile_number,
+        'role': user.role,
+        'profile_details': {}
+    }
+    
+    if user.role == 'patient':
+        profile = getattr(user, 'patient_profile', None)
+        if profile:
+            details['profile_details'] = {
+                'patient_code': profile.patient_code,
+                'full_name': profile.full_name,
+                'dob': str(profile.dob) if profile.dob else None,
+                'gender': profile.gender,
+                'marital_status': profile.marital_status,
+                'location': profile.location,
+                'languages': profile.languages,
+                'phone_number': profile.phone_number,
+                'insurance_details': profile.insurance_details,
+                'emergency_contact_name': profile.emergency_contact_name,
+                'emergency_contact_phone': profile.emergency_contact_phone,
+                'emergency_contact_relation': profile.emergency_contact_relation,
+                'medical_history_notes': profile.medical_history_notes,
+            }
+            if profile.assigned_caretaker:
+                details['profile_details']['assigned_caretaker'] = f"{profile.assigned_caretaker.username} ({profile.assigned_caretaker.email})"
+    elif user.role == 'doctor':
+        profile = getattr(user, 'doctor_profile', None)
+        if profile:
+            details['profile_details'] = {
+                'doctor_code': profile.doctor_code,
+                'full_name': profile.full_name,
+                'dob': str(profile.dob) if profile.dob else None,
+                'gender': profile.gender,
+                'experience_years': profile.experience_years,
+                'location': profile.location,
+                'state': profile.state,
+                'hospital_name': profile.hospital_name,
+                'pincode': profile.pincode,
+                'major_department': profile.major_department,
+                'languages_speak': profile.languages_speak,
+                'license_number': profile.license_number,
+                'consultation_fee': str(profile.consultation_fee),
+                'available_hours': profile.available_hours,
+                'phone_number': profile.phone_number,
+                'rating_avg': profile.rating_avg,
+                'reviews_count': profile.reviews_count,
+                'availability_status': profile.availability_status,
+            }
+    elif user.role == 'caretaker':
+        profile = getattr(user, 'caretaker_profile', None)
+        if profile:
+            details['profile_details'] = {
+                'caretaker_code': profile.caretaker_code,
+                'full_name': profile.full_name,
+                'dob': str(profile.dob) if profile.dob else None,
+                'gender': profile.gender,
+                'experience_years': profile.experience_years,
+                'location': profile.location,
+                'languages': profile.languages,
+                'license_number': profile.license_number,
+                'consultation_fee': str(profile.consultation_fee),
+                'available_hours': profile.available_hours,
+                'phone_number': profile.phone_number,
+                'rating_avg': profile.rating_avg,
+                'reviews_count': profile.reviews_count,
+            }
+            
+    return details
+
+
 # ── Signup ───────────────────────────────────────────────────────────────────
 class SignupView(APIView):
     """POST /api/auth/signup"""
@@ -83,16 +165,25 @@ class SignupView(APIView):
         mobile = data['mobile_number']
 
         # Duplicate checks (only email and mobile must be unique)
-        if User.objects.filter(email__iexact=normalized_email).exists():
-            return Response(
-                {'detail': 'An account with this email already exists.'},
-                status=status.HTTP_409_CONFLICT,
-            )
-        if User.objects.filter(mobile_number=mobile).exists():
-            return Response(
-                {'detail': 'An account with this mobile number already exists.'},
-                status=status.HTTP_409_CONFLICT,
-            )
+        existing_email_user = User.objects.filter(email__iexact=normalized_email).first()
+        if existing_email_user:
+            if not existing_email_user.is_active:
+                # Stale unverified account — clean it up and allow fresh signup
+                existing_email_user.delete()
+            else:
+                return Response(
+                    {'detail': 'An account with this email already exists.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
+        existing_mobile_user = User.objects.filter(mobile_number=mobile).first()
+        if existing_mobile_user:
+            if not existing_mobile_user.is_active:
+                existing_mobile_user.delete()
+            else:
+                return Response(
+                    {'detail': 'An account with this mobile number already exists.'},
+                    status=status.HTTP_409_CONFLICT,
+                )
 
         role = data.get('role', 'patient')
         user = User.objects.create_user(
@@ -103,9 +194,89 @@ class SignupView(APIView):
             role=role,
         )
         user.plain_password = data['password']
+        # Deactivate user until email verified via OTP
+        user.is_active = False
         user.save()
 
-        # Create associated role profile
+        # Generate 4-digit OTP
+        import random, datetime
+        otp_code = f"{random.randint(1000, 9999)}"
+        expires_at = datetime.datetime.utcnow() + datetime.timedelta(minutes=10)
+        from .models import SignupOTP
+        SignupOTP.objects.create(user=user, otp=otp_code, expires_at=expires_at)
+
+        # Send OTP email (background thread)
+        from .emails import send_signup_otp_email
+        threading.Thread(target=send_signup_otp_email, args=(user, otp_code), daemon=True).start()
+
+        # Return pending OTP response (no tokens yet)
+        return Response(
+            {
+                'status': 'pending_otp',
+                'message': 'OTP sent to email. Verify to complete registration.',
+                'email': user.email,
+            },
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+# ── Verify Signup OTP ────────────────────────────────────────────────────────
+class VerifySignupOTPView(APIView):
+    """POST /api/auth/verify-otp — Verify 4-digit OTP to activate user account."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        import datetime
+        from .models import SignupOTP
+
+        email = request.data.get('email', '').lower().strip()
+        otp_input = request.data.get('otp', '').strip()
+
+        if not email or not otp_input:
+            return Response(
+                {'detail': 'Email and OTP are required.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        user = User.objects.filter(email__iexact=email).first()
+        if not user:
+            return Response(
+                {'detail': 'No account found for this email.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if user.is_active:
+            # Already verified — just return tokens
+            token = get_tokens_for_user(user)
+            sanitized_username = user.username.replace('_', '')
+            return Response({
+                'status': 'success',
+                'access_token': token,
+                'user': {'id': user.id, 'username': sanitized_username, 'email': user.email, 'role': user.role},
+            })
+
+        otp_record = SignupOTP.objects.filter(user=user, otp=otp_input).order_by('-created_at').first()
+        if not otp_record:
+            return Response(
+                {'detail': 'Invalid OTP. Please check and try again.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        now_utc = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
+        if otp_record.expires_at.replace(tzinfo=datetime.timezone.utc) < now_utc:
+            return Response(
+                {'detail': 'OTP has expired. Please sign up again to receive a new OTP.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Activate user account
+        user.is_active = True
+        user.save()
+
+        # Create role profile now that email is verified
+        mobile = user.mobile_number
+        username = user.username
+        role = user.role
         if role == 'patient':
             PatientProfile.objects.get_or_create(user=user, defaults={'full_name': username, 'phone_number': mobile})
         elif role == 'doctor':
@@ -113,20 +284,19 @@ class SignupView(APIView):
         elif role == 'caretaker':
             CaretakerProfile.objects.get_or_create(user=user, defaults={'full_name': username, 'phone_number': mobile})
 
+        # Clean up used OTPs
+        SignupOTP.objects.filter(user=user).delete()
 
-        # Send welcome email in a background thread (non-blocking)
+        # Send welcome email in background
         threading.Thread(target=send_welcome_email, args=(user,), daemon=True).start()
 
         token = get_tokens_for_user(user)
-        return Response(
-            {
-                'status': 'success',
-                'message': 'Account created successfully.',
-                'access_token': token,
-                'user': {'id': user.id, 'username': user.username, 'email': user.email, 'role': user.role},
-            },
-            status=status.HTTP_201_CREATED,
-        )
+        sanitized_username = user.username.replace('_', '')
+        return Response({
+            'status': 'success',
+            'access_token': token,
+            'user': {'id': user.id, 'username': sanitized_username, 'email': user.email, 'role': user.role},
+        })
 
 
 # ── Login ────────────────────────────────────────────────────────────────────
@@ -163,10 +333,47 @@ class LoginView(APIView):
             )
 
         if not user.is_active:
+            from .models import SignupOTP
+            import datetime
+            has_pending_otp = SignupOTP.objects.filter(
+                user=user,
+                expires_at__gt=datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
+            ).exists()
+            if has_pending_otp:
+                return Response(
+                    {'detail': 'email_not_verified', 'email': user.email},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
             return Response(
-                {'detail': 'Your account is inactive. Please contact the administrator.'},
+                {'detail': 'Your account has been deactivated. Please contact the administrator.'},
                 status=status.HTTP_403_FORBIDDEN,
             )
+
+        # Sync email if profile has a different email
+        email_updated = False
+        if user.role == 'patient':
+            profile = getattr(user, 'patient_profile', None)
+            if profile and hasattr(profile, 'email') and profile.email:
+                if profile.email != user.email:
+                    user.email = profile.email
+                    email_updated = True
+        elif user.role == 'doctor':
+            profile = getattr(user, 'doctor_profile', None)
+            if profile and hasattr(profile, 'email') and profile.email:
+                if profile.email != user.email:
+                    user.email = profile.email
+                    email_updated = True
+        elif user.role == 'caretaker':
+            profile = getattr(user, 'caretaker_profile', None)
+            if profile and hasattr(profile, 'email') and profile.email:
+                if profile.email != user.email:
+                    user.email = profile.email
+                    email_updated = True
+        if email_updated:
+            user.save()
+
+        # Trigger login confirmation email
+        trigger_login_confirmation_email(user)
 
         token = get_tokens_for_user(user)
         sanitized_username = user.username.replace('_', '')
@@ -200,6 +407,8 @@ class DeleteSelfProfileView(APIView):
 
     def delete(self, request):
         user = request.user
+        user_data = extract_user_details(user)
+        trigger_account_deleted_email(user_data)
         user.delete()
         return Response({'status': 'success', 'message': 'Profile deleted successfully.'})
 
@@ -727,7 +936,29 @@ class AdminUsersView(APIView):
             return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
         
         user_id = request.data.get('user_id')
-        User.objects.filter(id=user_id).delete()
+        user = User.objects.filter(id=user_id).first()
+        if user:
+            user_data = extract_user_details(user)
+            trigger_account_deleted_email(user_data)
+            user.delete()
+            return Response({'status': 'success', 'message': 'User deleted.'})
+        return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+
+# ── Admin User Delete (dedicated URL-param route) ─────────────────────────────
+class AdminUserDeleteView(APIView):
+    """DELETE /api/auth/admin/users/<int:user_id> — Admin deletes a user by URL param."""
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request, user_id):
+        if request.user.role != 'admin' and not request.user.is_staff:
+            return Response({'detail': 'Admin access required.'}, status=status.HTTP_403_FORBIDDEN)
+        user = User.objects.filter(id=user_id).first()
+        if not user:
+            return Response({'detail': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+        user_data = extract_user_details(user)
+        trigger_account_deleted_email(user_data)
+        user.delete()
         return Response({'status': 'success', 'message': 'User deleted.'})
 
 
@@ -1919,21 +2150,24 @@ class ForgotPasswordView(APIView):
         serializer = ForgotPasswordSerializer(data=request.data)
         if not serializer.is_valid():
             return Response(
-                {'detail': 'Invalid email address.'},
+                {'detail': 'Please provide both email address and phone number.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         normalized_email = serializer.validated_data['email'].lower().strip()
+        mobile_number = serializer.validated_data['mobile_number'].strip()
 
-        # Generic response prevents email enumeration
-        generic_response = {
-            'status': 'success',
-            'message': 'If that email is registered, a password reset link has been sent.',
-        }
+        # Look up a user whose email AND mobile_number both match
+        user = User.objects.filter(
+            email__iexact=normalized_email,
+            mobile_number=mobile_number,
+        ).first()
 
-        user = User.objects.filter(email__iexact=normalized_email).first()
         if not user:
-            return Response(generic_response)
+            return Response(
+                {'detail': 'Invalid entry. The email and phone number do not match any registered account.'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         reset_token = secrets.token_urlsafe(32)
         PasswordResetToken.objects.create(
@@ -1948,7 +2182,10 @@ class ForgotPasswordView(APIView):
             daemon=True,
         ).start()
 
-        return Response(generic_response)
+        return Response({
+            'status': 'success',
+            'message': 'Verified! A password reset link has been sent to your email.',
+        })
 
 
 # ── Reset Password ───────────────────────────────────────────────────────────

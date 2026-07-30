@@ -61,6 +61,7 @@ class LoginSerializer(serializers.Serializer):
 
 class ForgotPasswordSerializer(serializers.Serializer):
     email = serializers.EmailField()
+    mobile_number = serializers.CharField(max_length=20)
 
 
 class ResetPasswordSerializer(serializers.Serializer):

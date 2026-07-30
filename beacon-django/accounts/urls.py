@@ -7,12 +7,14 @@ from .views import (
     MeView,
     ResetPasswordView,
     SignupView,
+    VerifySignupOTPView,
     DeleteSelfProfileView,
     UserProfilePictureUploadView,
     PatientVisitedDoctorsView,
     AdminStatsView,
     AdminUsersView,
     AdminUserProfileView,
+    AdminUserDeleteView,
     PatientProfileView,
     MedicalDocumentView,
     DirectoryListView,
@@ -43,6 +45,7 @@ from .views import (
 urlpatterns = [
     # Auth & Profile
     path('signup', SignupView.as_view(), name='auth-signup'),
+    path('verify-otp', VerifySignupOTPView.as_view(), name='auth-verify-otp'),
     path('login', LoginView.as_view(), name='auth-login'),
     path('me', MeView.as_view(), name='auth-me'),
     path('forgot-password', ForgotPasswordView.as_view(), name='auth-forgot-password'),
@@ -54,7 +57,8 @@ urlpatterns = [
     # Admin
     path('admin/stats', AdminStatsView.as_view(), name='admin-stats'),
     path('admin/users', AdminUsersView.as_view(), name='admin-users'),
-    path('admin/users/<int:user_id>/profile', AdminUserProfileView.as_view(), name='admin-user-profile'),
+    path('admin/users/<int:user_id>/', AdminUserDeleteView.as_view(), name='admin-user-delete'),
+    path('admin/users/<int:user_id>/profile/', AdminUserProfileView.as_view(), name='admin-user-profile'),
 
     # Patient
     path('patient/profile', PatientProfileView.as_view(), name='patient-profile-api'),

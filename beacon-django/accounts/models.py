@@ -275,6 +275,20 @@ class PasswordResetToken(models.Model):
         return f'ResetToken({self.user.username}, used={self.used})'
 
 
+class SignupOTP(models.Model):
+    """Stores the 4-digit OTP for email verification during signup."""
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='signup_otps')
+    otp = models.CharField(max_length=4)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField()
+
+    class Meta:
+        db_table = 'signup_otps'
+
+    def __str__(self):
+        return f'SignupOTP({self.user.email}, {self.otp})'
+
+
 class EmergencyAlert(models.Model):
     """
     Records emergency/medical conditions detected by the Voice AI Engine.

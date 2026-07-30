@@ -13,10 +13,23 @@ from django.core.mail import EmailMessage
 def send_email(to_email: str, subject: str, html_body: str) -> bool:
     """Send an HTML email. In dev mode (no SMTP config), prints to console."""
     if not settings.EMAIL_ENABLED:
+        import sys
         print('=' * 70)
-        print(f'[DEV MODE — SMTP NOT CONFIGURED] Email to: {to_email}')
-        print(f'Subject: {subject}')
-        print(html_body)
+        try:
+            print(f'[DEV MODE — SMTP NOT CONFIGURED] Email to: {to_email}')
+            print(f'Subject: {subject}')
+            print(html_body)
+        except Exception:
+            try:
+                sys.stdout.buffer.write(f'[DEV MODE — SMTP NOT CONFIGURED] Email to: {to_email}\n'.encode('utf-8'))
+                sys.stdout.buffer.write(f'Subject: {subject}\n'.encode('utf-8'))
+                sys.stdout.buffer.write(html_body.encode('utf-8'))
+                sys.stdout.buffer.write(b'\n')
+            except Exception:
+                enc = sys.stdout.encoding or 'utf-8'
+                print(f'[DEV MODE — SMTP NOT CONFIGURED] Email to: {to_email}'.encode(enc, errors='replace').decode(enc))
+                print(f'Subject: {subject}'.encode(enc, errors='replace').decode(enc))
+                print(html_body.encode(enc, errors='replace').decode(enc))
         print('=' * 70)
         return False
 
@@ -38,13 +51,47 @@ def send_email(to_email: str, subject: str, html_body: str) -> bool:
 def send_welcome_email(user) -> None:
     """Send a welcome email after signup (runs in a background thread)."""
     subject = 'Welcome to Beacon — Your Emergency & Prevention Assistant'
+    
+    role_cap = user.role.capitalize()
+    mobile = user.mobile_number or 'Not provided'
+    
     html = f"""
-    <div style="font-family: Arial, sans-serif; max-width: 560px; margin: auto;
-                background:#0f172a; color:#e2e8f0; padding: 32px; border-radius: 16px;">
-      <h1 style="color:#2dd4bf; font-size: 22px;">Welcome, {user.username} 👋</h1>
+    <div style="font-family:'Inter',Arial,sans-serif;max-width:560px;margin:auto;
+                background:#0f172a;color:#e2e8f0;padding:32px;border-radius:16px;">
+      <h1 style="color:#2dd4bf;font-size:22px;">Welcome, {user.username} 👋</h1>
       <p>Your Beacon account has been created successfully.</p>
-      <p style="color:#94a3b8; font-size: 13px;">
+      
+      <div style="background:#1e293b;border-radius:12px;padding:20px;margin-top:20px;margin-bottom:20px;
+                  border:1px solid #334155;">
+        <h3 style="color:#2dd4bf;font-size:15px;margin-top:0;margin-bottom:12px;border-bottom:1px solid #334155;padding-bottom:8px;">
+          Your Account Details
+        </h3>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+          <tr>
+            <td style="padding:8px 0;color:#94a3b8;width:140px;">Username</td>
+            <td style="padding:8px 0;color:#f8fafc;font-weight:600;">{user.username}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#94a3b8;">Email</td>
+            <td style="padding:8px 0;color:#f8fafc;font-weight:600;">{user.email}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#94a3b8;">Mobile Number</td>
+            <td style="padding:8px 0;color:#f8fafc;font-weight:600;">{mobile}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#94a3b8;">Role</td>
+            <td style="padding:8px 0;color:#f8fafc;font-weight:600;">{role_cap}</td>
+          </tr>
+        </table>
+      </div>
+
+      <p style="color:#94a3b8;font-size:13px;">
         If you're ever in a crisis, call or text <strong style="color:#2dd4bf;">988</strong> — no app needed.
+      </p>
+      
+      <p style="color:#64748b;font-size:12px;text-align:center;margin-top:20px;border-top:1px solid #334155;padding-top:12px;">
+        Beacon Recovery Platform — Your Emergency & Prevention Assistant
       </p>
     </div>
     """
@@ -298,3 +345,189 @@ def send_appointment_rejected_email(appointment, email_type='rejected'):
         args=(appointment, email_type),
         daemon=True,
     ).start()
+
+
+def send_account_deleted_email(user_data: dict) -> None:
+    """Send an HTML email confirmation after account deletion."""
+    subject = 'Account Deleted — Beacon'
+    
+    role_cap = user_data.get('role', 'user').capitalize()
+    username = user_data.get('username', '')
+    email = user_data.get('email', '')
+    mobile = user_data.get('mobile_number') or 'Not provided'
+    
+    details_html = f"""
+      <tr>
+        <td style="padding:8px 0;color:#94a3b8;width:140px;">Username</td>
+        <td style="padding:8px 0;color:#f8fafc;font-weight:600;">{username}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;color:#94a3b8;">Email</td>
+        <td style="padding:8px 0;color:#f8fafc;font-weight:600;">{email}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;color:#94a3b8;">Mobile Number</td>
+        <td style="padding:8px 0;color:#f8fafc;font-weight:600;">{mobile}</td>
+      </tr>
+      <tr>
+        <td style="padding:8px 0;color:#94a3b8;">Role</td>
+        <td style="padding:8px 0;color:#f8fafc;font-weight:600;">{role_cap}</td>
+      </tr>
+    """
+    
+    profile_details = user_data.get('profile_details', {})
+    if profile_details:
+        for key, val in profile_details.items():
+            if val is not None and val != '':
+                display_key = key.replace('_', ' ').title()
+                details_html += f"""
+                  <tr>
+                    <td style="padding:8px 0;color:#94a3b8;">{display_key}</td>
+                    <td style="padding:8px 0;color:#f8fafc;font-weight:600;">{val}</td>
+                  </tr>
+                """
+                
+    html = f"""
+    <div style="font-family:'Inter',Arial,sans-serif;max-width:560px;margin:auto;
+                background:#0f172a;color:#e2e8f0;padding:32px;border-radius:16px;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <span style="font-size:36px;">🗑️</span>
+      </div>
+      <h1 style="color:#f43f5e;font-size:20px;text-align:center;margin-bottom:6px;">
+        Account Deleted Successfully
+      </h1>
+      <p style="text-align:center;color:#94a3b8;font-size:13px;margin-top:0;">
+        Dear {username}, your Beacon account has been permanently deleted.
+      </p>
+
+      <div style="background:#1e293b;border-radius:12px;padding:20px;margin-top:20px;
+                  border:1px solid #334155;">
+        <h3 style="color:#2dd4bf;font-size:15px;margin-top:0;margin-bottom:12px;border-bottom:1px solid #334155;padding-bottom:8px;">
+          Deleted Account Details
+        </h3>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+          {details_html}
+        </table>
+      </div>
+
+      <p style="text-align:center;margin-top:18px;font-size:13px;color:#94a3b8;">
+        We're sorry to see you go. Thank you for using Beacon.
+      </p>
+
+      <p style="color:#64748b;font-size:12px;text-align:center;margin-top:20px;">
+        Beacon Recovery Platform — Your Emergency & Prevention Assistant
+      </p>
+    </div>
+    """
+    send_email(email, subject, html)
+
+
+def trigger_account_deleted_email(user_data: dict) -> None:
+    """Send account deletion email in a background thread."""
+    threading.Thread(
+        target=send_account_deleted_email,
+        args=(user_data,),
+        daemon=True,
+    ).start()
+
+
+def send_login_confirmation_email(user_username: str, user_email: str, user_role: str) -> None:
+    """Send a login confirmation email to the user's email."""
+    from datetime import datetime
+    subject = 'Login Confirmation — Beacon'
+    login_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    
+    html = f"""
+    <div style="font-family:'Inter',Arial,sans-serif;max-width:560px;margin:auto;
+                background:#0f172a;color:#e2e8f0;padding:32px;border-radius:16px;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <span style="font-size:36px;">🔑</span>
+      </div>
+      <h1 style="color:#2dd4bf;font-size:20px;text-align:center;margin-bottom:6px;">
+        New Login Detected
+      </h1>
+      <p style="text-align:center;color:#94a3b8;font-size:13px;margin-top:0;">
+        Dear {user_username}, we detected a successful login to your Beacon account.
+      </p>
+
+      <div style="background:#1e293b;border-radius:12px;padding:20px;margin-top:20px;
+                  border:1px solid #334155;">
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+          <tr>
+            <td style="padding:8px 0;color:#94a3b8;width:140px;">Username</td>
+            <td style="padding:8px 0;color:#f8fafc;font-weight:600;">{user_username}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#94a3b8;">Email</td>
+            <td style="padding:8px 0;color:#f8fafc;font-weight:600;">{user_email}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#94a3b8;">Role</td>
+            <td style="padding:8px 0;color:#f8fafc;font-weight:600;">{user_role.capitalize()}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0;color:#94a3b8;">Time</td>
+            <td style="padding:8px 0;color:#f8fafc;font-weight:600;">{login_time} UTC</td>
+          </tr>
+        </table>
+      </div>
+
+      <p style="text-align:center;margin-top:18px;font-size:13px;color:#94a3b8;">
+        If this wasn't you, please secure your account immediately or contact support.
+      </p>
+
+      <p style="color:#64748b;font-size:12px;text-align:center;margin-top:20px;">
+        Beacon Recovery Platform — Your Emergency & Prevention Assistant
+      </p>
+    </div>
+    """
+    send_email(user_email, subject, html)
+
+
+def trigger_login_confirmation_email(user) -> None:
+    """Send login confirmation email in a background thread."""
+    threading.Thread(
+        target=send_login_confirmation_email,
+        args=(user.username, user.email, user.role),
+        daemon=True,
+    ).start()
+
+
+def send_signup_otp_email(user, otp_code: str) -> None:
+    """Send the 4-digit OTP for email verification during signup."""
+    subject = 'Beacon — Verify Your Email Address'
+    html = f"""
+    <div style="font-family:'Inter',Arial,sans-serif;max-width:560px;margin:auto;
+                background:#0f172a;color:#e2e8f0;padding:32px;border-radius:16px;">
+      <div style="text-align:center;margin-bottom:20px;">
+        <span style="font-size:36px;">📧</span>
+      </div>
+      <h1 style="color:#2dd4bf;font-size:20px;text-align:center;margin-bottom:6px;">
+        Verify Your Email
+      </h1>
+      <p style="text-align:center;color:#94a3b8;font-size:13px;margin-top:0;">
+        Dear {user.username}, use the OTP below to complete your Beacon registration.
+      </p>
+
+      <div style="background:#1e293b;border-radius:12px;padding:28px 20px;margin:24px 0;
+                  border:1px solid #334155;text-align:center;">
+        <p style="color:#94a3b8;font-size:13px;margin:0 0 10px 0;">Your One-Time Password</p>
+        <span style="font-size:40px;font-weight:700;letter-spacing:12px;color:#2dd4bf;">
+          {otp_code}
+        </span>
+        <p style="color:#64748b;font-size:12px;margin:14px 0 0 0;">
+          This OTP expires in <strong style="color:#fbbf24;">10 minutes</strong>.
+        </p>
+      </div>
+
+      <p style="text-align:center;color:#94a3b8;font-size:13px;">
+        If you did not attempt to sign up for Beacon, please ignore this email.
+      </p>
+
+      <p style="color:#64748b;font-size:12px;text-align:center;margin-top:20px;
+                border-top:1px solid #334155;padding-top:12px;">
+        Beacon Recovery Platform — Your Emergency &amp; Prevention Assistant
+      </p>
+    </div>
+    """
+    send_email(user.email, subject, html)
