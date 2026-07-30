@@ -1,0 +1,2108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Beacon AI Care Unit Platform — Project Overview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#10242E;
+  --ink-soft:#3C5560;
+  --paper:#F6F8F7;
+  --surface:#FFFFFF;
+  --panel:#EBF2F1;
+  --panel-deep:#E0EAE8;
+  --line:#D7E1DF;
+  --teal:#1F7A6C;
+  --teal-deep:#0E4F46;
+  --teal-tint:#E4F1EE;
+  --coral:#E1552E;
+  --coral-tint:#FBE8E2;
+  --amber:#B9791E;
+  --amber-tint:#F7EEDD;
+  --admin:#5B4B8A;
+  --admin-tint:#EAE6F3;
+  --doctor:#1F7A6C;
+  --doctor-tint:#E4F1EE;
+  --patient:#2172B0;
+  --patient-tint:#E3EDF6;
+  --caretaker:#B0752F;
+  --caretaker-tint:#F5E9D9;
+  --get:#2172B0;
+  --post:#1F7A6C;
+  --put:#B9791E;
+  --delete:#E1552E;
+  --terminal-bg:#0B1E27;
+  --terminal-text:#DCEDE9;
+  --shadow: 0 1px 2px rgba(16,36,46,.04), 0 8px 24px -12px rgba(16,36,46,.12);
+  --radius: 14px;
+}
+
+[data-theme="dark"]{
+  --ink:#E9F2F0;
+  --ink-soft:#94ACB3;
+  --paper:#0D1A1F;
+  --surface:#152A31;
+  --panel:#1B333B;
+  --panel-deep:#223C44;
+  --line:#2A454D;
+  --teal:#33A491;
+  --teal-deep:#6FE0C9;
+  --teal-tint:#153531;
+  --coral:#FF7A54;
+  --coral-tint:#3A1F18;
+  --amber:#E3A552;
+  --amber-tint:#3A2C14;
+  --admin:#B6A6E8;
+  --admin-tint:#26203A;
+  --doctor:#33A491;
+  --doctor-tint:#153531;
+  --patient:#6FB3EA;
+  --patient-tint:#132A38;
+  --caretaker:#E0A354;
+  --caretaker-tint:#332512;
+  --get:#6FB3EA;
+  --post:#33A491;
+  --put:#E3A552;
+  --delete:#FF7A54;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 28px -12px rgba(0,0,0,.55);
+}
+
+body, .role-card, .model, .page-card, .email-card, .check-group,
+#sticky-palette, .pill, .side-nav a{
+  transition:background-color .4s ease, color .4s ease, border-color .4s ease;
+}
+
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+@media (prefers-reduced-motion: reduce){
+  html{scroll-behavior:auto;}
+  *{animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important;}
+  .ecg-track{ animation-duration:1.8s !important; animation-iteration-count:infinite !important; }
+  .ecg-scan::after{ animation-duration:1.8s !important; animation-iteration-count:infinite !important; }
+}
+
+body{
+  margin:0;
+  background:var(--paper);
+  color:var(--ink);
+  font-family:'Source Serif 4', Georgia, serif;
+  font-size:16px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+}
+
+h1,h2,h3,h4,.display,nav .brand,.eyebrow,.tag,.role-title,.status-pill,.method,.chip,.dbcode{
+  font-family:'Space Grotesk', 'Helvetica Neue', Arial, sans-serif;
+}
+
+code, .mono, pre, .field-name, .path{
+  font-family:'IBM Plex Mono', 'Courier New', monospace;
+}
+
+a{color:var(--teal-deep);}
+
+::selection{ background: var(--coral-tint); color:var(--coral); }
+
+/* ---------- Scroll reveal ---------- */
+.reveal{
+  opacity:0;
+  transform:translateY(18px);
+  transition:opacity .7s ease, transform .7s ease;
+}
+.reveal.in{
+  opacity:1;
+  transform:translateY(0);
+}
+
+/* ---------- Top progress ---------- */
+#scroll-progress{
+  position:fixed; top:0; left:0; height:3px; width:0%;
+  background:linear-gradient(90deg,var(--teal),var(--coral));
+  z-index:100;
+  transition:width .1s linear;
+}
+
+/* ---------- HERO ---------- */
+.hero{
+  position:relative;
+  padding:96px 18px 64px;
+  max-width:100%;
+  margin:0 auto;
+  overflow:hidden;
+}
+.hero-eyebrow{
+  display:inline-flex; align-items:center; gap:8px;
+  font-size:12.5px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--teal-deep); font-weight:600;
+  padding:6px 12px; background:var(--teal-tint); border-radius:999px;
+  margin-bottom:28px;
+}
+.hero-eyebrow .dot{
+  width:7px;height:7px;border-radius:50%;background:var(--coral);
+  animation:pulse-dot 2.2s ease-in-out infinite;
+}
+@keyframes pulse-dot{
+  0%,100%{ box-shadow:0 0 0 0 rgba(225,85,46,.5); }
+  50%{ box-shadow:0 0 0 6px rgba(225,85,46,0); }
+}
+.hero h1{
+  font-size:clamp(2.4rem, 5.5vw, 4.4rem);
+  line-height:1.02;
+  margin:0 0 22px;
+  font-weight:700;
+  letter-spacing:-0.01em;
+  color:var(--ink);
+  max-width:16ch;
+}
+.hero h1 em{
+  font-style:normal;
+  color:var(--teal-deep);
+  position:relative;
+}
+.hero-sub{
+  font-size:1.2rem;
+  color:var(--ink-soft);
+  max-width:56ch;
+  margin:0 0 36px;
+}
+.hero-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:52px;
+  align-items:center;
+}
+.hero-graph{
+  display:flex; flex-direction:column; align-items:center; gap:14px;
+  justify-self:end;
+}
+.hero-graph .donut-wrap{ width:168px; height:168px; }
+.hero-graph-caption{
+  display:inline-flex; align-items:center; gap:6px;
+  font-family:'IBM Plex Mono', monospace; font-size:12px;
+  color:var(--ink-soft);
+}
+@media (max-width:880px){
+  .hero-grid{ grid-template-columns:1fr; gap:28px; }
+  .hero-graph{ justify-self:center; }
+}
+.hero-meta{
+  display:flex; flex-wrap:wrap; gap:12px;
+  margin-bottom:44px;
+}
+.pill{
+  display:inline-flex; align-items:center; gap:8px;
+  padding:8px 16px; border-radius:999px;
+  background:var(--panel); border:1px solid var(--line);
+  font-family:'IBM Plex Mono', monospace; font-size:13px;
+  color:var(--ink-soft);
+}
+.pill b{ color:var(--ink); font-weight:600;}
+a.pill{ transition:transform .2s ease, border-color .2s ease, background-color .4s ease; }
+a.pill:hover{ transform:translateY(-2px); border-color:var(--teal); background:var(--teal-tint); }
+
+.ecg-wrap{
+  width:100%;
+  height:120px;
+  margin-top:8px;
+  position:relative;
+  overflow:hidden;
+}
+.ecg-wrap svg{ width:100%; height:100%; display:block; overflow:hidden; }
+.ecg-track{
+  animation:ecg-scroll 1.8s linear infinite;
+  filter:drop-shadow(0 0 4px rgba(225,85,46,.4));
+}
+.ecg-line{
+  fill:none;
+  stroke:var(--coral);
+  stroke-width:2.5;
+  stroke-linecap:round;
+  stroke-linejoin:round;
+}
+.ecg-baseline{
+  fill:none; stroke:var(--line); stroke-width:1.5;
+}
+@keyframes ecg-scroll{
+  0%{ transform:translateX(0); }
+  100%{ transform:translateX(-250px); }
+}
+.ecg-scan{
+  position:absolute; top:0; right:0; bottom:0; width:70px;
+  background:linear-gradient(90deg, transparent, var(--paper) 92%);
+  pointer-events:none;
+}
+.ecg-scan::after{
+  content:""; position:absolute; top:0; right:16px; bottom:0; width:2px;
+  background:var(--coral); opacity:.55;
+  animation:scan-pulse 1.8s ease-in-out infinite;
+}
+@keyframes scan-pulse{
+  0%,100%{ opacity:.25; }
+  50%{ opacity:.7; }
+}
+/* ---------- LAYOUT: sidebar + content ---------- */
+.layout{
+  max-width:100%;
+  margin:0 auto;
+  padding:0 18px 120px;
+  display:grid;
+  grid-template-columns:210px minmax(0,1fr);
+  gap:36px;
+}
+.sidebar{
+  position:sticky;
+  top:24px;
+  align-self:start;
+  height:calc(100vh - 48px);
+  overflow-y:auto;
+  padding-right:8px;
+}
+.sidebar::-webkit-scrollbar{ width:4px; }
+.sidebar::-webkit-scrollbar-thumb{ background:var(--line); border-radius:4px; }
+.search-wrap{ position:relative; margin-bottom:22px; }
+.search-wrap svg{
+  position:absolute; left:11px; top:50%; transform:translateY(-50%);
+  width:15px; height:15px; color:var(--ink-soft); pointer-events:none;
+}
+#global-search{
+  width:100%; padding:10px 12px 10px 32px; border-radius:10px;
+  border:1px solid var(--line); background:var(--surface); color:var(--ink);
+  font-family:'IBM Plex Mono', monospace; font-size:12.5px;
+  outline:none; transition:border-color .2s ease, box-shadow .2s ease;
+}
+#global-search::placeholder{ color:var(--ink-soft); }
+#global-search:focus{ border-color:var(--teal); box-shadow:0 0 0 3px var(--teal-tint); }
+.search-count{
+  display:block; margin-top:7px; font-size:11px; color:var(--ink-soft);
+  font-family:'IBM Plex Mono', monospace;
+}
+mark.search-hit{
+  background:var(--coral-tint); color:var(--coral);
+  padding:0 2px; border-radius:3px; font-weight:600;
+}
+mark.search-hit.current-hit{
+  background:var(--coral); color:#fff;
+}
+
+.side-title{
+  font-size:11px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--ink-soft); font-weight:600; margin-bottom:14px;
+}
+.side-nav a{
+  display:block;
+  text-decoration:none;
+  color:var(--ink-soft);
+  font-size:14.5px;
+  font-weight:500;
+  padding:8px 0 8px 14px;
+  border-left:2px solid var(--line);
+  transition:color .2s ease, border-color .2s ease;
+}
+.side-nav a:hover{ color:var(--teal-deep); }
+.side-nav a.active{
+  color:var(--teal-deep);
+  border-left-color:var(--teal);
+  font-weight:600;
+}
+
+.content section{
+  padding-top:8px;
+  margin-bottom:88px;
+  scroll-margin-top:24px;
+}
+.section-head{
+  display:flex; align-items:baseline; gap:14px; margin-bottom:8px;
+}
+.section-num{
+  font-family:'IBM Plex Mono', monospace;
+  color:var(--line);
+  font-size:14px;
+  font-weight:600;
+}
+.section-head h2{
+  font-size:2rem; margin:0; font-weight:700; letter-spacing:-.01em;
+}
+.section-desc{
+  color:var(--ink-soft); max-width:62ch; margin:0 0 32px; font-size:1.02rem;
+}
+
+/* ---------- File tree ---------- */
+.tree{
+  background:var(--terminal-bg);
+  color:var(--terminal-text);
+  border-radius:var(--radius);
+  padding:28px 30px;
+  font-family:'IBM Plex Mono', monospace;
+  font-size:13.5px;
+  line-height:1.9;
+  overflow-x:auto;
+  box-shadow:var(--shadow);
+}
+.tree .folder{ color:#7FD9C4; font-weight:600; }
+.tree .comment{ color:#7C93A0; }
+.tree .file{ color:var(--terminal-text); }
+
+/* ---------- Role cards ---------- */
+.role-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(230px, 1fr));
+  gap:18px;
+}
+.role-card{
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:26px 24px;
+  box-shadow:var(--shadow);
+  position:relative;
+  overflow:hidden;
+  transition:transform .25s ease, box-shadow .25s ease;
+}
+.role-card:hover{ transform:translateY(-4px); box-shadow:0 4px 8px rgba(16,36,46,.06), 0 20px 36px -16px rgba(16,36,46,.18); }
+.role-card::before{
+  content:"";
+  position:absolute; top:0; left:0; right:0; height:5px;
+  background:var(--accent, var(--teal));
+}
+.role-card.admin{ --accent:var(--admin); }
+.role-card.doctor{ --accent:var(--doctor); }
+.role-card.patient{ --accent:var(--patient); }
+.role-card.caretaker{ --accent:var(--caretaker); }
+.role-title{ font-size:1.15rem; font-weight:700; margin:6px 0 10px; }
+.role-card p{ margin:0 0 6px; color:var(--ink-soft); font-size:.95rem;}
+.role-login{
+  margin-top:14px; padding-top:14px; border-top:1px dashed var(--line);
+  font-family:'IBM Plex Mono', monospace; font-size:12.5px; color:var(--ink-soft);
+}
+.role-login b{ color:var(--ink); }
+
+/* ---------- DB model accordions ---------- */
+.model-list{ display:flex; flex-direction:column; gap:14px; }
+.model{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  box-shadow:var(--shadow); overflow:hidden;
+}
+.model summary{
+  list-style:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:20px 24px;
+  font-weight:600; font-size:1.05rem;
+}
+.model summary::-webkit-details-marker{ display:none; }
+.model summary .dbcode{
+  font-size:11.5px; color:var(--teal-deep); background:var(--teal-tint);
+  padding:4px 10px; border-radius:999px; font-weight:600; letter-spacing:.02em;
+  white-space:nowrap;
+}
+.model summary .chevron{
+  width:18px; height:18px; flex:none;
+  transition:transform .25s ease;
+  color:var(--ink-soft);
+}
+.model[open] summary .chevron{ transform:rotate(180deg); }
+.model-body{ padding:0 24px 24px; }
+table.fields{
+  width:100%; border-collapse:collapse; font-size:.92rem;
+}
+table.fields th{
+  text-align:left; font-family:'Space Grotesk',sans-serif; font-size:11.5px;
+  text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft);
+  padding:8px 10px; border-bottom:1px solid var(--line);
+}
+table.fields td{
+  padding:10px 10px; border-bottom:1px solid var(--panel-deep);
+  color:var(--ink-soft); vertical-align:top;
+}
+table.fields td.field-name{ color:var(--ink); font-weight:600; white-space:nowrap; }
+
+.other-models{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr));
+  gap:14px; margin-top:18px;
+}
+.mini-model{
+  background:var(--panel); border-radius:12px; padding:16px 18px;
+}
+.mini-model .field-name{ display:block; font-weight:700; color:var(--ink); margin-bottom:4px; font-size:.92rem;}
+.mini-model p{ margin:0; font-size:.86rem; color:var(--ink-soft); }
+
+/* ---------- Requirements & bug fixes ---------- */
+.req-list{ margin:0; padding-left:20px; color:var(--ink-soft); font-size:.92rem; }
+.req-list li{ margin-bottom:9px; line-height:1.55; }
+.req-list li b{ color:var(--ink); }
+.req-list.sub{ margin-top:10px; }
+.req-sub-title{
+  font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:.85rem;
+  color:var(--teal-deep); margin:18px 0 4px; text-transform:uppercase; letter-spacing:.05em;
+}
+.req-sub-title:first-child{ margin-top:0; }
+.status-pill{
+  display:inline-block; font-size:10.5px; font-weight:700; padding:2px 8px;
+  border-radius:999px; margin-left:8px; vertical-align:1px;
+}
+.status-pill.rejected{ background:var(--coral-tint); color:var(--coral); }
+.status-pill.completed{ background:var(--teal-tint); color:var(--teal-deep); }
+.status-pill.missed{ background:var(--amber-tint); color:var(--amber); }
+
+/* ---------- Seed accounts ---------- */
+.table-scroll{
+  overflow-x:auto; border-radius:var(--radius); box-shadow:var(--shadow);
+  border:1px solid var(--line);
+}
+table.seed{
+  width:100%; border-collapse:collapse; font-size:.83rem; background:var(--surface);
+  white-space:nowrap;
+}
+table.seed th{
+  text-align:left; font-family:'Space Grotesk',sans-serif; font-size:10.5px;
+  text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft);
+  padding:11px 14px; background:var(--panel); border-bottom:1px solid var(--line);
+  position:sticky; top:0;
+}
+table.seed td{
+  padding:11px 14px; border-bottom:1px solid var(--panel-deep); color:var(--ink-soft);
+}
+table.seed tr:last-child td{ border-bottom:none; }
+table.seed td.uname{ color:var(--ink); font-weight:600; }
+table.seed td.pw{ font-family:'IBM Plex Mono',monospace; color:var(--coral); }
+.seed-block{ margin-bottom:28px; }
+.seed-block h4{
+  font-size:.95rem; margin:0 0 12px; display:flex; align-items:center; gap:8px;
+}
+
+/* ---------- Frontend pages ---------- */
+.page-grid{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(280px,1fr));
+  gap:16px;
+}
+.page-card{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  padding:22px; box-shadow:var(--shadow);
+}
+.page-card .path{
+  display:inline-block; font-size:11.5px; color:var(--teal-deep);
+  background:var(--teal-tint); padding:3px 9px; border-radius:6px; margin-bottom:10px;
+}
+.page-card h4{ margin:0 0 10px; font-size:1.05rem; }
+.page-card ul{ margin:0; padding-left:18px; color:var(--ink-soft); font-size:.9rem; }
+.page-card li{ margin-bottom:4px; }
+.page-card .badge{
+  display:inline-block; margin-left:6px; font-size:10.5px; padding:2px 7px;
+  background:var(--coral-tint); color:var(--coral); border-radius:999px; font-weight:600;
+  font-family:'Space Grotesk',sans-serif;
+}
+
+/* ---------- Activity dashboard ---------- */
+.activity-card{
+  background:var(--surface); border:1px solid var(--line); border-radius:20px;
+  box-shadow:var(--shadow); padding:8px;
+}
+.activity-grid{
+  display:grid; grid-template-columns:1fr 1fr;
+}
+.activity-block{ padding:26px 28px; }
+.activity-block h4{
+  margin:0 0 20px; font-size:.95rem; font-weight:700; color:var(--ink);
+}
+.activity-block.timesheet{
+  border-left:1px solid var(--line);
+}
+.worked-body{
+  display:flex; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap;
+}
+.activity-stats{
+  list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:16px;
+}
+.activity-stats li{ display:flex; flex-direction:column; gap:2px; }
+.activity-stats span{ font-size:.78rem; color:var(--ink-soft); }
+.activity-stats b{ font-size:1.15rem; color:var(--ink); font-weight:700; }
+
+.donut-wrap{ position:relative; width:150px; height:150px; flex:none; }
+.donut-wrap svg{ width:100%; height:100%; transform:rotate(-90deg); }
+.donut-track{ fill:none; stroke:var(--panel-deep); stroke-width:13; }
+.donut-progress{
+  fill:none; stroke:var(--teal); stroke-width:13; stroke-linecap:round;
+  stroke-dasharray:439.8; stroke-dashoffset:439.8;
+  transition:stroke-dashoffset 1.5s cubic-bezier(.16,.84,.44,1) .15s;
+}
+.reveal.in .donut-progress{ stroke-dashoffset:140.7; }
+#hero-clock-progress{ transition:stroke-dashoffset .3s linear; }
+.donut-center{
+  position:absolute; inset:0; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+}
+.donut-time{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:1.3rem; color:var(--ink); }
+.donut-label{ font-size:.72rem; color:var(--ink-soft); margin-top:2px; }
+
+.bars-wrap{
+  display:flex; align-items:flex-end; gap:22px; height:160px; padding-top:10px;
+}
+.bar-col{ display:flex; flex-direction:column; align-items:center; gap:8px; flex:1; height:100%; justify-content:flex-end; }
+.bar-track{
+  width:34px; height:110px; border-radius:8px; background:var(--panel);
+  display:flex; align-items:flex-end; overflow:hidden;
+}
+.bar-track.pending{
+  background:repeating-linear-gradient(135deg, var(--panel-deep), var(--panel-deep) 3px, transparent 3px, transparent 7px);
+  border:1px dashed var(--line);
+}
+.bar-fill{
+  width:100%; height:0; border-radius:8px;
+  background:linear-gradient(180deg, var(--teal), var(--teal-deep));
+  transition:height 1.3s cubic-bezier(.16,.84,.44,1) .1s;
+}
+.reveal.in .bar-fill{ height:var(--h); }
+.bar-value{ font-size:.78rem; color:var(--ink); font-weight:600; font-family:'IBM Plex Mono',monospace; }
+.bar-day{ font-size:.72rem; color:var(--ink-soft); }
+.bar-col.pending .bar-value{ color:var(--ink-soft); }
+
+@media (max-width:640px){
+  .activity-grid{ grid-template-columns:1fr; }
+  .activity-block.timesheet{ border-left:none; border-top:1px solid var(--line); }
+  .worked-body{ justify-content:center; }
+  .bars-wrap{ gap:14px; }
+}
+
+/* ---------- API routes tabs ---------- */
+.tabs{
+  display:flex; gap:6px; flex-wrap:wrap; margin-bottom:22px;
+  border-bottom:1px solid var(--line); padding-bottom:0;
+}
+.tab-btn{
+  font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:13.5px;
+  border:none; background:none; cursor:pointer; color:var(--ink-soft);
+  padding:10px 16px; border-bottom:2px solid transparent; margin-bottom:-1px;
+  transition:color .2s ease, border-color .2s ease;
+}
+.tab-btn.active{ color:var(--teal-deep); border-bottom-color:var(--teal); }
+.tab-panel{ display:none; }
+.tab-panel.active{ display:block; animation:fadein .35s ease; }
+@keyframes fadein{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);} }
+
+.route-table{ width:100%; border-collapse:collapse; }
+.route-table tr{ border-bottom:1px solid var(--panel-deep); }
+.route-table tr:last-child{ border-bottom:none; }
+.route-table td{ padding:13px 10px; vertical-align:top; font-size:.92rem; }
+.method{
+  display:inline-block; min-width:52px; text-align:center;
+  font-size:11px; font-weight:700; letter-spacing:.03em;
+  padding:3px 8px; border-radius:6px; color:#fff;
+}
+.method.get{ background:var(--get); }
+.method.post{ background:var(--post); }
+.method.put{ background:var(--put); }
+.method.delete{ background:var(--delete); }
+.route-table code.path{ font-size:.85rem; color:var(--ink); }
+.route-table td.desc{ color:var(--ink-soft); }
+
+/* ---------- Email system ---------- */
+.email-grid{
+  display:grid; grid-template-columns:1.1fr .9fr; gap:24px;
+}
+@media (max-width:760px){ .email-grid{ grid-template-columns:1fr; } }
+.email-card{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  box-shadow:var(--shadow); padding:24px;
+}
+.email-card h4{ margin-top:0; }
+table.trigger-table{ width:100%; border-collapse:collapse; font-size:.9rem; }
+table.trigger-table td{ padding:10px 6px; border-bottom:1px solid var(--panel-deep); color:var(--ink-soft); }
+table.trigger-table td:first-child{ color:var(--ink); font-weight:600; width:55%; }
+.reliability-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:12px; }
+.reliability-list li{ display:flex; gap:10px; font-size:.9rem; color:var(--ink-soft); }
+.reliability-list .check{
+  flex:none; width:18px; height:18px; border-radius:50%;
+  background:var(--teal-tint); color:var(--teal-deep);
+  display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700;
+}
+
+/* ---------- Checklist ---------- */
+.progress-wrap{
+  display:flex; align-items:center; gap:16px; margin-bottom:28px;
+  background:var(--panel); border-radius:12px; padding:16px 20px;
+}
+.progress-bar{
+  flex:1; height:8px; background:var(--panel-deep); border-radius:999px; overflow:hidden;
+}
+.progress-fill{
+  height:100%; width:0%; background:linear-gradient(90deg,var(--teal),var(--coral));
+  border-radius:999px; transition:width .4s ease;
+}
+.progress-label{ font-family:'IBM Plex Mono',monospace; font-size:13px; color:var(--ink-soft); white-space:nowrap; }
+
+.check-groups{
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(300px,1fr));
+  gap:18px;
+}
+.check-group{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius);
+  padding:20px 22px; box-shadow:var(--shadow);
+}
+.check-group h4{ margin:0 0 14px; font-size:.98rem; display:flex; align-items:center; gap:8px;}
+.check-group ul{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
+.check-group li{ display:flex; align-items:flex-start; gap:10px; font-size:.88rem; color:var(--ink-soft); }
+.check-group input[type=checkbox]{
+  appearance:none; -webkit-appearance:none;
+  width:17px; height:17px; flex:none; margin-top:1px;
+  border:1.5px solid var(--line); border-radius:5px; cursor:pointer;
+  position:relative; transition:background .2s ease, border-color .2s ease;
+}
+.check-group input[type=checkbox]:checked{
+  background:var(--teal); border-color:var(--teal);
+}
+.check-group input[type=checkbox]:checked::after{
+  content:"✓"; position:absolute; inset:0; color:#fff; font-size:12px;
+  display:flex; align-items:center; justify-content:center; font-weight:700;
+}
+.check-group li label{ cursor:pointer; }
+.check-group li.checked label{ color:var(--ink); text-decoration:line-through; text-decoration-color:var(--line); }
+
+/* ---------- Environment ---------- */
+.env-block{
+  background:var(--terminal-bg); border-radius:var(--radius); box-shadow:var(--shadow);
+  overflow:hidden;
+}
+.env-topbar{
+  display:flex; align-items:center; gap:8px;
+  padding:14px 20px; background:rgba(255,255,255,.03);
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.env-topbar span{ width:10px; height:10px; border-radius:50%; }
+.env-topbar span:nth-child(1){ background:#E1552E; }
+.env-topbar span:nth-child(2){ background:#B9791E; }
+.env-topbar span:nth-child(3){ background:#1F7A6C; }
+.env-topbar .fname{
+  margin-left:10px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:#7C93A0;
+}
+.env-block pre{
+  margin:0; padding:26px 30px; overflow-x:auto;
+  font-family:'IBM Plex Mono',monospace; font-size:13px; line-height:1.9; color:var(--terminal-text);
+}
+.env-block .c{ color:#7C93A0; }
+.env-block .k{ color:#7FD9C4; }
+.env-block .v{ color:#F2C57C; }
+.note{
+  margin-top:18px; font-size:.9rem; color:var(--ink-soft);
+  background:var(--amber-tint); border-left:3px solid var(--amber);
+  padding:14px 18px; border-radius:0 10px 10px 0;
+}
+
+/* ---------- Footer ---------- */
+footer{
+  text-align:center; padding:48px 32px 64px; color:var(--ink-soft); font-size:.85rem;
+  border-top:1px solid var(--line);
+}
+
+/* ---------- Mobile ---------- */
+@media (max-width: 880px){
+  .layout{ grid-template-columns:1fr; }
+  .sidebar{
+    position:sticky; top:0; height:auto; z-index:50;
+    background:rgba(246,248,247,.92); backdrop-filter:blur(8px);
+    padding:14px 0; border-bottom:1px solid var(--line);
+    margin:0 -14px 24px; padding-left:14px; padding-right:14px;
+  }
+  .side-title{ display:none; }
+  .side-nav{ display:flex; gap:6px; overflow-x:auto; }
+  .side-nav a{
+    border-left:none; border-bottom:2px solid transparent;
+    padding:8px 12px; white-space:nowrap; flex:none;
+  }
+  .side-nav a.active{ border-bottom-color:var(--teal); }
+  .hero{ padding:64px 14px 40px; }
+  .layout{ padding:0 14px 90px; }
+}
+
+/* ---------- Sticky notes ---------- */
+#sticky-fab{
+  position:fixed; right:26px; bottom:26px; z-index:200;
+  width:56px; height:56px; border-radius:50%;
+  background:var(--terminal-bg); color:var(--terminal-text); border:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:0 10px 26px -8px rgba(16,36,46,.45);
+  transition:transform .2s ease, background .2s ease;
+}
+#sticky-fab:hover{ transform:translateY(-3px) scale(1.04); background:var(--teal-deep); }
+#sticky-fab svg{ width:24px; height:24px; }
+
+#sticky-palette{
+  position:fixed; right:26px; bottom:94px; z-index:200;
+  width:150px;
+  background:var(--surface); border-radius:16px;
+  box-shadow:0 16px 40px -10px rgba(16,36,46,.28), 0 2px 8px rgba(16,36,46,.08);
+  padding:14px;
+  opacity:0; transform:translateY(10px) scale(.96);
+  pointer-events:none;
+  transition:opacity .2s ease, transform .2s ease;
+}
+#sticky-palette.open{ opacity:1; transform:translateY(0) scale(1); pointer-events:auto; }
+.palette-head{
+  display:flex; align-items:center; justify-content:space-between;
+  margin-bottom:12px;
+}
+.palette-head span{ font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:13.5px; color:var(--ink); }
+.palette-head button{
+  border:none; background:none; cursor:pointer; color:var(--ink-soft);
+  font-size:16px; line-height:1; padding:2px 4px; border-radius:6px;
+}
+.palette-head button:hover{ background:var(--panel); color:var(--ink); }
+.palette-grid{
+  display:grid; grid-template-columns:repeat(2, 1fr); gap:9px;
+}
+.swatch{
+  width:100%; aspect-ratio:1; border-radius:9px; border:none; cursor:pointer;
+  position:relative; transition:transform .15s ease, box-shadow .15s ease;
+  box-shadow:inset 0 -10px 14px -10px rgba(0,0,0,.18);
+}
+.swatch:hover{ transform:translateY(-2px) scale(1.06); box-shadow:0 6px 14px -6px rgba(16,36,46,.35); }
+.swatch::after{
+  content:""; position:absolute; top:0; right:0;
+  width:0; height:0;
+  border-style:solid; border-width:0 10px 10px 0;
+  border-color:transparent rgba(255,255,255,.55) transparent transparent;
+  border-radius:0 9px 0 0;
+}
+
+.sticky-note{
+  position:absolute; z-index:150;
+  width:168px; min-height:168px;
+  padding:16px 16px 30px;
+  box-shadow:0 14px 28px -12px rgba(16,36,46,.35), 0 2px 6px rgba(16,36,46,.12);
+  border-radius:3px 3px 3px 16px;
+  cursor:grab;
+  font-family:'Space Grotesk', sans-serif;
+  transition:box-shadow .15s ease;
+}
+.sticky-note::before{
+  content:""; position:absolute; top:0; right:0;
+  width:0; height:0;
+  border-style:solid; border-width:0 22px 22px 0;
+  border-color:transparent rgba(0,0,0,.12) transparent transparent;
+  border-radius:0 3px 0 0;
+}
+.sticky-note.dragging{
+  cursor:grabbing; box-shadow:0 26px 50px -14px rgba(16,36,46,.5), 0 4px 10px rgba(16,36,46,.18);
+  z-index:999;
+}
+.sticky-note .note-remove{
+  position:absolute; top:6px; right:8px;
+  border:none; background:none; cursor:pointer;
+  font-size:15px; line-height:1; color:rgba(0,0,0,.38);
+  padding:2px 5px; border-radius:6px; opacity:0;
+  transition:opacity .15s ease, background .15s ease, color .15s ease;
+}
+.sticky-note:hover .note-remove{ opacity:1; }
+.sticky-note .note-remove:hover{ background:rgba(0,0,0,.08); color:rgba(0,0,0,.65); }
+.sticky-note .note-text{
+  width:100%; height:100%; min-height:110px;
+  border:none; outline:none; background:none; resize:none;
+  font-family:'Space Grotesk', sans-serif; font-size:14px; line-height:1.5;
+  color:rgba(0,0,0,.72); font-weight:500;
+  cursor:text;
+}
+.sticky-note .note-text:empty::before{
+  content:attr(data-placeholder); color:rgba(0,0,0,.32);
+}
+
+/* ---------- Theme toggle ---------- */
+#theme-toggle{
+  position:fixed; top:22px; right:26px; z-index:200;
+  width:48px; height:48px; border-radius:50%;
+  background:var(--surface); border:1px solid var(--line); cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:var(--shadow);
+  transition:background-color .4s ease, border-color .4s ease, transform .2s ease;
+}
+#theme-toggle:hover{ transform:translateY(-2px); }
+#theme-toggle svg{ width:20px; height:20px; color:var(--ink); }
+#theme-toggle .sun{ display:none; }
+[data-theme="dark"] #theme-toggle .moon{ display:none; }
+[data-theme="dark"] #theme-toggle .sun{ display:block; }
+
+/* ---------- Animated paper background ---------- */
+#bg-layer{
+  position:fixed; inset:0; z-index:-1;
+  overflow:hidden; background:var(--paper);
+  transition:background-color .4s ease;
+}
+#bg-layer .grain{
+  position:absolute; inset:-60px;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  opacity:.05;
+  animation:grain-shift 1.4s steps(4) infinite;
+}
+[data-theme="dark"] #bg-layer .grain{ opacity:.08; }
+@keyframes grain-shift{
+  0%{ transform:translate(0,0); }
+  25%{ transform:translate(-2%,1%); }
+  50%{ transform:translate(1%,-2%); }
+  75%{ transform:translate(-1%,-1%); }
+  100%{ transform:translate(0,0); }
+}
+#bg-layer .blob{
+  position:absolute; border-radius:50%;
+  filter:blur(90px);
+  opacity:.35;
+  will-change:transform;
+}
+#bg-layer .blob-a{
+  width:520px; height:520px; top:-140px; left:-120px;
+  background:var(--teal-tint);
+  animation:drift-a 34s ease-in-out infinite;
+}
+#bg-layer .blob-b{
+  width:460px; height:460px; bottom:-160px; right:-100px;
+  background:var(--coral-tint);
+  animation:drift-b 40s ease-in-out infinite;
+}
+#bg-layer .blob-c{
+  width:380px; height:380px; top:40%; left:60%;
+  background:var(--amber-tint);
+  animation:drift-c 46s ease-in-out infinite;
+}
+@keyframes drift-a{
+  0%,100%{ transform:translate(0,0) scale(1); }
+  50%{ transform:translate(80px,60px) scale(1.15); }
+}
+@keyframes drift-b{
+  0%,100%{ transform:translate(0,0) scale(1); }
+  50%{ transform:translate(-70px,-50px) scale(1.1); }
+}
+@keyframes drift-c{
+  0%,100%{ transform:translate(-40px,0) scale(1); }
+  50%{ transform:translate(40px,-40px) scale(1.2); }
+}
+@media (prefers-reduced-motion: reduce){
+  #bg-layer .grain, #bg-layer .blob{ animation:none; }
+}
+</style>
+</head>
+<body>
+
+<div id="bg-layer">
+  <div class="blob blob-a"></div>
+  <div class="blob blob-b"></div>
+  <div class="blob blob-c"></div>
+  <div class="grain"></div>
+</div>
+
+<button id="theme-toggle" title="Toggle dark mode" aria-label="Toggle dark mode">
+  <svg class="moon" viewBox="0 0 24 24" fill="none"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+  <svg class="sun" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="4.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 2.5V5M12 19V21.5M4.2 4.2L6 6M18 18L19.8 19.8M2.5 12H5M19 12H21.5M4.2 19.8L6 18M18 6L19.8 4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+</button>
+
+<div id="scroll-progress"></div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-grid">
+    <div class="hero-text">
+      <div class="hero-eyebrow"><span class="dot"></span> Vital signs: stable · in active development</div>
+      <h1>Beacon AI Care Unit<br><em>Platform</em></h1>
+      <p class="hero-sub">A Django-powered care coordination system connecting patients, doctors, and caretakers — with real-time appointments, video calls, emergency alerts, and email notifications built in.</p>
+      <div class="hero-meta">
+        <span class="pill">Stack <b>Django 4 · DRF · SQLite · Vanilla JS · JWT</b></span>
+        <a class="pill" href="https://github.com/its-rajkumarpadmanabhan/Genai-Main.git" target="_blank" rel="noopener noreferrer" style="text-decoration:none;">Repo <b>its-rajkumarpadmanabhan/Genai-Main</b></a>
+        <span class="pill">Run <b>python manage.py runserver</b></span>
+      </div>
+      <div class="ecg-wrap">
+        <svg viewBox="0 0 1000 120" preserveAspectRatio="none">
+          <path class="ecg-baseline" d="M0,60 L1000,60"/>
+          <defs>
+            <path id="ecg-unit" class="ecg-line" d="M0,60 L90,60 L100,45 L112,15 L124,105 L136,40 L148,60 L250,60"/>
+          </defs>
+          <g class="ecg-track">
+            <use href="#ecg-unit" x="-250"/>
+            <use href="#ecg-unit" x="0"/>
+            <use href="#ecg-unit" x="250"/>
+            <use href="#ecg-unit" x="500"/>
+            <use href="#ecg-unit" x="750"/>
+            <use href="#ecg-unit" x="1000"/>
+            <use href="#ecg-unit" x="1250"/>
+          </g>
+        </svg>
+        <div class="ecg-scan"></div>
+      </div>
+    </div>
+
+    <div class="hero-graph">
+      <div class="donut-wrap hero-donut reveal">
+        <svg viewBox="0 0 160 160">
+          <circle class="donut-track" cx="80" cy="80" r="70"/>
+          <circle class="donut-progress" id="hero-clock-progress" cx="80" cy="80" r="70"/>
+        </svg>
+        <div class="donut-center">
+          <span class="donut-time" id="hero-clock-time">06:24</span>
+          <span class="donut-label">current time</span>
+        </div>
+      </div>
+      <span class="hero-graph-caption">Live clock · updates every second</span>
+    </div>
+  </div>
+</div>
+
+<!-- LAYOUT -->
+<div class="layout">
+  <aside class="sidebar">
+    <div class="search-wrap">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="1.8"/><path d="M21 21L16.5 16.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+      <input type="text" id="global-search" placeholder="Search everything…" autocomplete="off">
+      <span class="search-count" id="search-count"></span>
+    </div>
+    <div class="side-title">Contents</div>
+    <nav class="side-nav" id="side-nav">
+      <a href="#structure">Project structure</a>
+      <a href="#roles">Roles &amp; access</a>
+      <a href="#database">Database models</a>
+      <a href="#frontend">Frontend pages</a>
+      <a href="#api">API routes</a>
+      <a href="#email">Email system</a>
+      <a href="#checklist">Function checklist</a>
+      <a href="#requirements">Requirements &amp; fixes</a>
+      <a href="#seed-accounts">Seed / test accounts</a>
+      <a href="#env">Environment</a>
+    </nav>
+  </aside>
+
+  <main class="content">
+
+    <!-- STRUCTURE -->
+    <section id="structure">
+      <div class="section-head reveal"><span class="section-num">01</span><h2>Project structure</h2></div>
+      <p class="section-desc reveal">Everything lives inside <code>beacon-django/</code> — models, views, and serializers under <code>accounts/</code>, templates rendered per role, and settings under <code>beacon/</code>.</p>
+      <div class="tree reveal">
+<span class="folder">beacon-django/</span>
+├── <span class="folder">accounts/</span>
+│   ├── models.py        <span class="comment">← All DB models</span>
+│   ├── views.py         <span class="comment">← All API logic (~2200 lines)</span>
+│   ├── serializers.py   <span class="comment">← DRF serializers</span>
+│   ├── urls.py          <span class="comment">← All API routes</span>
+│   ├── emails.py        <span class="comment">← Email notification helpers</span>
+│   └── admin.py         <span class="comment">← Django admin config</span>
+├── <span class="folder">templates/</span>
+│   ├── <span class="file">admin-dashboard.html</span>      <span class="comment">← Admin portal</span>
+│   ├── <span class="file">caretaker-dashboard.html</span>  <span class="comment">← Caretaker portal</span>
+│   ├── <span class="file">patient-profile.html</span>      <span class="comment">← Patient portal</span>
+│   ├── <span class="file">doctor-profile.html</span>       <span class="comment">← Doctor portal</span>
+│   ├── <span class="file">login signup.html</span>         <span class="comment">← Login / Signup</span>
+│   ├── <span class="file">forgot-password.html</span>      <span class="comment">← Forgot password</span>
+│   ├── <span class="file">reset-password.html</span>       <span class="comment">← Reset password</span>
+│   └── <span class="file">voice-timeline.html</span>       <span class="comment">← Voice AI timeline</span>
+├── <span class="folder">beacon/</span>
+│   └── settings.py      <span class="comment">← Django settings, SMTP config</span>
+├── .env                 <span class="comment">← Environment variables (SECRET, SMTP, DB)</span>
+└── manage.py</div>
+    </section>
+
+    <!-- ROLES -->
+    <section id="roles">
+      <div class="section-head reveal"><span class="section-num">02</span><h2>Roles &amp; access</h2></div>
+      <p class="section-desc reveal">Four roles share one login screen but see entirely different dashboards after authenticating.</p>
+      <div class="role-grid reveal">
+        <div class="role-card admin">
+          <div class="role-title">Admin</div>
+          <p>Full platform management — every user, every appointment.</p>
+          <div class="role-login">Login: <b>Email + Password</b></div>
+        </div>
+        <div class="role-card doctor">
+          <div class="role-title">Doctor</div>
+          <p>Appointments, patients, prescriptions, video calls.</p>
+          <div class="role-login">Login: <b>Email + Password</b></div>
+        </div>
+        <div class="role-card patient">
+          <div class="role-title">Patient</div>
+          <p>Book appointments, manage profile, caretaker requests.</p>
+          <div class="role-login">Login: <b>Email + Password</b></div>
+        </div>
+        <div class="role-card caretaker">
+          <div class="role-title">Caretaker</div>
+          <p>Monitor patients, book on behalf, join video calls.</p>
+          <div class="role-login">Login: <b>Email + Password</b></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DATABASE -->
+    <section id="database">
+      <div class="section-head reveal"><span class="section-num">03</span><h2>Database models</h2></div>
+      <p class="section-desc reveal">Every profile links back to <code>CustomUser</code> by role. Click a model to see its fields.</p>
+
+      <div class="model-list reveal">
+        <details class="model" open>
+          <summary><span>CustomUser <span style="color:var(--ink-soft); font-weight:400;">— table: users</span></span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">core</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <table class="fields">
+              <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+              <tr><td class="field-name">username</td><td>CharField</td><td>Display name</td></tr>
+              <tr><td class="field-name">email</td><td>EmailField</td><td>Unique — used for login</td></tr>
+              <tr><td class="field-name">mobile_number</td><td>CharField</td><td>Optional</td></tr>
+              <tr><td class="field-name">plain_password</td><td>CharField</td><td>Stored for admin visibility only</td></tr>
+              <tr><td class="field-name">role</td><td>CharField</td><td>admin / doctor / patient / caretaker</td></tr>
+              <tr><td class="field-name">profile_picture</td><td>TextField</td><td>Base64 or URL</td></tr>
+              <tr><td class="field-name">is_active</td><td>BooleanField</td><td>Account status</td></tr>
+              <tr><td class="field-name">created_at</td><td>DateTimeField</td><td>Auto</td></tr>
+            </table>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>PatientProfile <span style="color:var(--ink-soft); font-weight:400;">— table: patient_profiles</span></span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">patient</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <table class="fields">
+              <tr><th>Field</th><th>Notes</th></tr>
+              <tr><td class="field-name">patient_code</td><td>Auto-generated PAT-XXXXXX</td></tr>
+              <tr><td class="field-name">full_name, dob, gender, marital_status</td><td>Personal info</td></tr>
+              <tr><td class="field-name">location, languages, phone_number, email</td><td>Contact info</td></tr>
+              <tr><td class="field-name">insurance_details</td><td>Insurance text</td></tr>
+              <tr><td class="field-name">emergency_contact_name/phone/relation</td><td>Emergency contact</td></tr>
+              <tr><td class="field-name">medical_history_notes</td><td>Free-text notes</td></tr>
+              <tr><td class="field-name">assigned_caretaker</td><td>FK → CustomUser (caretaker)</td></tr>
+            </table>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>DoctorProfile <span style="color:var(--ink-soft); font-weight:400;">— table: doctor_profiles</span></span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">doctor</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <table class="fields">
+              <tr><th>Field</th><th>Notes</th></tr>
+              <tr><td class="field-name">doctor_code</td><td>Auto-generated DOC-XXXXXX</td></tr>
+              <tr><td class="field-name">full_name, dob, gender</td><td>Personal info</td></tr>
+              <tr><td class="field-name">experience_years, consultation_fee</td><td>Professional info</td></tr>
+              <tr><td class="field-name">hospital_name, location, state, pincode</td><td>Location</td></tr>
+              <tr><td class="field-name">major_department, license_number</td><td>Specialization</td></tr>
+              <tr><td class="field-name">available_hours, availability_status</td><td>Schedule</td></tr>
+              <tr><td class="field-name">rating_avg, reviews_count</td><td>Ratings</td></tr>
+              <tr><td class="field-name">specialized_details, languages_speak</td><td>Extra details</td></tr>
+            </table>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>CaretakerProfile <span style="color:var(--ink-soft); font-weight:400;">— table: caretaker_profiles</span></span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">caretaker</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <table class="fields">
+              <tr><th>Field</th><th>Notes</th></tr>
+              <tr><td class="field-name">caretaker_code</td><td>Auto-generated CAR-XXXXXX</td></tr>
+              <tr><td class="field-name">full_name, dob, gender</td><td>Personal info</td></tr>
+              <tr><td class="field-name">experience_years, consultation_fee</td><td>Professional info</td></tr>
+              <tr><td class="field-name">location, languages, license_number</td><td>Details</td></tr>
+              <tr><td class="field-name">available_hours, phone_number</td><td>Contact</td></tr>
+              <tr><td class="field-name">rating_avg, reviews_count</td><td>Ratings</td></tr>
+            </table>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>Appointment <span style="color:var(--ink-soft); font-weight:400;">— table: appointments</span></span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">core</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <table class="fields">
+              <tr><th>Field</th><th>Notes</th></tr>
+              <tr><td class="field-name">patient, doctor</td><td>FK → CustomUser</td></tr>
+              <tr><td class="field-name">caretaker</td><td>FK → CustomUser (optional)</td></tr>
+              <tr><td class="field-name">booked_by</td><td>patient or caretaker</td></tr>
+              <tr><td class="field-name">appointment_date, time_slot</td><td>Schedule</td></tr>
+              <tr><td class="field-name">appointment_type</td><td>online or offline</td></tr>
+              <tr><td class="field-name">status</td><td>pending / accepted / rejected / completed / missed</td></tr>
+              <tr><td class="field-name">prescription_pdf</td><td>Base64 PDF</td></tr>
+              <tr><td class="field-name">is_call_active, is_caretaker_added_to_call</td><td>Video call state</td></tr>
+              <tr><td class="field-name">doctor_notes</td><td>Doctor's notes</td></tr>
+            </table>
+          </div>
+        </details>
+      </div>
+
+      <div class="other-models reveal">
+        <div class="mini-model"><span class="field-name">CaretakerRequest</span><p>Patient → Caretaker connection request (pending/accepted/rejected)</p></div>
+        <div class="mini-model"><span class="field-name">CaretakerEditRequest</span><p>Caretaker → request to edit patient profile (pending/approved/rejected)</p></div>
+        <div class="mini-model"><span class="field-name">MedicalDocument</span><p>Patient medical files (base64)</p></div>
+        <div class="mini-model"><span class="field-name">Review</span><p>Star ratings for doctors/caretakers</p></div>
+        <div class="mini-model"><span class="field-name">EmergencyAlert</span><p>AI-detected emergency conditions with severity level</p></div>
+        <div class="mini-model"><span class="field-name">PasswordResetToken</span><p>One-time password reset tokens</p></div>
+      </div>
+    </section>
+
+    <!-- FRONTEND PAGES -->
+    <section id="frontend">
+      <div class="section-head reveal"><span class="section-num">04</span><h2>Frontend pages</h2></div>
+      <p class="section-desc reveal">Seven templates, each rendering a different portal. Patient and caretaker dashboards refresh silently every 2 seconds — no flicker.</p>
+      <div class="page-grid reveal">
+        <div class="page-card">
+          <span class="path">/</span>
+          <h4>login signup.html</h4>
+          <ul><li>Toggle Login / Signup</li><li>Role selection</li><li>JWT stored in localStorage</li></ul>
+        </div>
+        <div class="page-card">
+          <span class="path">/admin-dashboard</span>
+          <h4>admin-dashboard.html</h4>
+          <ul><li>Live platform stats</li><li>Search &amp; filter every role</li><li>Add / edit / delete any user</li></ul>
+        </div>
+        <div class="page-card">
+          <span class="path">/doctor-profile</span>
+          <h4>doctor-profile.html</h4>
+          <ul><li>Accept / reject appointments</li><li>Upload prescriptions</li><li>On-leave mode + video calls</li></ul>
+        </div>
+        <div class="page-card">
+          <span class="path">/patient-profile</span>
+          <h4>patient-profile.html <span class="badge">live refresh</span></h4>
+          <ul><li>Book appointments, doctor directory</li><li>Caretaker connections</li><li>Emergency alerts + voice timeline</li></ul>
+        </div>
+        <div class="page-card">
+          <span class="path">/caretaker-dashboard</span>
+          <h4>caretaker-dashboard.html <span class="badge">live refresh</span></h4>
+          <ul><li>Accepted care first, then pending</li><li>Book on behalf of patient</li><li>Join video calls</li></ul>
+        </div>
+        <div class="page-card">
+          <span class="path">/forgot-password · /reset-password</span>
+          <h4>Password recovery</h4>
+          <ul><li>Email-based reset flow</li><li>JWT token in reset link</li></ul>
+        </div>
+        <div class="page-card">
+          <span class="path">/voice-timeline</span>
+          <h4>voice-timeline.html</h4>
+          <ul><li>AI voice session timeline</li><li>Emergency event history</li></ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- API ROUTES -->
+    <section id="api">
+      <div class="section-head reveal"><span class="section-num">05</span><h2>API routes</h2></div>
+      <p class="section-desc reveal">All under <code>/api/auth/...</code>, grouped by who calls them.</p>
+
+      <div class="tabs reveal" id="tabs">
+        <button class="tab-btn active" data-tab="auth">Auth</button>
+        <button class="tab-btn" data-tab="admin">Admin</button>
+        <button class="tab-btn" data-tab="patient">Patient</button>
+        <button class="tab-btn" data-tab="doctor">Doctor</button>
+        <button class="tab-btn" data-tab="caretaker">Caretaker</button>
+        <button class="tab-btn" data-tab="shared">Shared</button>
+      </div>
+
+      <div class="tab-panel active reveal" data-panel="auth">
+        <table class="route-table">
+          <tr><td><span class="method post">POST</span></td><td><code class="path">/api/auth/signup</code></td><td class="desc">Register new user</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code class="path">/api/auth/login</code></td><td class="desc">Login → returns JWT token</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code class="path">/api/auth/me</code></td><td class="desc">Get current user info</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code class="path">/api/auth/forgot-password</code></td><td class="desc">Send reset email</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code class="path">/api/auth/reset-password</code></td><td class="desc">Reset password via token</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code class="path">/api/auth/check-availability</code></td><td class="desc">Check email/username uniqueness</td></tr>
+          <tr><td><span class="method delete">DEL</span></td><td><code class="path">/api/auth/profile/delete</code></td><td class="desc">Delete own account</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code class="path">/api/auth/profile/picture</code></td><td class="desc">Upload profile picture</td></tr>
+        </table>
+      </div>
+
+      <div class="tab-panel" data-panel="admin">
+        <table class="route-table">
+          <tr><td><span class="method get">GET</span></td><td><code class="path">/api/auth/admin/stats</code></td><td class="desc">Platform statistics</td></tr>
+          <tr><td><span class="method get">GET/POST/PUT/DEL</span></td><td><code class="path">/api/auth/admin/users</code></td><td class="desc">Manage all users</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code class="path">/api/auth/admin/users/&lt;id&gt;/profile</code></td><td class="desc">Full profile of any user</td></tr>
+        </table>
+      </div>
+
+      <div class="tab-panel" data-panel="patient">
+        <table class="route-table">
+          <tr><td><span class="method get">GET/PUT</span></td><td><code class="path">/api/auth/patient/profile</code></td><td class="desc">View/edit patient profile</td></tr>
+          <tr><td><span class="method get">GET/POST/DEL</span></td><td><code class="path">/api/auth/patient/documents</code></td><td class="desc">Medical documents</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code class="path">/api/auth/patient/appointments</code></td><td class="desc">Patient's appointments</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code class="path">/api/auth/patient/visited-doctors</code></td><td class="desc">Past doctors list</td></tr>
+          <tr><td><span class="method get">GET/POST</span></td><td><code class="path">/api/auth/patient/caretaker-request</code></td><td class="desc">Send/view caretaker requests</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code class="path">/api/auth/patient/emergency-alerts</code></td><td class="desc">Patient's emergency alerts</td></tr>
+        </table>
+      </div>
+
+      <div class="tab-panel" data-panel="doctor">
+        <table class="route-table">
+          <tr><td><span class="method get">GET/PUT</span></td><td><code class="path">/api/auth/doctor/profile</code></td><td class="desc">View/edit doctor profile</td></tr>
+          <tr><td><span class="method get">GET/POST</span></td><td><code class="path">/api/auth/doctor/appointments</code></td><td class="desc">View / accept / reject appointments</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code class="path">/api/auth/doctor/patients</code></td><td class="desc">Doctor's patient list</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code class="path">/api/auth/doctor/patients/&lt;id&gt;</code></td><td class="desc">Single patient details</td></tr>
+          <tr><td><span class="method get">GET/POST</span></td><td><code class="path">/api/auth/doctor/patients/&lt;id&gt;/records</code></td><td class="desc">Patient records</td></tr>
+        </table>
+      </div>
+
+      <div class="tab-panel" data-panel="caretaker">
+        <table class="route-table">
+          <tr><td><span class="method get">GET/PUT</span></td><td><code class="path">/api/auth/caretaker/profile</code></td><td class="desc">View/edit caretaker profile (incl. email)</td></tr>
+          <tr><td><span class="method get">GET/POST</span></td><td><code class="path">/api/auth/caretaker/requests</code></td><td class="desc">View/handle care requests</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code class="path">/api/auth/caretaker/patients</code></td><td class="desc">Caretaker's patients list</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code class="path">/api/auth/caretaker/patient-edit-request</code></td><td class="desc">Request to edit patient profile</td></tr>
+          <tr><td><span class="method delete">DEL</span></td><td><code class="path">/api/auth/caretaker/unlink</code></td><td class="desc">Unlink from patient</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code class="path">/api/auth/caretaker/emergency-alerts</code></td><td class="desc">Emergency alerts for assigned patient</td></tr>
+        </table>
+      </div>
+
+      <div class="tab-panel" data-panel="shared">
+        <table class="route-table">
+          <tr><td><span class="method get">GET</span></td><td><code class="path">/api/auth/directory/search</code></td><td class="desc">Search doctors/caretakers</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code class="path">/api/auth/appointments/book</code></td><td class="desc">Book an appointment</td></tr>
+          <tr><td><span class="method delete">DEL</span></td><td><code class="path">/api/auth/appointments/&lt;id&gt;/cancel</code></td><td class="desc">Cancel appointment</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code class="path">/api/auth/appointments/&lt;id&gt;/start-call</code></td><td class="desc">Start video call</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code class="path">/api/auth/appointments/&lt;id&gt;/end-call</code></td><td class="desc">End video call</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code class="path">/api/auth/appointments/&lt;id&gt;/toggle-caretaker-call</code></td><td class="desc">Add/remove caretaker from call</td></tr>
+          <tr><td><span class="method get">GET</span></td><td><code class="path">/api/auth/appointments/&lt;id&gt;/join-video-call</code></td><td class="desc">Join video call</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code class="path">/api/auth/review</code></td><td class="desc">Submit rating/review</td></tr>
+          <tr><td><span class="method post">POST</span></td><td><code class="path">/api/auth/emergency-alerts</code></td><td class="desc">Create emergency alert</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- EMAIL SYSTEM -->
+    <section id="email">
+      <div class="section-head reveal"><span class="section-num">06</span><h2>Email notification system</h2></div>
+      <p class="section-desc reveal">Sends in a background thread so nothing blocks the API response — and always re-queries the database for the current email before sending.</p>
+      <div class="email-grid reveal">
+        <div class="email-card">
+          <h4>When emails are sent</h4>
+          <table class="trigger-table">
+            <tr><td>Doctor accepts appointment</td><td>Patient + assigned caretaker</td></tr>
+            <tr><td>Doctor rejects appointment</td><td>Patient + assigned caretaker</td></tr>
+            <tr><td>Doctor marks On Leave</td><td>Patient + assigned caretaker</td></tr>
+            <tr><td>Forgot password request</td><td>Patient / Doctor / Caretaker</td></tr>
+          </table>
+        </div>
+        <div class="email-card">
+          <h4>Reliability</h4>
+          <ul class="reliability-list">
+            <li><span class="check">✓</span> Runs in a background thread — never blocks the API response</li>
+            <li><span class="check">✓</span> Always queries fresh from the database — never a stale or cached email</li>
+            <li><span class="check">✓</span> Supports Gmail SMTP (App Password) or any SMTP relay, e.g. SendGrid</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- CHECKLIST -->
+    <section id="checklist">
+      <div class="section-head reveal"><span class="section-num">07</span><h2>Function checklist</h2></div>
+      <p class="section-desc reveal">Tick items off as you verify them working end to end.</p>
+
+      <div class="progress-wrap reveal">
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="progress-label" id="progress-label">0 / 0 verified</div>
+      </div>
+
+      <div class="check-groups reveal" id="checklist-root">
+        <div class="check-group">
+          <h4>🔐 Auth &amp; account</h4>
+          <ul>
+            <li><input type="checkbox" id="c1"><label for="c1">Sign up as Patient / Doctor / Caretaker</label></li>
+            <li><input type="checkbox" id="c2"><label for="c2">Login with email + password</label></li>
+            <li><input type="checkbox" id="c3"><label for="c3">JWT token stored and used for all API calls</label></li>
+            <li><input type="checkbox" id="c4"><label for="c4">Forgot password → email link → reset password</label></li>
+            <li><input type="checkbox" id="c5"><label for="c5">Delete own account</label></li>
+            <li><input type="checkbox" id="c6"><label for="c6">Upload profile picture</label></li>
+          </ul>
+        </div>
+        <div class="check-group">
+          <h4>👨‍💼 Admin dashboard</h4>
+          <ul>
+            <li><input type="checkbox" id="c7"><label for="c7">View platform stats</label></li>
+            <li><input type="checkbox" id="c8"><label for="c8">Search patients / doctors / caretakers tables</label></li>
+            <li><input type="checkbox" id="c9"><label for="c9">Caretaker table shows latest email after update</label></li>
+            <li><input type="checkbox" id="c10"><label for="c10">Add / edit / delete any user</label></li>
+            <li><input type="checkbox" id="c11"><label for="c11">View full profile of any user (modal)</label></li>
+          </ul>
+        </div>
+        <div class="check-group">
+          <h4>🏥 Doctor profile</h4>
+          <ul>
+            <li><input type="checkbox" id="c12"><label for="c12">Edit profile (hospital, dept, fee, hours)</label></li>
+            <li><input type="checkbox" id="c13"><label for="c13">Accept appointment → sends email ✉️</label></li>
+            <li><input type="checkbox" id="c14"><label for="c14">Reject appointment → sends email ✉️</label></li>
+            <li><input type="checkbox" id="c15"><label for="c15">Upload prescription PDF</label></li>
+            <li><input type="checkbox" id="c16"><label for="c16">Start video call (online appointments)</label></li>
+            <li><input type="checkbox" id="c17"><label for="c17">On Leave mode cancels today + emails sent</label></li>
+          </ul>
+        </div>
+        <div class="check-group">
+          <h4>🧑‍⚕️ Patient profile</h4>
+          <ul>
+            <li><input type="checkbox" id="c18"><label for="c18">Edit personal profile &amp; emergency contact</label></li>
+            <li><input type="checkbox" id="c19"><label for="c19">Upload medical documents</label></li>
+            <li><input type="checkbox" id="c20"><label for="c20">Book appointment (offline/online, date, slot)</label></li>
+            <li><input type="checkbox" id="c21"><label for="c21">Send caretaker request</label></li>
+            <li><input type="checkbox" id="c22"><label for="c22">Review &amp; rate caretaker</label></li>
+            <li><input type="checkbox" id="c23"><label for="c23">Silent background refresh, no flicker</label></li>
+          </ul>
+        </div>
+        <div class="check-group">
+          <h4>🤝 Caretaker dashboard</h4>
+          <ul>
+            <li><input type="checkbox" id="c24"><label for="c24">Edit profile incl. email → syncs to User model</label></li>
+            <li><input type="checkbox" id="c25"><label for="c25">Accepted Care shown before Pending</label></li>
+            <li><input type="checkbox" id="c26"><label for="c26">Book appointment on behalf of patient</label></li>
+            <li><input type="checkbox" id="c27"><label for="c27">Request profile edit for patient</label></li>
+            <li><input type="checkbox" id="c28"><label for="c28">Unlink from patient</label></li>
+            <li><input type="checkbox" id="c29"><label for="c29">Join video call when added</label></li>
+          </ul>
+        </div>
+        <div class="check-group">
+          <h4>📹 Video calls</h4>
+          <ul>
+            <li><input type="checkbox" id="c30"><label for="c30">Doctor starts call → link on appointment</label></li>
+            <li><input type="checkbox" id="c31"><label for="c31">Patient joins from appointment card</label></li>
+            <li><input type="checkbox" id="c32"><label for="c32">Doctor toggles caretaker in/out of call</label></li>
+            <li><input type="checkbox" id="c33"><label for="c33">Calls open in separate tab, refresh unaffected</label></li>
+            <li><input type="checkbox" id="c34"><label for="c34">Doctor ends call</label></li>
+          </ul>
+        </div>
+        <div class="check-group">
+          <h4>🚨 Emergency alerts</h4>
+          <ul>
+            <li><input type="checkbox" id="c35"><label for="c35">Voice AI creates alert with severity level</label></li>
+            <li><input type="checkbox" id="c36"><label for="c36">Patient sees own alerts on profile</label></li>
+            <li><input type="checkbox" id="c37"><label for="c37">Caretaker sees alerts for assigned patient</label></li>
+            <li><input type="checkbox" id="c38"><label for="c38">caretaker_notified / caretaker_seen tracking</label></li>
+          </ul>
+        </div>
+        <div class="check-group">
+          <h4>📧 Email notifications</h4>
+          <ul>
+            <li><input type="checkbox" id="c39"><label for="c39">Gmail App Password configured in .env</label></li>
+            <li><input type="checkbox" id="c40"><label for="c40">Accept email includes doctor, date, time, location</label></li>
+            <li><input type="checkbox" id="c41"><label for="c41">On Leave cancels + emails all pending today</label></li>
+            <li><input type="checkbox" id="c42"><label for="c42">Password reset email sent</label></li>
+            <li><input type="checkbox" id="c43"><label for="c43">Always uses latest email from DB</label></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- REQUIREMENTS & BUG FIXES -->
+    <section id="requirements">
+      <div class="section-head reveal"><span class="section-num">08</span><h2>Requirements &amp; bug fix log</h2></div>
+      <p class="section-desc reveal">Consolidated dev handoff notes — bug fixes, appointment rules, connection workflow, and profile requirements, organised by area.</p>
+
+      <div class="model-list reveal">
+
+        <details class="model" open>
+          <summary><span>1. Bug fixes</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">priority</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <div class="req-sub-title">1.1 Appointment booking errors</div>
+            <ul class="req-list">
+              <li>Caretaker booking throws <code>assignedPatients.forEach is not a function</code> — must be corrected.</li>
+              <li>Caretaker must be able to select a date when booking an appointment.</li>
+              <li>Appointment request and confirmation details are not appearing on patient or caretaker profiles after booking.</li>
+              <li>Patient-to-caretaker request fails with <b>"Caretaker not found."</b> — must be corrected.</li>
+            </ul>
+            <div class="req-sub-title">1.2 Notifications</div>
+            <ul class="req-list">
+              <li>Close button on the caretaker's alert (triggered by a patient notification) does not work — must be corrected.</li>
+            </ul>
+            <div class="req-sub-title">1.3 Doctor profile</div>
+            <ul class="req-list">
+              <li>On a doctor's profile, "Assigned Patients" shows a leftover/previous preview instead of the default "No profile preview" state when nothing is selected.</li>
+              <li>Doctor cannot mark an appointment as <span class="status-pill missed">Missed</span> for today or tomorrow — this should only be allowed once the appointment date has passed.</li>
+              <li>Filter option on the profile page does not work — must respect the filter selected by the user.</li>
+            </ul>
+            <div class="req-sub-title">1.4 Admin dashboard</div>
+            <ul class="req-list">
+              <li>Admin dashboard structure has not been updated. Apply the template/structure from <code>adminsdashboard.html</code> to <code>admin-dashboard.html</code>.</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>2. Appointment system</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">core</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <div class="req-sub-title">2.1 Booking rules</div>
+            <ul class="req-list">
+              <li>A caretaker can book a doctor appointment using the patient's ID; the request must also appear on both the patient's and caretaker's profiles.</li>
+              <li>If a patient books their own appointment, show "🩺 Booked by Patient: [Patient Name] | [ID]" on the patient profile, visible to doctor and caretaker as well.</li>
+              <li>When a caretaker books on behalf of a patient, the patient's profile should show the booking as "Booked by Caretaker: [Caretaker Name]."</li>
+              <li>Regardless of who books, neither party should see full booking details until the patient and caretaker are connected.</li>
+              <li>Only doctors may initiate/conduct video call appointments — not patients or caretakers.</li>
+              <li>When booking, the appointment type (Online / Offline) must be specified.</li>
+            </ul>
+            <div class="req-sub-title">2.2 Appointment ordering</div>
+            <ul class="req-list">
+              <li>In the caretaker's "Patient Doctor Appointments" list and the patient's "My Appointments" list, the most recent/last appointment should appear first.</li>
+              <li>General rule: appointments are shown first-booked-first; <span class="status-pill completed">Completed</span> and <span class="status-pill missed">Missed</span> appointments move to the bottom of the list.</li>
+            </ul>
+            <div class="req-sub-title">2.3 Doctor-side behavior</div>
+            <ul class="req-list">
+              <li>If a doctor switches "Today's Availability" to "On Leave Today" after accepting a booking, the affected patient/caretaker receive a popup: "Today's appointment cancelled by doctor because doctor is on leave today," and the patient's status updates to "Cancelled by Doctor."</li>
+              <li>Doctor can upload a prescription in PDF format for online and offline appointments; patient and caretaker view it via a "Prescription" button on the current appointment.</li>
+              <li>Add a search option in "Patient Appointments" (doctor view) to look up patients by name or ID, filtered by status (upcoming, completed, awaiting approval).</li>
+            </ul>
+            <div class="req-sub-title">2.4 Request status visibility</div>
+            <ul class="req-list">
+              <li>When a patient sends a request to a doctor, show "Waiting for confirmation — [Doctor Name], [Date], [Time]" on the patient profile, visible to any caretaker viewing it.</li>
+              <li>Caretaker-booked requests show the same "Waiting for confirmation" status on the caretaker's profile; the caretaker must supply the patient ID to complete booking.</li>
+              <li>Colour-code appointment statuses: <span class="status-pill rejected">Rejected</span>, <span class="status-pill completed">Completed</span>, and <span class="status-pill missed">Missed</span> should each have a distinct colour.</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>3. Patient–caretaker connection workflow</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">core</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <ul class="req-list">
+              <li>Patients may send requests to up to <b>5 caretakers</b> at a time; caretakers may accept up to <b>2 patients</b> at a time.</li>
+              <li>If a request is rejected or a patient/caretaker is removed, the other party is freed up to connect elsewhere.</li>
+              <li>Each profile should have categorized lists: Accepted, Pending, Sent, and Rejected requests.</li>
+              <li>If a caretaker rejects a request, the patient should not be told it was rejected, and can send a new request freely.</li>
+              <li>If a caretaker accepts a request, both parties are notified and can view each other's profile; the patient profile also displays the accepting caretaker's details, visible to the assigned doctor.</li>
+              <li>Currently, sending a request to a caretaker shows "Caretaker not found." — must be fixed.</li>
+              <li>There is currently no record of a patient's outgoing request visible on the patient's own profile — must be added.</li>
+              <li>Caretakers and patients should each have an option to remove/disconnect from the other.</li>
+              <li>Caretakers should be able to submit a "Request Profile Edit for Patient" on an ongoing basis (not one-time).</li>
+              <li>Add a timeline/history view in both profiles showing this request/connection activity.</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>4. Profile requirements</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">profiles</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <div class="req-sub-title">4.1 Admin</div>
+            <ul class="req-list">
+              <li>Full access to all doctor, patient, and caretaker profiles and data; full CRUD across all user types.</li>
+            </ul>
+            <div class="req-sub-title">4.2 Patient</div>
+            <ul class="req-list">
+              <li>Fields: name, DOB, location, languages, phone, nearest emergency contact, gender, marital status, insurance.</li>
+              <li>Medical record updates; past and upcoming appointments; document upload/download support.</li>
+              <li>Filter and choose a caretaker by location, gender, and age, then send a connection request.</li>
+              <li>Remove the current "🩺 Voice AI Health Timeline" section; create a dedicated page for it below "Voice AI Engine."</li>
+              <li>"AI Detected Records" from the Voice AI Health Timeline must also be visible to the assigned caretaker.</li>
+              <li>Add a "📍 View Location" option within the caretaker's view of the Patient Voice AI Health Timeline.</li>
+              <li>Remove the "Patient Profile Preview" section. Patient can delete their own profile.</li>
+              <li>For patients, the first page shown after login should be the AI Voice page.</li>
+            </ul>
+            <div class="req-sub-title">4.3 Doctor</div>
+            <ul class="req-list">
+              <li>Fields: name, DOB, experience, location, pincode, department, languages, license number, gender, specialization, fee, hours, phone.</li>
+              <li>Calendar view of patient appointments; accept/reject requests from patients or caretakers.</li>
+              <li>Once accepted, read-only access to the named patient's medical records (no CRUD).</li>
+              <li>After a checkup, update the appointment as Missed or Completed. Doctor can delete their own profile.</li>
+              <li>Doctor list shows only appointment-accepted/consulted patients, along with each patient's assigned caretaker.</li>
+            </ul>
+            <div class="req-sub-title">4.4 Caretaker</div>
+            <ul class="req-list">
+              <li>Fields: name, DOB, experience, location, languages, license number, gender, fee, hours, phone.</li>
+              <li>Views the main list of patients seeking caretakers; can send/receive connection requests.</li>
+              <li>Once accepted, can view the patient's profile and request profile edits when needed.</li>
+              <li>Caretaker profile should only display the list of doctors (not other caretakers). Can delete their own profile.</li>
+            </ul>
+            <div class="req-sub-title">4.5 Cross-profile visibility</div>
+            <ul class="req-list">
+              <li>Patient profile shows both caretaker and doctor lists.</li>
+              <li>Newly created doctors/caretakers automatically appear in patient profiles; new doctors automatically appear in caretaker profiles.</li>
+              <li>All profile details stay in sync and update across each relevant profile.</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>5. Video call feature</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">calls</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <ul class="req-list">
+              <li>All appointment types support video call: doctor–patient, doctor–caretaker consultations.</li>
+              <li>Appointment booking must specify whether it is Online (video call) or Offline (in-person).</li>
+              <li>Only the doctor can initiate a video call for an appointment — not the patient or caretaker.</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>6. Notifications &amp; Voice AI assistant</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">voice-ai</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <ul class="req-list">
+              <li>When a patient asks the Voice AI to contact the caretaker, an alert is sent to the caretaker if available.</li>
+              <li>If no caretaker is available, the AI informs the patient and waits for the next command.</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>7. Authentication &amp; access control</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">auth</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <ul class="req-list">
+              <li>Sign-up/login supports four user types: Admin, Doctor, Patient, Caretaker.</li>
+              <li>After logout, the browser back button must not restore access to the profile — re-entry requires logging in again.</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>8. UI/UX &amp; responsiveness</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">ui</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <ul class="req-list">
+              <li>Rename "Rate" to "Star" everywhere in the UI.</li>
+              <li>Remove "Clinic Location" from doctor profiles. Rename "City" to "Location" (e.g., "Location: Aluva, Kochi"), and auto-populate a "Hospital" name based on the selected location.</li>
+              <li>Overall page layout should be responsive across tablets, Android, iOS, Windows, Mac/PC, and Android TV.</li>
+            </ul>
+          </div>
+        </details>
+
+        <details class="model">
+          <summary><span>10. AI Voice Engine — emergency detection &amp; alerts</span>
+            <span style="display:flex; align-items:center; gap:10px;">
+              <span class="dbcode">emergency</span>
+              <svg class="chevron" viewBox="0 0 20 20" fill="none"><path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </span>
+          </summary>
+          <div class="model-body">
+            <div class="req-sub-title">10.1 Detection &amp; logging</div>
+            <ul class="req-list">
+              <li>When a patient asks the Voice AI Engine a question, the AI evaluates whether the query indicates a medical emergency or a condition requiring help.</li>
+              <li>Any question flagged as an emergency or medical-condition concern is logged as a search record on the patient's profile (in addition to normal AI Voice Timeline logging).</li>
+            </ul>
+            <div class="req-sub-title">10.2 Caretaker alert</div>
+            <ul class="req-list">
+              <li>If the patient has an assigned/connected caretaker, the caretaker receives a real-time popup notification in their profile as soon as the emergency query is logged.</li>
+              <li>Popup format example: "Your patient needs quick assistance — [explanation of condition/query]."</li>
+              <li>The popup includes two action elements: a button showing the patient's current location, and the patient's contact number for immediate follow-up.</li>
+              <li>If no caretaker is currently assigned, no popup is sent (per Section 6, the patient is informed no caretaker is available).</li>
+            </ul>
+          </div>
+        </details>
+
+      </div>
+
+      <div class="note reveal">
+        Database render connection referenced in these requirements: <code>sqlite:///./beacon_users.db</code>
+      </div>
+    </section>
+
+    <!-- SEED / TEST ACCOUNTS -->
+    <section id="seed-accounts">
+      <div class="section-head reveal"><span class="section-num">09</span><h2>Seed / test accounts</h2></div>
+      <p class="section-desc reveal">Appendix A from the requirements doc — dummy accounts for development and QA use only.</p>
+      <div class="note reveal">These are dummy accounts with plaintext sample passwords. Remove or rotate all credentials before any staging or production deployment, and do not share this appendix outside the dev team.</div>
+
+      <div class="seed-block reveal" style="margin-top:24px;">
+        <h4>👑 Admin</h4>
+        <div class="table-scroll">
+          <table class="seed">
+            <tr><th>Username</th><th>Phone</th><th>Email</th><th>Password</th></tr>
+            <tr><td class="uname">admin</td><td>+91 9876543200</td><td>admin@hospitaltest.com</td><td class="pw">Admin@123</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="seed-block reveal">
+        <h4>🧑‍⚕️ Patients</h4>
+        <div class="table-scroll">
+          <table class="seed">
+            <tr><th>Username</th><th>Email</th><th>Phone</th><th>Password</th><th>DOB</th><th>Gender</th><th>Marital status</th><th>Location</th><th>Languages</th><th>Insurance no.</th><th>Emergency contact</th></tr>
+            <tr><td class="uname">rakesh_naidu</td><td>xobane9904@kingcq.com</td><td>+91 9876543245</td><td class="pw">Rakesh@123</td><td>1993-08-11</td><td>Male</td><td>Married</td><td>Kaloor, Kochi</td><td>English, Malayalam</td><td>INC09UIYH78657676934GH</td><td>Rekha (+91 9898989836)</td></tr>
+            <tr><td class="uname">rohit_patel</td><td>rohit.patel@patienttest.com</td><td>+91 9876501035</td><td class="pw">Patient@135</td><td>1993-12-06</td><td>Male</td><td>Single</td><td>Navrangpura, Ahmedabad</td><td>Gujarati, English</td><td>INS09UIYH78657670035GH</td><td>Rina Patel (9898901035)</td></tr>
+            <tr><td class="uname">devika_krishnan</td><td>devika.krishnan@patienttest.com</td><td>+91 9876501036</td><td class="pw">Patient@136</td><td>1999-01-12</td><td>Female</td><td>Single</td><td>Kazhakkoottam, Trivandrum</td><td>Malayalam, English</td><td>INS09UIYH78657670036GH</td><td>Mohan Krishnan (9898901036)</td></tr>
+            <tr><td class="uname">mohan_babu</td><td>mohan.babu@patienttest.com</td><td>+91 9876501037</td><td class="pw">Patient@137</td><td>1985-04-08</td><td>Male</td><td>Married</td><td>Kottayam</td><td>Malayalam, English</td><td>INS09UIYH78657670037GH</td><td>Latha Babu (9898901037)</td></tr>
+            <tr><td class="uname">ashwini_singh</td><td>ashwini.singh@patienttest.com</td><td>+91 9876501038</td><td class="pw">Patient@138</td><td>1997-06-24</td><td>Female</td><td>Single</td><td>Noida, Delhi NCR</td><td>Hindi, English</td><td>INS09UIYH78657670038GH</td><td>Rajesh Singh (9898901038)</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="seed-block reveal">
+        <h4>🩺 Doctors</h4>
+        <div class="table-scroll">
+          <table class="seed">
+            <tr><th>Name</th><th>Phone</th><th>Email</th><th>Password</th><th>License no.</th><th>Experience</th><th>Fee</th><th>Available hours</th><th>Location</th><th>Languages</th><th>Department</th></tr>
+            <tr><td class="uname">Aditya Malhotra</td><td>+91 9876543326</td><td>aditya.malhotra@hospitaltest.com</td><td class="pw">Aditya@226</td><td>MCI-MH-2020-12026</td><td>9 Years</td><td>₹800.00</td><td>09:00 AM – 05:00 PM</td><td>Cardiology Wing, Block A</td><td>English, Hindi</td><td>Cardiology</td></tr>
+            <tr><td class="uname">Bhavana Nair</td><td>+91 9876543327</td><td>bhavana.nair@hospitaltest.com</td><td class="pw">Bhavana@227</td><td>MCI-KL-2019-12027</td><td>12 Years</td><td>₹900.00</td><td>10:00 AM – 06:00 PM</td><td>Neurology Wing, Block B</td><td>English, Malayalam</td><td>Neurology</td></tr>
+            <tr><td class="uname">Chirag Patel</td><td>+91 9876543328</td><td>chirag.patel@hospitaltest.com</td><td class="pw">Chirag@228</td><td>MCI-GJ-2021-12028</td><td>7 Years</td><td>₹700.00</td><td>09:00 AM – 05:00 PM</td><td>Orthopedics, Block C</td><td>English, Gujarati</td><td>Orthopedics</td></tr>
+          </table>
+        </div>
+      </div>
+
+      <div class="seed-block reveal">
+        <h4>🤝 Caretakers</h4>
+        <div class="table-scroll">
+          <table class="seed">
+            <tr><th>Name</th><th>Email</th><th>Phone</th><th>Password</th><th>DOB</th><th>Gender</th><th>Experience</th><th>Fee</th><th>Location</th><th>Languages</th><th>License no.</th><th>Availability</th></tr>
+            <tr><td class="uname">vishnu</td><td>vishnu@hospitaltest.com</td><td>+91 9876543332</td><td class="pw">Care@182</td><td>1994-11-26</td><td>Male</td><td>6 Years</td><td>₹340.00</td><td>Kakkanad, Kochi</td><td>Malayalam, English</td><td>CCFD564YTHGYT182</td><td>24/7 Available</td></tr>
+            <tr><td class="uname">yamuna</td><td>yamuna@hospitaltest.com</td><td>+91 9876543333</td><td class="pw">Care@183</td><td>1999-01-31</td><td>Female</td><td>2 Years</td><td>₹180.00</td><td>Aluva, Kochi</td><td>Malayalam, Tamil</td><td>CCFD564YTHGYT183</td><td>09:00 AM – 05:00 PM</td></tr>
+            <tr><td class="uname">zubin</td><td>zubin@hospitaltest.com</td><td>+91 9876543334</td><td class="pw">Care@184</td><td>1992-05-16</td><td>Male</td><td>7 Years</td><td>₹380.00</td><td>Vyttila, Kochi</td><td>Malayalam, English</td><td>CCFD564YTHGYT184</td><td>24/7 Available</td></tr>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ENVIRONMENT -->
+    <section id="env">
+      <div class="section-head reveal"><span class="section-num">10</span><h2>Environment configuration</h2></div>
+      <p class="section-desc reveal"><code>.env</code> at the project root. Without SMTP configured, emails print to the terminal in dev mode — nothing crashes.</p>
+      <div class="env-block reveal">
+        <div class="env-topbar"><span></span><span></span><span></span><span class="fname">.env</span></div>
+        <pre><span class="c"># Django</span>
+<span class="k">DJANGO_SECRET_KEY</span>=<span class="v">your-secret-key</span>
+<span class="k">DEBUG</span>=<span class="v">True</span>
+<span class="k">ALLOWED_HOSTS</span>=<span class="v">*</span>
+
+<span class="c"># JWT</span>
+<span class="k">JWT_SECRET</span>=<span class="v">your-jwt-secret</span>
+
+<span class="c"># Database</span>
+<span class="k">DATABASE_URL</span>=<span class="v">sqlite:///./beacon_users.db</span>
+
+<span class="c"># Gmail SMTP (requires 2FA + App Password)</span>
+<span class="k">SMTP_HOST</span>=<span class="v">smtp.gmail.com</span>
+<span class="k">SMTP_PORT</span>=<span class="v">587</span>
+<span class="k">SMTP_USER</span>=<span class="v">yourname@gmail.com</span>
+<span class="k">SMTP_PASSWORD</span>=<span class="v">your16charapppassword</span>   <span class="c">← NO spaces</span>
+<span class="k">SMTP_FROM_EMAIL</span>=<span class="v">yourname@gmail.com</span>
+<span class="k">SMTP_FROM_NAME</span>=<span class="v">Beacon AI Care Unit Platform</span>
+
+<span class="c"># AI / Gemini</span>
+<span class="k">GEMINI_API_KEY</span>=<span class="v">your-gemini-key</span>
+
+<span class="c"># Base URL</span>
+<span class="k">FRONTEND_BASE_URL</span>=<span class="v">http://localhost:8000</span></pre>
+      </div>
+      <div class="note reveal">Note: without SMTP config, emails are printed to the terminal in dev mode. No crash.</div>
+    </section>
+
+  </main>
+</div>
+
+<footer>Beacon AI Care Unit Platform — project overview · generated reference, not production docs<br>© <span id="copyright-year"></span> Rajkumar Padmanabhan. All rights reserved.</footer>
+
+<!-- Sticky notes layer -->
+<button id="sticky-fab" title="Add a sticky note" aria-label="Add a sticky note">
+  <svg viewBox="0 0 24 24" fill="none"><path d="M12 5V19M5 12H19" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+</button>
+
+<div id="sticky-palette">
+  <div class="palette-head">
+    <span>Sticky Notes</span>
+    <button id="palette-close" aria-label="Close">✕</button>
+  </div>
+  <div class="palette-grid">
+    <button class="swatch" data-color="#FFE58A" style="background:#FFE58A"></button>
+    <button class="swatch" data-color="#BFE083" style="background:#BFE083"></button>
+    <button class="swatch" data-color="#FFC94D" style="background:#FFC94D"></button>
+    <button class="swatch" data-color="#F2A24C" style="background:#F2A24C"></button>
+    <button class="swatch" data-color="#8FD08A" style="background:#8FD08A"></button>
+    <button class="swatch" data-color="#7BC9D9" style="background:#7BC9D9"></button>
+    <button class="swatch" data-color="#F2A0C4" style="background:#F2A0C4"></button>
+    <button class="swatch" data-color="#7FB6E8" style="background:#7FB6E8"></button>
+    <button class="swatch" data-color="#F6C6D6" style="background:#F6C6D6"></button>
+    <button class="swatch" data-color="#B7A6E0" style="background:#B7A6E0"></button>
+    <button class="swatch" data-color="#9AE0D6" style="background:#9AE0D6"></button>
+    <button class="swatch" data-color="#F2A6A0" style="background:#F2A6A0"></button>
+    <button class="swatch" data-color="#C9B6E8" style="background:#C9B6E8"></button>
+    <button class="swatch" data-color="#D8D8D8" style="background:#D8D8D8"></button>
+  </div>
+</div>
+
+<script>
+// Disable right-click context menu across the page
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+// Dark / light theme toggle
+const themeToggle = document.getElementById('theme-toggle');
+// Default to light mode regardless of system preference; user can still toggle.
+themeToggle.addEventListener('click', () => {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  if(isDark){ document.documentElement.removeAttribute('data-theme'); }
+  else{ document.documentElement.setAttribute('data-theme', 'dark'); }
+});
+
+// Copyright year
+const cyEl = document.getElementById('copyright-year');
+if(cyEl) cyEl.textContent = new Date().getFullYear();
+
+// Scroll progress bar
+const progressBar = document.getElementById('scroll-progress');
+window.addEventListener('scroll', () => {
+  const h = document.documentElement;
+  const scrolled = (h.scrollTop) / (h.scrollHeight - h.clientHeight) * 100;
+  progressBar.style.width = scrolled + '%';
+});
+
+// Reveal on scroll
+const revealEls = document.querySelectorAll('.reveal');
+const io = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); }
+  });
+}, { threshold: 0.12 });
+revealEls.forEach(el => io.observe(el));
+
+// Sidebar active link tracking
+const sections = document.querySelectorAll('main.content section');
+const navLinks = document.querySelectorAll('.side-nav a');
+const navObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    const id = entry.target.getAttribute('id');
+    const link = document.querySelector('.side-nav a[href="#' + id + '"]');
+    if(entry.isIntersecting){
+      navLinks.forEach(l => l.classList.remove('active'));
+      if(link) link.classList.add('active');
+    }
+  });
+}, { rootMargin: '-20% 0px -70% 0px' });
+sections.forEach(s => navObserver.observe(s));
+
+// Tabs
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelector('.tab-panel[data-panel="' + btn.dataset.tab + '"]').classList.add('active');
+  });
+});
+
+// Checklist progress
+const checkboxes = document.querySelectorAll('#checklist-root input[type=checkbox]');
+const fill = document.getElementById('progress-fill');
+const label = document.getElementById('progress-label');
+function updateProgress(){
+  const total = checkboxes.length;
+  const done = document.querySelectorAll('#checklist-root input[type=checkbox]:checked').length;
+  fill.style.width = (total ? (done/total*100) : 0) + '%';
+  label.textContent = done + ' / ' + total + ' verified';
+}
+checkboxes.forEach(cb => {
+  cb.addEventListener('change', () => {
+    cb.closest('li').classList.toggle('checked', cb.checked);
+    updateProgress();
+  });
+});
+updateProgress();
+
+// ---------- Sticky notes ----------
+const fab = document.getElementById('sticky-fab');
+const palette = document.getElementById('sticky-palette');
+const paletteClose = document.getElementById('palette-close');
+const STORAGE_KEY = 'beacon-sticky-notes';
+let notesData = [];
+
+fab.addEventListener('click', () => palette.classList.toggle('open'));
+paletteClose.addEventListener('click', () => palette.classList.remove('open'));
+document.addEventListener('click', (e) => {
+  if(palette.classList.contains('open') && !palette.contains(e.target) && e.target !== fab && !fab.contains(e.target)){
+    palette.classList.remove('open');
+  }
+});
+
+document.querySelectorAll('.swatch').forEach(sw => {
+  sw.addEventListener('click', () => {
+    createStickyNote({ color: sw.dataset.color });
+    palette.classList.remove('open');
+  });
+});
+
+function loadNotes(){
+  let saved = [];
+  try{
+    saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+  }catch(err){ saved = []; }
+  saved.forEach(data => createStickyNote(data, false));
+}
+
+function persistNotes(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(notesData));
+  }catch(err){ /* storage unavailable or full — fail silently */ }
+}
+
+function createStickyNote(data, isNew){
+  if(isNew === undefined) isNew = true;
+
+  const id = data.id || ('note-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8));
+  const color = data.color || '#FFE58A';
+
+  const note = document.createElement('div');
+  note.className = 'sticky-note';
+  note.dataset.id = id;
+  note.style.background = color;
+
+  let left = data.left, top = data.top;
+  if(left === undefined || top === undefined){
+    // Cascade placement in the current viewport, near the fab, offset per note
+    const scrollX = window.scrollX || window.pageXOffset;
+    const scrollY = window.scrollY || window.pageYOffset;
+    const cascade = (notesData.length % 6) * 22;
+    left = scrollX + window.innerWidth - 320 - cascade;
+    top = scrollY + window.innerHeight - 340 - cascade;
+    left = Math.max(scrollX + 16, left);
+    top = Math.max(scrollY + 16, top);
+  }
+  const rotation = data.rotation !== undefined ? data.rotation : (Math.random() * 6 - 3).toFixed(1);
+  note.style.left = left + 'px';
+  note.style.top = top + 'px';
+  note.style.transform = 'rotate(' + rotation + 'deg)';
+  note.dataset.rotation = rotation;
+
+  const record = { id, color, left, top, rotation, text: data.text || '' };
+
+  const removeBtn = document.createElement('button');
+  removeBtn.className = 'note-remove';
+  removeBtn.innerHTML = '✕';
+  removeBtn.setAttribute('aria-label', 'Remove note');
+  removeBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    note.remove();
+    notesData = notesData.filter(n => n.id !== id);
+    persistNotes();
+  });
+
+  const text = document.createElement('div');
+  text.className = 'note-text';
+  text.contentEditable = 'true';
+  text.setAttribute('data-placeholder', 'Type a note…');
+  text.textContent = record.text;
+  text.addEventListener('pointerdown', (e) => e.stopPropagation());
+  text.addEventListener('input', () => {
+    record.text = text.textContent;
+    persistNotes();
+  });
+
+  note.appendChild(removeBtn);
+  note.appendChild(text);
+  document.body.appendChild(note);
+
+  notesData.push(record);
+  if(isNew) persistNotes();
+
+  makeDraggable(note, record);
+  if(isNew) text.focus();
+}
+
+function makeDraggable(note, record){
+  let dragging = false;
+  let offsetX = 0, offsetY = 0;
+
+  note.addEventListener('pointerdown', (e) => {
+    if(e.target.closest('.note-remove')) return;
+    dragging = true;
+    note.classList.add('dragging');
+    note.style.transform = 'rotate(0deg)';
+    note.setPointerCapture(e.pointerId);
+    const rect = note.getBoundingClientRect();
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+  });
+
+  note.addEventListener('pointermove', (e) => {
+    if(!dragging) return;
+    const scrollX = window.scrollX || window.pageXOffset;
+    const scrollY = window.scrollY || window.pageYOffset;
+    let newLeft = e.clientX + scrollX - offsetX;
+    let newTop = e.clientY + scrollY - offsetY;
+    newLeft = Math.max(scrollX, newLeft);
+    newTop = Math.max(scrollY, newTop);
+    note.style.left = newLeft + 'px';
+    note.style.top = newTop + 'px';
+    record.left = newLeft;
+    record.top = newTop;
+  });
+
+  function endDrag(e){
+    if(!dragging) return;
+    dragging = false;
+    note.classList.remove('dragging');
+    note.style.transform = 'rotate(' + note.dataset.rotation + 'deg)';
+    try{ note.releasePointerCapture(e.pointerId); }catch(err){}
+    persistNotes();
+  }
+  note.addEventListener('pointerup', endDrag);
+  note.addEventListener('pointercancel', endDrag);
+}
+
+loadNotes();
+
+// ---------- Global search ----------
+(function(){
+  const input = document.getElementById('global-search');
+  const countEl = document.getElementById('search-count');
+  const contentRoot = document.querySelector('main.content');
+  if(!input || !contentRoot) return;
+
+  let debounceTimer = null;
+
+  function clearHighlights(){
+    contentRoot.querySelectorAll('mark.search-hit').forEach(m => {
+      const parent = m.parentNode;
+      if(!parent) return;
+      parent.replaceChild(document.createTextNode(m.textContent), m);
+      parent.normalize();
+    });
+  }
+
+  function collectTextNodes(root){
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+      acceptNode(n){
+        if(!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+        const p = n.parentElement;
+        if(!p || p.closest('script, style, #global-search')) return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    });
+    const nodes = [];
+    let n;
+    while(n = walker.nextNode()) nodes.push(n);
+    return nodes;
+  }
+
+  function runSearch(term){
+    clearHighlights();
+
+    if(!term){
+      countEl.textContent = '';
+      return;
+    }
+
+    const lower = term.toLowerCase();
+    const nodes = collectTextNodes(contentRoot);
+    let count = 0;
+    let firstMark = null;
+
+    nodes.forEach(tn => {
+      const text = tn.nodeValue;
+      const lowerText = text.toLowerCase();
+      if(lowerText.indexOf(lower) === -1) return;
+
+      const frag = document.createDocumentFragment();
+      let idx = 0, pos;
+      while((pos = lowerText.indexOf(lower, idx)) !== -1){
+        if(pos > idx) frag.appendChild(document.createTextNode(text.slice(idx, pos)));
+        const mark = document.createElement('mark');
+        mark.className = 'search-hit';
+        mark.textContent = text.slice(pos, pos + term.length);
+        frag.appendChild(mark);
+        if(!firstMark) firstMark = mark;
+        count++;
+        idx = pos + term.length;
+      }
+      if(idx < text.length) frag.appendChild(document.createTextNode(text.slice(idx)));
+      tn.parentNode.replaceChild(frag, tn);
+    });
+
+    // Reveal matches hidden inside closed accordions or inactive tabs
+    contentRoot.querySelectorAll('mark.search-hit').forEach(m => {
+      const details = m.closest('details');
+      if(details && !details.open) details.open = true;
+
+      const tabPanel = m.closest('.tab-panel');
+      if(tabPanel && !tabPanel.classList.contains('active')){
+        const key = tabPanel.getAttribute('data-panel');
+        const btn = document.querySelector('.tab-btn[data-tab="' + key + '"]');
+        if(btn) btn.click();
+      }
+    });
+
+    countEl.textContent = count ? (count + ' match' + (count > 1 ? 'es' : '') + ' found') : 'No matches';
+
+    if(firstMark){
+      firstMark.classList.add('current-hit');
+      firstMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  input.addEventListener('input', (e) => {
+    const term = e.target.value.trim();
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => runSearch(term), 150);
+  });
+
+  input.addEventListener('keydown', (e) => {
+    if(e.key === 'Escape'){
+      input.value = '';
+      runSearch('');
+      input.blur();
+    }
+  });
+})();
+
+// ---------- Hero live clock ----------
+(function(){
+  const timeEl = document.getElementById('hero-clock-time');
+  const progressEl = document.getElementById('hero-clock-progress');
+  if(!timeEl || !progressEl) return;
+
+  const CIRCUMFERENCE = 439.8;
+
+  function tick(){
+    const now = new Date();
+    const h = now.getHours();
+    const m = now.getMinutes();
+    const s = now.getSeconds();
+
+    timeEl.textContent = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0') + ':' + String(s).padStart(2,'0');
+
+    const secondsIntoDay = h*3600 + m*60 + s;
+    const fraction = secondsIntoDay / 86400;
+    progressEl.style.strokeDashoffset = CIRCUMFERENCE * (1 - fraction);
+  }
+
+  tick();
+  setInterval(tick, 1000);
+})();
+</script>
+
+</body>
+</html>
