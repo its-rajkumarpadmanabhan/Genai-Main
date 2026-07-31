@@ -1,392 +1,645 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Carewell — Sign Up</title>
-<script>
-  (function(){
-    const token = localStorage.getItem('beacon_token') || localStorage.getItem('access_token');
-    const userRaw = localStorage.getItem('beacon_user');
-    if(token && userRaw){
-      try {
-        const user = JSON.parse(userRaw);
-        const role = user.role || 'patient';
-        const target = role === 'admin' ? '/admin-dashboard' :
-                       role === 'doctor' ? '/doctor-profile' :
-                       role === 'caretaker' ? '/caretaker-dashboard' : '/patient-profile';
-        window.location.href = target;
-      } catch(e){}
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Beacon AI — Sign Up</title>
+  <script>
+    (function () {
+      const token = localStorage.getItem('beacon_token') || localStorage.getItem('access_token');
+      const userRaw = localStorage.getItem('beacon_user');
+      if (token && userRaw) {
+        try {
+          const user = JSON.parse(userRaw);
+          const role = user.role || 'patient';
+          const target = role === 'admin' ? '/admin-dashboard' :
+            role === 'doctor' ? '/doctor-profile' :
+              role === 'caretaker' ? '/caretaker-dashboard' : '/patient-profile';
+          window.location.href = target;
+        } catch (e) { }
+      }
+    })();
+    document.addEventListener('contextmenu', event => { event.preventDefault(); });
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+    rel="stylesheet">
+  <style>    :root{
+      --ink:#20042E; --paper:#FAF5EE; --surface:#FFFFFF; --line:#E6D5C3;
+      --pine:#804A8A; --pine-deep:#3A0353; --pine-soft:#F3E8F5; --brick:#C24141; --brick-soft:#FCEAEA;
+      --slate:#F59E51; --slate-soft:#FFF2E5; --muted:#6C5275; --amber:#F59E51; --amber-soft:#FFF2E5;
+      --amber-gold:#F8D299; --gold-deep:#D97E30;
+      --radius:14px;
     }
-  })();
-  document.addEventListener('contextmenu', event => { event.preventDefault(); });
-</script>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-  :root{
-    --ink:#1E2A22; --paper:#EAF0EC; --surface:#FFFFFF; --line:#D7DFD9;
-    --pine:#33604F; --pine-deep:#25473A; --brick:#AE4436; --brick-soft:#F3DFDA;
-    --slate:#4A6E8C; --slate-soft:#DCE7EF; --muted:#6E7D75; --amber:#B9873A; --amber-soft:#F1E3CB;
-    --radius:14px;
-  }
-  *{box-sizing:border-box;}
-  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
-  .mono{font-family:'JetBrains Mono',monospace;}
-  a{color:inherit;text-decoration:none;}
-  button{font-family:inherit;}
 
-  #view-auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 50% 20%,#F2F6F3 0%,var(--paper) 60%);}
-  .auth-card{width:100%;max-width:460px;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:32px;box-shadow:0 20px 60px rgba(37,71,58,.08);}
-  .auth-brand{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:6px;}
-  .auth-brand .brand-mark{width:38px;height:38px;border-radius:10px;background:linear-gradient(160deg,#4C8A72,#2C5344);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:600;font-size:19px;color:#fff;}
-  .auth-brand .brand-name{font-family:'Fraunces',serif;font-size:22px;font-weight:600;}
-  .auth-sub{text-align:center;color:var(--muted);font-size:13px;margin:0 0 24px;}
+    * {
+      box-sizing: border-box;
+    }
 
-  .role-picker{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px;}
-  .role-picker button{padding:12px 4px;border-radius:11px;border:1.5px solid var(--line);background:var(--paper);cursor:pointer;font-size:11.5px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:6px;}
-  .role-picker button svg{width:18px;height:18px;}
-  .role-picker button.active{border-color:var(--pine);background:#DCE9E2;color:var(--pine-deep);}
+    body {
+      margin: 0;
+      background: linear-gradient(135deg, #FAF5EE 0%, #F5EAE0 100%);
+      color: var(--ink);
+      font-family: 'Inter', sans-serif;
+    }
 
-  .auth-tabs{display:flex;gap:6px;background:var(--paper);border-radius:10px;padding:4px;margin-bottom:18px;}
-  .auth-tabs button{flex:1;border:none;background:transparent;padding:8px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;}
-  .auth-tabs button.active{background:var(--pine-deep);color:#EFF3F0;}
+    .mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
 
-  .field{margin-bottom:12px;}
-  .field label{display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
-  .field input{width:100%;border:1px solid var(--line);border-radius:99px;padding:10px 14px;font-size:13.5px;font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);}
+    a {
+      color: inherit;
+      text-decoration: none;
+    }
 
-  .btn-primary{width:100%;background:var(--pine-deep);color:#EFF3F0;border:none;border-radius:10px;padding:12px;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:8px;transition:background .2s;}
-  .btn-primary:hover{background:var(--pine);}
-  .btn-primary:disabled{opacity:.6;cursor:not-allowed;}
+    button {
+      font-family: inherit;
+    }
 
-  .form-msg{font-size:12px;text-align:center;margin-top:12px;min-height:16px;color:var(--brick);}
-  .form-msg.ok{color:var(--pine);}
-  .form-sublink{text-align:center;font-size:12px;margin-top:14px;color:var(--muted);}
-  .form-sublink a{color:var(--pine);font-weight:600;}
+    #view-auth {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: radial-gradient(circle at 50% 20%, #FAF5EE 0%, #F5EAE0 100%);
+    }
 
-  /* ── OTP Panel ── */
-  #otpPanel{display:none;}
-  .otp-icon{text-align:center;font-size:44px;margin-bottom:6px;}
-  .otp-title{text-align:center;font-family:'Fraunces',serif;font-size:20px;font-weight:600;margin:0 0 6px;}
-  .otp-hint{text-align:center;color:var(--muted);font-size:13px;margin:0 0 22px;line-height:1.6;}
-  .otp-hint strong{color:var(--pine-deep);}
-  .otp-inputs{display:flex;gap:10px;justify-content:center;margin-bottom:20px;}
-  .otp-inputs input{
-    width:56px;height:64px;border:2px solid var(--line);border-radius:12px;
-    text-align:center;font-size:26px;font-weight:700;font-family:'JetBrains Mono',monospace;
-    background:var(--paper);color:var(--ink);outline:none;transition:border-color .2s;
-  }
-  .otp-inputs input:focus{border-color:var(--pine);}
-  .otp-resend{text-align:center;font-size:12px;color:var(--muted);margin-top:10px;}
-  .otp-resend a{color:var(--pine);font-weight:600;cursor:pointer;}
-  #resendTimer{color:var(--muted);}
-</style>
+    .auth-card {
+      width: 100%;
+      max-width: 460px;
+      background: var(--surface);
+      border: 2px solid #E6D5C3;
+      border-radius: 20px;
+      padding: 32px;
+      box-shadow: 0 20px 60px rgba(58, 3, 83, 0.15);
+    }
+
+    .auth-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      justify-content: center;
+      margin-bottom: 8px;
+    }
+
+    .auth-brand .brand-mark {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #F59E51, #F8D299);
+      color: #3A0353;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Fraunces', serif;
+      font-weight: 800;
+      font-size: 22px;
+      box-shadow: 0 4px 12px rgba(245, 158, 81, 0.4);
+    }
+
+    .auth-brand .brand-name {
+      font-family: 'Fraunces', serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: #3A0353;
+    }
+
+    .auth-sub {
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      margin: 0 0 24px;
+    }
+
+    .role-picker {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+
+    .role-picker button {
+      padding: 12px 4px;
+      border-radius: 11px;
+      border: 1.5px solid var(--line);
+      background: var(--paper);
+      cursor: pointer;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .role-picker button svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .role-picker button.active {
+      border-color: var(--amber);
+      background: #FFF2E5;
+      color: var(--pine-deep);
+    }
+
+    .auth-tabs {
+      display: flex;
+      gap: 6px;
+      background: #F3E8F5;
+      border-radius: 12px;
+      padding: 5px;
+      margin-bottom: 20px;
+    }
+
+    .auth-tabs button {
+      flex: 1;
+      border: none;
+      background: transparent;
+      padding: 10px;
+      border-radius: 9px;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .auth-tabs button.active {
+      background: linear-gradient(135deg, #F59E51, #F8D299);
+      color: #20042E;
+      box-shadow: 0 3px 10px rgba(245, 158, 81, 0.35);
+    }
+
+    .field {
+      margin-bottom: 14px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--pine-deep);
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      margin-bottom: 6px;
+    }
+
+    .field input {
+      width: 100%;
+      border: 1.5px solid var(--line);
+      border-radius: 10px;
+      padding: 11px 14px;
+      font-size: 13.5px;
+      font-family: 'Inter', sans-serif;
+      background: var(--paper);
+      color: var(--ink);
+      transition: border-color 0.15s ease;
+    }
+
+    .field input:focus {
+      outline: none;
+      border-color: var(--pine);
+      background: #FFFFFF;
+    }
+
+    .btn-primary {
+      width: 100%;
+      background: linear-gradient(135deg, #3A0353 0%, #804A8A 100%);
+      color: #FFFFFF;
+      border: none;
+      border-radius: 10px;
+      padding: 13px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 8px;
+      box-shadow: 0 4px 14px rgba(58, 3, 83, 0.3);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(58, 3, 83, 0.4);
+    }
+
+    .form-msg {
+      font-size: 12px;
+      text-align: center;
+      margin-top: 12px;
+      min-height: 16px;
+      color: var(--brick);
+    }
+
+    .form-sublink {
+      text-align: center;
+      font-size: 12px;
+      margin-top: 14px;
+      color: var(--muted);
+    }
+
+    .form-sublink a {
+      color: var(--pine);
+      font-weight: 600;
+    }
+
+    /* ── OTP Panel ── */
+    #otpPanel {
+      display: none;
+    }
+
+    .otp-icon {
+      text-align: center;
+      font-size: 44px;
+      margin-bottom: 6px;
+    }
+
+    .otp-title {
+      text-align: center;
+      font-family: 'Fraunces', serif;
+      font-size: 20px;
+      font-weight: 600;
+      margin: 0 0 6px;
+    }
+
+    .otp-hint {
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      margin: 0 0 22px;
+      line-height: 1.6;
+    }
+
+    .otp-hint strong {
+      color: var(--pine-deep);
+    }
+
+    .otp-inputs {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      margin-bottom: 20px;
+    }
+
+    .otp-inputs input {
+      width: 56px;
+      height: 64px;
+      border: 2px solid var(--line);
+      border-radius: 12px;
+      text-align: center;
+      font-size: 26px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--paper);
+      color: var(--ink);
+      outline: none;
+      transition: border-color .2s;
+    }
+
+    .otp-inputs input:focus {
+      border-color: var(--pine);
+    }
+
+    .otp-resend {
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+
+    .otp-resend a {
+      color: var(--pine);
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    #resendTimer {
+      color: var(--muted);
+    }
+  </style>
 </head>
+
 <body>
 
-<div id="view-auth">
-  <div class="auth-card">
-    <div class="auth-brand">
-      <div class="brand-mark">C</div>
-      <div class="brand-name">Carewell</div>
+  <div id="view-auth">
+    <div class="auth-card">
+      <div class="auth-brand">
+        <div class="brand-mark">B</div>
+        <div class="brand-name">Beacon AI</div>
+      </div>
+
+      <!-- ── SIGNUP FORM ── -->
+      <div id="signupPanel">
+        <p class="auth-sub">One account, one role. Choose how you're joining.</p>
+
+        <div class="role-picker" id="rolePicker">
+          <button data-role="patient" class="active" onclick="pickRole('patient')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7" />
+            </svg>Patient</button>
+          <button data-role="caretaker" onclick="pickRole('caretaker')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path
+                d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.5 1-1a5.5 5.5 0 0 0 0-7.9z" />
+            </svg>Caretaker</button>
+          <button data-role="doctor" onclick="pickRole('doctor')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
+            </svg>Doctor</button>
+        </div>
+
+        <div class="auth-tabs">
+          <button onclick="window.location.href='/login'">Log in</button>
+          <button class="active">Sign up</button>
+        </div>
+
+        <form id="signupForm" onsubmit="handleSignup(event)">
+          <div class="field">
+            <label>Username</label>
+            <input id="suUsername" type="text" placeholder="e.g. jordan_smith" required>
+          </div>
+          <div class="field">
+            <label>Email Address</label>
+            <input id="suEmail" type="email" placeholder="you@example.com" required>
+          </div>
+          <div class="field">
+            <label>Mobile Number</label>
+            <input id="suMobile" type="tel" placeholder="+1 555 123 4567" required>
+          </div>
+          <div class="field">
+            <label>Password</label>
+            <input id="suPw" type="password" placeholder="••••••••" required>
+          </div>
+          <div class="field">
+            <label>Confirm Password</label>
+            <input id="suConfirmPw" type="password" placeholder="••••••••" required>
+          </div>
+          <button class="btn-primary" type="submit" id="submitBtn">Create <span id="roleLabel">patient</span>
+            account</button>
+        </form>
+
+        <div class="form-msg" id="authMsg"></div>
+
+        <div class="form-sublink">
+          Already have an account? <a href="/login">Log in here</a>
+        </div>
+      </div>
+
+      <!-- ── OTP VERIFICATION PANEL ── -->
+      <div id="otpPanel">
+        <div class="otp-icon">📧</div>
+        <p class="otp-title">Verify your email</p>
+        <p class="otp-hint" id="otpHint">We sent a 4-digit OTP to<br><strong id="otpEmailDisplay"></strong><br>Enter it
+          below to activate your account.</p>
+
+        <div class="otp-inputs" id="otpInputs">
+          <input id="otp0" type="text" inputmode="numeric" maxlength="1" autocomplete="off">
+          <input id="otp1" type="text" inputmode="numeric" maxlength="1" autocomplete="off">
+          <input id="otp2" type="text" inputmode="numeric" maxlength="1" autocomplete="off">
+          <input id="otp3" type="text" inputmode="numeric" maxlength="1" autocomplete="off">
+        </div>
+
+        <button class="btn-primary" id="verifyBtn" onclick="handleVerifyOTP()">Verify &amp; Activate Account</button>
+
+        <div class="form-msg" id="otpMsg"></div>
+
+        <div class="otp-resend">
+          Didn't receive it? <a onclick="resendOTP()">Resend OTP</a>
+          <span id="resendTimer"></span>
+        </div>
+      </div>
+
     </div>
-
-    <!-- ── SIGNUP FORM ── -->
-    <div id="signupPanel">
-      <p class="auth-sub">One account, one role. Choose how you're joining.</p>
-
-      <div class="role-picker" id="rolePicker">
-        <button data-role="patient" class="active" onclick="pickRole('patient')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.5 4-7 8-7s8 2.5 8 7"/></svg>Patient</button>
-        <button data-role="caretaker" onclick="pickRole('caretaker')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.5 1-1a5.5 5.5 0 0 0 0-7.9z"/></svg>Caretaker</button>
-        <button data-role="doctor" onclick="pickRole('doctor')">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M8 2v4M16 2v4M3 8h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/></svg>Doctor</button>
-      </div>
-
-      <div class="auth-tabs">
-        <button onclick="window.location.href='/login'">Log in</button>
-        <button class="active">Sign up</button>
-      </div>
-
-      <form id="signupForm" onsubmit="handleSignup(event)">
-        <div class="field">
-          <label>Username</label>
-          <input id="suUsername" type="text" placeholder="e.g. jordan_smith" required>
-        </div>
-        <div class="field">
-          <label>Email Address</label>
-          <input id="suEmail" type="email" placeholder="you@example.com" required>
-        </div>
-        <div class="field">
-          <label>Mobile Number</label>
-          <input id="suMobile" type="tel" placeholder="+1 555 123 4567" required>
-        </div>
-        <div class="field">
-          <label>Password</label>
-          <input id="suPw" type="password" placeholder="••••••••" required>
-        </div>
-        <div class="field">
-          <label>Confirm Password</label>
-          <input id="suConfirmPw" type="password" placeholder="••••••••" required>
-        </div>
-        <button class="btn-primary" type="submit" id="submitBtn">Create <span id="roleLabel">patient</span> account</button>
-      </form>
-
-      <div class="form-msg" id="authMsg"></div>
-
-      <div class="form-sublink">
-        Already have an account? <a href="/login">Log in here</a>
-      </div>
-    </div>
-
-    <!-- ── OTP VERIFICATION PANEL ── -->
-    <div id="otpPanel">
-      <div class="otp-icon">📧</div>
-      <p class="otp-title">Verify your email</p>
-      <p class="otp-hint" id="otpHint">We sent a 4-digit OTP to<br><strong id="otpEmailDisplay"></strong><br>Enter it below to activate your account.</p>
-
-      <div class="otp-inputs" id="otpInputs">
-        <input id="otp0" type="text" inputmode="numeric" maxlength="1" autocomplete="off">
-        <input id="otp1" type="text" inputmode="numeric" maxlength="1" autocomplete="off">
-        <input id="otp2" type="text" inputmode="numeric" maxlength="1" autocomplete="off">
-        <input id="otp3" type="text" inputmode="numeric" maxlength="1" autocomplete="off">
-      </div>
-
-      <button class="btn-primary" id="verifyBtn" onclick="handleVerifyOTP()">Verify &amp; Activate Account</button>
-
-      <div class="form-msg" id="otpMsg"></div>
-
-      <div class="otp-resend">
-        Didn't receive it? <a onclick="resendOTP()">Resend OTP</a>
-        <span id="resendTimer"></span>
-      </div>
-    </div>
-
   </div>
-</div>
 
-<script>
-  let selectedRole = 'patient';
-  let pendingEmail = '';
-  let resendCountdown = null;
+  <script>
+    let selectedRole = 'patient';
+    let pendingEmail = '';
+    let resendCountdown = null;
 
-  function pickRole(role){
-    selectedRole = role;
-    document.querySelectorAll('#rolePicker button').forEach(b => {
-      b.classList.toggle('active', b.dataset.role === role);
+    function pickRole(role) {
+      selectedRole = role;
+      document.querySelectorAll('#rolePicker button').forEach(b => {
+        b.classList.toggle('active', b.dataset.role === role);
+      });
+      document.getElementById('roleLabel').textContent = role;
+    }
+
+    function safeDetail(detail) {
+      if (!detail) return '';
+      if (typeof detail === 'string') return detail;
+      if (Array.isArray(detail)) return detail.map(d => (typeof d === 'string' ? d : d.msg || JSON.stringify(d))).join('; ');
+      return detail.msg || JSON.stringify(detail);
+    }
+
+    /* ── OTP input auto-advance & backspace ── */
+    document.querySelectorAll('.otp-inputs input').forEach((inp, i, all) => {
+      inp.addEventListener('input', e => {
+        const val = e.target.value.replace(/\D/g, '');
+        e.target.value = val.slice(-1);
+        if (val && i < all.length - 1) all[i + 1].focus();
+      });
+      inp.addEventListener('keydown', e => {
+        if (e.key === 'Backspace' && !e.target.value && i > 0) all[i - 1].focus();
+      });
+      inp.addEventListener('paste', e => {
+        e.preventDefault();
+        const pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+        [...pasted.slice(0, 4)].forEach((ch, idx) => { if (all[idx]) all[idx].value = ch; });
+        const nextEmpty = [...all].findIndex(a => !a.value);
+        if (nextEmpty !== -1) all[nextEmpty].focus(); else all[3].focus();
+      });
     });
-    document.getElementById('roleLabel').textContent = role;
-  }
 
-  function safeDetail(detail) {
-    if (!detail) return '';
-    if (typeof detail === 'string') return detail;
-    if (Array.isArray(detail)) return detail.map(d => (typeof d === 'string' ? d : d.msg || JSON.stringify(d))).join('; ');
-    return detail.msg || JSON.stringify(detail);
-  }
+    /* ── Show OTP panel ── */
+    function showOTPPanel(email) {
+      pendingEmail = email;
+      document.getElementById('signupPanel').style.display = 'none';
+      document.getElementById('otpPanel').style.display = 'block';
+      document.getElementById('otpEmailDisplay').textContent = email;
+      document.getElementById('otp0').focus();
+      startResendTimer(60);
+    }
 
-  /* ── OTP input auto-advance & backspace ── */
-  document.querySelectorAll('.otp-inputs input').forEach((inp, i, all) => {
-    inp.addEventListener('input', e => {
-      const val = e.target.value.replace(/\D/g, '');
-      e.target.value = val.slice(-1);
-      if(val && i < all.length - 1) all[i+1].focus();
-    });
-    inp.addEventListener('keydown', e => {
-      if(e.key === 'Backspace' && !e.target.value && i > 0) all[i-1].focus();
-    });
-    inp.addEventListener('paste', e => {
+    /* ── Resend countdown ── */
+    function startResendTimer(seconds) {
+      clearInterval(resendCountdown);
+      const timerEl = document.getElementById('resendTimer');
+      let remaining = seconds;
+      timerEl.textContent = ' (' + remaining + 's)';
+      resendCountdown = setInterval(() => {
+        remaining--;
+        if (remaining <= 0) {
+          clearInterval(resendCountdown);
+          timerEl.textContent = '';
+        } else {
+          timerEl.textContent = ' (' + remaining + 's)';
+        }
+      }, 1000);
+    }
+
+    /* ── Resend OTP ── */
+    async function resendOTP() {
+      if (!pendingEmail) return;
+      const timerEl = document.getElementById('resendTimer');
+      if (timerEl.textContent && timerEl.textContent !== '') return; // still counting
+      const otpMsg = document.getElementById('otpMsg');
+      otpMsg.className = 'form-msg';
+      otpMsg.textContent = 'Sending new OTP...';
+      try {
+        // Re-use the signup endpoint — it clears stale inactive user and sends fresh OTP
+        const formData = {
+          role: selectedRole, username: document.getElementById('suUsername').value.trim(),
+          email: pendingEmail, mobile_number: document.getElementById('suMobile').value.trim(),
+          password: document.getElementById('suPw').value
+        };
+        const res = await fetch('/api/auth/signup', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        });
+        const data = await res.json();
+        if (res.status === 202 && data.status === 'pending_otp') {
+          otpMsg.className = 'form-msg ok';
+          otpMsg.textContent = 'New OTP sent! Check your email.';
+          ['otp0', 'otp1', 'otp2', 'otp3'].forEach(id => document.getElementById(id).value = '');
+          document.getElementById('otp0').focus();
+          startResendTimer(60);
+        } else {
+          otpMsg.textContent = safeDetail(data.detail) || 'Could not resend OTP.';
+        }
+      } catch (err) {
+        otpMsg.textContent = 'Network error. Please try again.';
+      }
+    }
+
+    /* ── Handle Signup ── */
+    async function handleSignup(e) {
       e.preventDefault();
-      const pasted = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g,'');
-      [...pasted.slice(0,4)].forEach((ch, idx) => { if(all[idx]) all[idx].value = ch; });
-      const nextEmpty = [...all].findIndex(a => !a.value);
-      if(nextEmpty !== -1) all[nextEmpty].focus(); else all[3].focus();
-    });
-  });
+      const msg = document.getElementById('authMsg');
+      const btn = document.getElementById('submitBtn');
+      msg.className = 'form-msg';
+      msg.textContent = '';
 
-  /* ── Show OTP panel ── */
-  function showOTPPanel(email) {
-    pendingEmail = email;
-    document.getElementById('signupPanel').style.display = 'none';
-    document.getElementById('otpPanel').style.display = 'block';
-    document.getElementById('otpEmailDisplay').textContent = email;
-    document.getElementById('otp0').focus();
-    startResendTimer(60);
-  }
+      const username = document.getElementById('suUsername').value.trim();
+      const email = document.getElementById('suEmail').value.trim();
+      const mobile_number = document.getElementById('suMobile').value.trim();
+      const password = document.getElementById('suPw').value;
+      const confirmPassword = document.getElementById('suConfirmPw').value;
 
-  /* ── Resend countdown ── */
-  function startResendTimer(seconds) {
-    clearInterval(resendCountdown);
-    const timerEl = document.getElementById('resendTimer');
-    let remaining = seconds;
-    timerEl.textContent = ' (' + remaining + 's)';
-    resendCountdown = setInterval(() => {
-      remaining--;
-      if(remaining <= 0){
-        clearInterval(resendCountdown);
-        timerEl.textContent = '';
-      } else {
-        timerEl.textContent = ' (' + remaining + 's)';
+      if (!username || !email || !mobile_number || !password || !confirmPassword) {
+        msg.textContent = 'Please fill in all fields.';
+        return;
       }
-    }, 1000);
-  }
-
-  /* ── Resend OTP ── */
-  async function resendOTP() {
-    if(!pendingEmail) return;
-    const timerEl = document.getElementById('resendTimer');
-    if(timerEl.textContent && timerEl.textContent !== '') return; // still counting
-    const otpMsg = document.getElementById('otpMsg');
-    otpMsg.className = 'form-msg';
-    otpMsg.textContent = 'Sending new OTP...';
-    try {
-      // Re-use the signup endpoint — it clears stale inactive user and sends fresh OTP
-      const formData = { role: selectedRole, username: document.getElementById('suUsername').value.trim(),
-        email: pendingEmail, mobile_number: document.getElementById('suMobile').value.trim(),
-        password: document.getElementById('suPw').value };
-      const res = await fetch('/api/auth/signup', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
-      const data = await res.json();
-      if(res.status === 202 && data.status === 'pending_otp'){
-        otpMsg.className = 'form-msg ok';
-        otpMsg.textContent = 'New OTP sent! Check your email.';
-        ['otp0','otp1','otp2','otp3'].forEach(id => document.getElementById(id).value = '');
-        document.getElementById('otp0').focus();
-        startResendTimer(60);
-      } else {
-        otpMsg.textContent = safeDetail(data.detail) || 'Could not resend OTP.';
-      }
-    } catch(err) {
-      otpMsg.textContent = 'Network error. Please try again.';
-    }
-  }
-
-  /* ── Handle Signup ── */
-  async function handleSignup(e){
-    e.preventDefault();
-    const msg = document.getElementById('authMsg');
-    const btn = document.getElementById('submitBtn');
-    msg.className = 'form-msg';
-    msg.textContent = '';
-
-    const username = document.getElementById('suUsername').value.trim();
-    const email = document.getElementById('suEmail').value.trim();
-    const mobile_number = document.getElementById('suMobile').value.trim();
-    const password = document.getElementById('suPw').value;
-    const confirmPassword = document.getElementById('suConfirmPw').value;
-
-    if(!username || !email || !mobile_number || !password || !confirmPassword){
-      msg.textContent = 'Please fill in all fields.';
-      return;
-    }
-    if(password !== confirmPassword){
-      msg.textContent = 'Passwords do not match.';
-      return;
-    }
-
-    btn.disabled = true;
-    btn.textContent = 'Sending OTP...';
-
-    try {
-      const res = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: selectedRole, username, email, mobile_number, password })
-      });
-
-      const ct = res.headers.get('content-type') || '';
-      let data = {};
-      if(ct.includes('application/json')){
-        data = await res.json();
-      } else {
-        throw new Error('Server returned invalid response (' + res.status + ').');
-      }
-
-      if(res.status === 202 && data.status === 'pending_otp'){
-        // ✅ Success — show OTP panel
-        showOTPPanel(data.email || email);
+      if (password !== confirmPassword) {
+        msg.textContent = 'Passwords do not match.';
         return;
       }
 
-      if(!res.ok){
-        const errDetail = safeDetail(data.detail) || 'Signup failed.';
-        if(errDetail.toLowerCase().includes('email already exists')){
-          msg.innerHTML = 'An account with this email already exists. <a href="/login" style="color:var(--pine);font-weight:600;text-decoration:underline;">Click here to log in</a>.';
-          btn.disabled = false;
-          btn.textContent = 'Create ' + selectedRole + ' account';
+      btn.disabled = true;
+      btn.textContent = 'Sending OTP...';
+
+      try {
+        const res = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role: selectedRole, username, email, mobile_number, password })
+        });
+
+        const ct = res.headers.get('content-type') || '';
+        let data = {};
+        if (ct.includes('application/json')) {
+          data = await res.json();
+        } else {
+          throw new Error('Server returned invalid response (' + res.status + ').');
+        }
+
+        if (res.status === 202 && data.status === 'pending_otp') {
+          // ✅ Success — show OTP panel
+          showOTPPanel(data.email || email);
           return;
         }
-        throw new Error(errDetail);
+
+        if (!res.ok) {
+          const errDetail = safeDetail(data.detail) || 'Signup failed.';
+          if (errDetail.toLowerCase().includes('email already exists')) {
+            msg.innerHTML = 'An account with this email already exists. <a href="/login" style="color:var(--pine);font-weight:600;text-decoration:underline;">Click here to log in</a>.';
+            btn.disabled = false;
+            btn.textContent = 'Create ' + selectedRole + ' account';
+            return;
+          }
+          throw new Error(errDetail);
+        }
+
+        throw new Error('Unexpected response from server.');
+      } catch (err) {
+        msg.textContent = err.message;
+        btn.disabled = false;
+        btn.textContent = 'Create ' + selectedRole + ' account';
+      }
+    }
+
+    /* ── Handle OTP Verify ── */
+    async function handleVerifyOTP() {
+      const otpMsg = document.getElementById('otpMsg');
+      const verifyBtn = document.getElementById('verifyBtn');
+      otpMsg.className = 'form-msg';
+      otpMsg.textContent = '';
+
+      const otp = ['otp0', 'otp1', 'otp2', 'otp3'].map(id => document.getElementById(id).value).join('');
+      if (otp.length < 4) {
+        otpMsg.textContent = 'Please enter the full 4-digit OTP.';
+        return;
       }
 
-      throw new Error('Unexpected response from server.');
-    } catch(err){
-      msg.textContent = err.message;
-      btn.disabled = false;
-      btn.textContent = 'Create ' + selectedRole + ' account';
-    }
-  }
+      verifyBtn.disabled = true;
+      verifyBtn.textContent = 'Verifying...';
 
-  /* ── Handle OTP Verify ── */
-  async function handleVerifyOTP(){
-    const otpMsg = document.getElementById('otpMsg');
-    const verifyBtn = document.getElementById('verifyBtn');
-    otpMsg.className = 'form-msg';
-    otpMsg.textContent = '';
+      try {
+        const res = await fetch('/api/auth/verify-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: pendingEmail, otp })
+        });
+        const data = await res.json();
 
-    const otp = ['otp0','otp1','otp2','otp3'].map(id => document.getElementById(id).value).join('');
-    if(otp.length < 4){
-      otpMsg.textContent = 'Please enter the full 4-digit OTP.';
-      return;
-    }
+        if (res.ok && data.status === 'success') {
+          // ✅ Verified — store token and redirect
+          localStorage.setItem('beacon_token', data.access_token);
+          localStorage.setItem('access_token', data.access_token);
+          localStorage.setItem('beacon_user', JSON.stringify(data.user));
 
-    verifyBtn.disabled = true;
-    verifyBtn.textContent = 'Verifying...';
+          otpMsg.className = 'form-msg ok';
+          otpMsg.textContent = '✅ Email verified! Redirecting to your dashboard...';
 
-    try {
-      const res = await fetch('/api/auth/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: pendingEmail, otp })
-      });
-      const data = await res.json();
-
-      if(res.ok && data.status === 'success'){
-        // ✅ Verified — store token and redirect
-        localStorage.setItem('beacon_token', data.access_token);
-        localStorage.setItem('access_token', data.access_token);
-        localStorage.setItem('beacon_user', JSON.stringify(data.user));
-
-        otpMsg.className = 'form-msg ok';
-        otpMsg.textContent = '✅ Email verified! Redirecting to your dashboard...';
-
-        const role = data.user && data.user.role ? data.user.role : selectedRole;
-        const targetPage = role === 'admin' ? '/admin-dashboard' :
-                           role === 'doctor' ? '/doctor-profile' :
-                           role === 'caretaker' ? '/caretaker-dashboard' : '/app';
-        setTimeout(() => window.location.href = targetPage, 1200);
-      } else {
-        otpMsg.textContent = safeDetail(data.detail) || 'Invalid OTP. Please try again.';
+          const role = data.user && data.user.role ? data.user.role : selectedRole;
+          const targetPage = role === 'admin' ? '/admin-dashboard' :
+            role === 'doctor' ? '/doctor-profile' :
+              role === 'caretaker' ? '/caretaker-dashboard' : '/app';
+          setTimeout(() => window.location.href = targetPage, 1200);
+        } else {
+          otpMsg.textContent = safeDetail(data.detail) || 'Invalid OTP. Please try again.';
+          verifyBtn.disabled = false;
+          verifyBtn.textContent = 'Verify & Activate Account';
+          // Shake the inputs
+          document.getElementById('otpInputs').style.animation = 'none';
+          setTimeout(() => {
+            document.getElementById('otpInputs').style.animation = '';
+            ['otp0', 'otp1', 'otp2', 'otp3'].forEach(id => document.getElementById(id).value = '');
+            document.getElementById('otp0').focus();
+          }, 100);
+        }
+      } catch (err) {
+        otpMsg.textContent = 'Network error. Please try again.';
         verifyBtn.disabled = false;
         verifyBtn.textContent = 'Verify & Activate Account';
-        // Shake the inputs
-        document.getElementById('otpInputs').style.animation = 'none';
-        setTimeout(() => {
-          document.getElementById('otpInputs').style.animation = '';
-          ['otp0','otp1','otp2','otp3'].forEach(id => document.getElementById(id).value = '');
-          document.getElementById('otp0').focus();
-        }, 100);
       }
-    } catch(err){
-      otpMsg.textContent = 'Network error. Please try again.';
-      verifyBtn.disabled = false;
-      verifyBtn.textContent = 'Verify & Activate Account';
     }
-  }
-</script>
+  </script>
 </body>
+
 </html>

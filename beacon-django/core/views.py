@@ -35,13 +35,13 @@ TTS_VOICE = 'Kore'
 # ── Pydantic schema (same as main.py VoiceInterventionResponse) ───────────────
 class VoiceInterventionResponse(BaseModel):
     vocal_risk_analysis: str = Field(
-        description='Analysis of vocal tone, distress level, or summary of user inquiry in target language.'
+        description='Analysis of vocal tone, distress level, or summary of user inquiry strictly in the user-selected response language.'
     )
     detected_specialty: str = Field(
         description='Identified medical requirement or condition (e.g. Emergency Medicine, Neurology, General Medicine).'
     )
     immediate_safety_steps: str = Field(
-        description='Immediate physical safety or first-aid steps in target language.'
+        description='Immediate physical safety or first-aid steps strictly in the user-selected response language.'
     )
     deescalation_script: str = Field(
         description=(
@@ -241,18 +241,19 @@ class VoiceInterventionView(APIView):
             5. IF CLOSED: If the nearest is closed, announce it and redirect to the next nearest OPEN facility.
 
             CRITICAL LANGUAGE & SCRIPT RULES FOR TEXT-TO-SPEECH (TTS):
-            - Auto-detect the language spoken by the user in the audio (or requested '{language}').
-            - Generate 'deescalation_script' COMPLETELY in that target language.
-            - IF THE LANGUAGE IS NON-ENGLISH (e.g. Malayalam, Tamil, Hindi, Arabic):
-              Write EVERYTHING in that language's native script.
-              IMPORTANT: Transliterate ALL hospital names, clinic names, and medical facility names PHONETICALLY into the target native script!
-              Examples for Malayalam:
-              - Instead of 'Regional Healthcare Clinic', write 'റീജിയണൽ ഹെൽത്ത്‌കെയർ ക്ലിനിക്ക്'.
-              - Instead of 'St. Jude Urgent Care Facility', write 'സെന്റ് ജൂഡ് അടിയന്തര പരിചരണ കേന്ദ്രം'.
-              - Instead of 'Emergency General Hospital', write 'എമർജൻസി ജനറൽ ഹോസ്പിറ്റൽ'.
-              - Instead of 'City Critical Care & Trauma Center', write 'സിറ്റി ക്രിട്ടിക്കൽ കെയർ ആൻഡ് ട്രോമ സെന്റർ'.
-              - Write 'km' as 'കിലോമീറ്റർ' and 'mins' as 'മിനിറ്റ്'.
-              NEVER mix English/Latin alphabet letters inside non-English scripts so the Text-to-Speech voice engine can pronounce the entire response fluently without glitches.
+            1. MANDATORY TARGET RESPONSE LANGUAGE: You MUST generate all response content (vocal_risk_analysis, immediate_safety_steps, deescalation_script) STRICTLY AND EXCLUSIVELY in the user-selected Response Language: '{language}'.
+            2. IGNORE AUDIO LANGUAGE FOR OUTPUT: Do NOT reply in the language spoken by the user in the audio if it differs from '{language}'. Regardless of what language the user speaks in the audio (e.g., English), translate and understand the user's inquiry, but generate all outputs and speech scripts EXCLUSIVELY in '{language}'.
+            3. STRICT SCRIPT & PHONETIC TRANSLITERATION FOR NON-ENGLISH (e.g., Malayalam, Tamil, Hindi, Spanish, Arabic):
+               - Write EVERYTHING (vocal_risk_analysis, immediate_safety_steps, deescalation_script) strictly in '{language}' native script.
+               - DO NOT mix Latin/English alphabet characters inside non-English script output.
+               - Transliterate ALL hospital names, clinic names, medical terms, abbreviations (e.g., ICU, Dr., St.), and units (e.g., km -> കിലോമീറ്റർ, mins -> മിനിറ്റ്) PHONETICALLY into the target native script!
+               - Examples for Malayalam:
+                 * Instead of 'Regional Healthcare Clinic', write 'റീജിയണൽ ഹെൽത്ത്‌കെയർ ക്ലിനിക്ക്'.
+                 * Instead of 'St. Jude Urgent Care Facility', write 'സെന്റ് ജൂഡ് അടിയന്തര പരിചരണ കേന്ദ്രം'.
+                 * Instead of 'Emergency General Hospital', write 'എമർജൻസി ജനറൽ ഹോസ്പിറ്റൽ'.
+                 * Instead of 'City Critical Care & Trauma Center', write 'സിറ്റി ക്രിട്ടിക്കൽ കെയർ ആൻഡ് ട്രോമ സെന്റർ'.
+                 * Instead of '2 km', write '2 കിലോമീറ്റർ'.
+               - This ensures both the displayed "Beacon Analysis Output" text and the Text-to-Speech (TTS) audio reader pronounce all words (both native words and transliterated English names/terms) with 100% correct accuracy without voice synthesis glitches.
 
             OUTPUT MUST BE VALID JSON MATCHING THE SCHEMA EXACTLY.
             """

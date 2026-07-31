@@ -264,14 +264,32 @@ async def _generate_neural_speech_async(text: str, target_language: str) -> Opti
             detected_voice = 'ar-SA-ZariyahNeural' # Arabic
             break
 
-    voice = detected_voice or voice_map.get(target_language, 'en-US-AvaNeural')
+    voice = voice_map.get(target_language) or detected_voice or 'en-US-AvaNeural'
 
-    # Clean leftover English units/words in Malayalam text so Edge TTS reads fluently
+    # Clean leftover English terms/units in target native script so Edge TTS reads fluently with 100% accuracy
     cleaned_text = text
     if voice == 'ml-IN-SobhanaNeural':
         cleaned_text = re.sub(r'\bkm\b', 'കിലോമീറ്റർ', cleaned_text, flags=re.IGNORECASE)
         cleaned_text = re.sub(r'\bmins?\b', 'മിനിറ്റ്', cleaned_text, flags=re.IGNORECASE)
         cleaned_text = re.sub(r'\bminutes?\b', 'മിനിറ്റ്', cleaned_text, flags=re.IGNORECASE)
+        cleaned_text = re.sub(r'\bhospitals?\b', 'ഹോസ്പിറ്റൽ', cleaned_text, flags=re.IGNORECASE)
+        cleaned_text = re.sub(r'\bclinics?\b', 'ക്ലിനിക്ക്', cleaned_text, flags=re.IGNORECASE)
+        cleaned_text = re.sub(r'\bcare\b', 'കെയർ', cleaned_text, flags=re.IGNORECASE)
+        cleaned_text = re.sub(r'\bemergency\b', 'എമർജൻസി', cleaned_text, flags=re.IGNORECASE)
+        cleaned_text = re.sub(r'\bcent(er|re)s?\b', 'സെന്റർ', cleaned_text, flags=re.IGNORECASE)
+        cleaned_text = re.sub(r'\bdr\.?\b', 'ഡോക്ടർ', cleaned_text, flags=re.IGNORECASE)
+        cleaned_text = re.sub(r'\bst\.?\b', 'സെന്റ്', cleaned_text, flags=re.IGNORECASE)
+        cleaned_text = re.sub(r'\bicu\b', 'ഐ.സി.യു', cleaned_text, flags=re.IGNORECASE)
+    elif voice == 'hi-IN-SwaraNeural':
+        cleaned_text = re.sub(r'\bkm\b', 'किलोमीटर', cleaned_text, flags=re.IGNORECASE)
+        cleaned_text = re.sub(r'\bmins?\b', 'मिनट', cleaned_text, flags=re.IGNORECASE)
+        cleaned_text = re.sub(r'\bhospitals?\b', 'अस्पताल', cleaned_text, flags=re.IGNORECASE)
+        cleaned_text = re.sub(r'\bclinics?\b', 'क्लिनिक', cleaned_text, flags=re.IGNORECASE)
+    elif voice == 'ta-IN-PallaviNeural':
+        cleaned_text = re.sub(r'\bkm\b', 'கிலோமீட்டர்', cleaned_text, flags=re.IGNORECASE)
+        cleaned_text = re.sub(r'\bmins?\b', 'நிமிடம்', cleaned_text, flags=re.IGNORECASE)
+        cleaned_text = re.sub(r'\bhospitals?\b', 'ஆஸ்பத்திரி', cleaned_text, flags=re.IGNORECASE)
+        cleaned_text = re.sub(r'\bclinics?\b', 'கிளினிக்', cleaned_text, flags=re.IGNORECASE)
 
     try:
         communicate = edge_tts.Communicate(cleaned_text, voice)

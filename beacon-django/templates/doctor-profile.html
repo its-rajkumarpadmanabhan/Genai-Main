@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Carewell — Doctor Profile</title>
+<title>Beacon AI — Doctor Profile</title>
 <script>
   (function(){
     const token = localStorage.getItem('beacon_token') || localStorage.getItem('access_token');
@@ -25,26 +25,27 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --ink:#0F172A; --paper:#F0F6FF; --surface:#FFFFFF; --line:#CCE0FF;
-    --pine:#1E90FF; --pine-deep:#0056B3; --pine-soft:#E6F2FF; --brick:#AE4436; --brick-soft:#F3DFDA;
-    --slate:#4A6E8C; --slate-soft:#DCE7EF; --muted:#64748B; --amber:#B9873A; --amber-soft:#F1E3CB;
+    --ink:#20042E; --paper:#FAF5EE; --surface:#FFFFFF; --line:#E6D5C3;
+    --pine:#804A8A; --pine-deep:#3A0353; --pine-soft:#F3E8F5; --brick:#C24141; --brick-soft:#FCEAEA;
+    --slate:#F59E51; --slate-soft:#FFF2E5; --muted:#6C5275; --amber:#F59E51; --amber-soft:#FFF2E5;
+    --amber-gold:#F8D299; --gold-deep:#D97E30;
     --radius:14px;
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
+  body{margin:0;background:linear-gradient(135deg, #FAF5EE 0%, #F5EAE0 100%);color:var(--ink);font-family:'Inter',sans-serif;}
   .mono{font-family:'JetBrains Mono',monospace;}
 
   .app{display:grid;grid-template-columns:230px 1fr;width:100%;min-height:100vh;margin:0;}
-  .sidebar{background:var(--pine-deep);color:#EFF3F0;padding:28px 20px;display:flex;flex-direction:column;gap:26px;}
+  .sidebar{background:linear-gradient(180deg, #3A0353 0%, #2A023D 100%);color:#F8EBFB;padding:28px 20px;display:flex;flex-direction:column;gap:26px;border-right:2px solid #F59E51;}
   .brand{display:flex;align-items:center;gap:10px;}
-  .brand-mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(160deg,#1E90FF,#0056B3);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:600;font-size:17px;flex-shrink:0;}
-  .brand-name{font-family:'Fraunces',serif;font-size:17px;font-weight:600;}
-  .brand-sub{font-size:11px;color:#9FB6AB;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;}
-  nav{display:flex;flex-direction:column;gap:3px;}
-  nav a{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:9px;color:#D7E4DE;text-decoration:none;font-size:13.5px;font-weight:500;position:relative;}
+  .brand-mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg, #F59E51, #F8D299);color:#3A0353;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:800;font-size:19px;flex-shrink:0;box-shadow:0 3px 10px rgba(245,158,81,0.4);}
+  .brand-name{font-family:'Fraunces',serif;font-size:18px;font-weight:700;color:#FFFFFF;}
+  .brand-sub{font-size:11px;color:#F59E51;font-family:'JetBrains Mono',monospace;letter-spacing:.8px;font-weight:700;}
+  nav{display:flex;flex-direction:column;gap:4px;}
+  nav a{display:flex;align-items:center;gap:11px;padding:10px 14px;border-radius:10px;color:#EAD5F0;text-decoration:none;font-size:13.5px;font-weight:600;position:relative;transition:all 0.15s ease;}
   nav a svg{width:16px;height:16px;flex-shrink:0;}
-  nav a.active{background:#EFF3F0;color:var(--pine-deep);}
-  nav a:not(.active):hover{background:rgba(255,255,255,.08);}
+  nav a.active{background:linear-gradient(135deg, #F59E51, #F8D299);color:#20042E;font-weight:700;box-shadow:0 4px 12px rgba(245,158,81,0.35);}
+  nav a:not(.active):hover{background:rgba(245,158,81,0.18);color:#F8D299;}
   .sidebar-foot{margin-top:auto;}
   .btn-symbol {
     width: 38px;
@@ -162,8 +163,8 @@
   <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="brand">
-      <div class="brand-mark">C</div>
-      <div><div class="brand-name">Carewell</div><div class="brand-sub">DOCTOR PORTAL</div></div>
+      <div class="brand-mark">B</div>
+      <div><div class="brand-name">Beacon AI</div><div class="brand-sub">DOCTOR PORTAL</div></div>
     </div>
     <nav>
       <a href="/doctor-profile" class="active" id="navProfileBtn" onclick="switchDoctorTab('profile'); return false;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Doctor Profile</span></a>
@@ -498,64 +499,65 @@ async function uploadProfilePicture(event){
   reader.readAsDataURL(file);
 }
 
+function renderDoctorProfile(data){
+  if(!data) return;
+  profileData = data;
+  docReviewsData = profileData.reviews || [];
+
+  const banner = document.getElementById('roleWarningBanner');
+  if(banner) banner.style.display = 'none';
+
+  const avgBadge = document.getElementById('dReviewAvgBadge');
+  const countBadge = document.getElementById('dReviewCountBadge');
+  if(avgBadge) avgBadge.textContent = `⭐ ${profileData.rating_avg || 5.0}`;
+  if(countBadge) countBadge.textContent = `(${profileData.reviews_count || docReviewsData.length} Reviews)`;
+
+  const rawName = profileData.full_name || profileData.username || 'Doctor';
+  const docName = rawName;
+  document.getElementById('dName').textContent = docName;
+  document.getElementById('bcDocName').textContent = docName;
+  document.getElementById('dCode').textContent = profileData.doctor_code || 'DOC-NEW';
+  document.getElementById('dDept').textContent = profileData.major_department || 'General Practitioner';
+  document.getElementById('dGender').textContent = profileData.gender || 'Not provided';
+  document.getElementById('dEmail').textContent = profileData.email || 'Not provided';
+  document.getElementById('dLicense').textContent = profileData.license_number || 'Not provided';
+  document.getElementById('dExp').textContent = (profileData.experience_years || 0) + ' Years';
+  document.getElementById('dFee').textContent = '₹' + (profileData.consultation_fee || '0');
+  document.getElementById('dHours').textContent = profileData.available_hours || '09:00 AM - 05:00 PM';
+  document.getElementById('dLocation').textContent = profileData.location || 'Not provided';
+  document.getElementById('dState').textContent = profileData.state || 'Not provided';
+  document.getElementById('dHospital').textContent = profileData.hospital_name || 'Not provided';
+  document.getElementById('dLang').textContent = profileData.languages_speak || 'Not provided';
+  document.getElementById('dPhone').textContent = profileData.phone_number || profileData.mobile_number || 'Not provided';
+  document.getElementById('dSpecialized').textContent = profileData.specialized_details || 'Not provided';
+  if(profileData.availability_status){
+    document.getElementById('quickAvailability').value = profileData.availability_status;
+  }
+  if(profileData.profile_picture){
+    document.getElementById('avatarContent').innerHTML = `<img src="${profileData.profile_picture}" style="width:100%;height:100%;object-fit:cover;" />`;
+  }
+
+  const beaconUserRaw = localStorage.getItem('beacon_user');
+  if (beaconUserRaw) {
+    try {
+      const bu = JSON.parse(beaconUserRaw);
+      bu.username = profileData.full_name || profileData.username || bu.username;
+      bu.mobile_number = profileData.phone_number || profileData.mobile_number || bu.mobile_number;
+      if (profileData.email) bu.email = profileData.email;
+      localStorage.setItem('beacon_user', JSON.stringify(bu));
+    } catch(e){}
+  }
+}
+
 async function loadDoctorProfile(){
   try {
     const res = await fetch('/api/auth/doctor/profile', { headers: getAuthHeader() });
     if(res.ok){
-      const banner = document.getElementById('roleWarningBanner');
-      if(banner) banner.style.display = 'none';
-      profileData = await res.json();
-      docReviewsData = profileData.reviews || [];
-
-      const avgBadge = document.getElementById('dReviewAvgBadge');
-      const countBadge = document.getElementById('dReviewCountBadge');
-      if(avgBadge) avgBadge.textContent = `⭐ ${profileData.rating_avg || 5.0}`;
-      if(countBadge) countBadge.textContent = `(${profileData.reviews_count || docReviewsData.length} Reviews)`;
-
-      const rawName = profileData.full_name || profileData.username || 'Doctor';
-      const docName = rawName;
-      document.getElementById('dName').textContent = docName;
-      document.getElementById('bcDocName').textContent = docName;
-      document.getElementById('dCode').textContent = profileData.doctor_code || 'DOC-NEW';
-      document.getElementById('dDept').textContent = profileData.major_department || 'General Practitioner';
-      document.getElementById('dGender').textContent = profileData.gender || 'Not provided';
-      document.getElementById('dEmail').textContent = profileData.email || 'Not provided';
-      document.getElementById('dLicense').textContent = profileData.license_number || 'Not provided';
-      document.getElementById('dExp').textContent = (profileData.experience_years || 0) + ' Years';
-      document.getElementById('dFee').textContent = '₹' + (profileData.consultation_fee || '0');
-      document.getElementById('dHours').textContent = profileData.available_hours || '09:00 AM - 05:00 PM';
-      document.getElementById('dLocation').textContent = profileData.location || 'Not provided';
-      document.getElementById('dState').textContent = profileData.state || 'Not provided';
-      document.getElementById('dHospital').textContent = profileData.hospital_name || 'Not provided';
-      document.getElementById('dLang').textContent = profileData.languages_speak || 'Not provided';
-      document.getElementById('dPhone').textContent = profileData.phone_number || profileData.mobile_number || 'Not provided';
-      document.getElementById('dSpecialized').textContent = profileData.specialized_details || 'Not provided';
-      if(profileData.availability_status){
-        document.getElementById('quickAvailability').value = profileData.availability_status;
-      }
-      if(profileData.profile_picture){
-        document.getElementById('avatarContent').innerHTML = `<img src="${profileData.profile_picture}" style="width:100%;height:100%;object-fit:cover;" />`;
-      }
-
-      const beaconUserRaw = localStorage.getItem('beacon_user');
-      if (beaconUserRaw) {
-        try {
-          const bu = JSON.parse(beaconUserRaw);
-          bu.username = profileData.full_name || profileData.username || bu.username;
-          bu.mobile_number = profileData.phone_number || profileData.mobile_number || bu.mobile_number;
-          if (profileData.email) bu.email = profileData.email;
-          localStorage.setItem('beacon_user', JSON.stringify(bu));
-        } catch(e){}
-      }
+      const data = await res.json();
+      _lastDocProfSig = JSON.stringify(data);
+      renderDoctorProfile(data);
     } else if(res.status === 401){
-      let detail = 'Your login session has expired. Please log in again.';
-      try {
-        const err = await res.json();
-        if (err && err.detail) detail = err.detail;
-      } catch(e){}
-      localStorage.clear();
-      alert(detail);
-      window.location.href = '/login';
+      console.log('Session check in background: 401');
     } else {
       const err = await res.json().catch(() => ({}));
       const banner = document.getElementById('roleWarningBanner');
@@ -1174,42 +1176,48 @@ function triggerPrescriptionUpload(apptId, currentStatus) {
   fileInput.click();
 }
 
+function renderDoctorPatientsList(patients) {
+  const container = document.getElementById('patientsContainer');
+  if(!container) return;
+  if(!patients || patients.length === 0){
+    container.innerHTML = '<div class="empty-box">No accepted or consulted patient profiles available currently.</div>';
+  } else {
+    container.innerHTML = patients.map((p, idx) => `
+      <div class="patient-card" style="background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 2px 6px rgba(0,0,0,0.02);">
+        <!-- Header -->
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;">
+          <div>
+            <div style="font-weight:700;font-size:14.5px;color:var(--ink);display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+              <span style="background:var(--pine-soft);color:var(--pine-deep);font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:12px;">Reg #${idx + 1}</span>
+              ${p.full_name}
+            </div>
+            <div class="mono" style="font-size:11px;color:var(--muted);margin-top:2px;">(${p.patient_code})</div>
+          </div>
+          <span class="status-pill active" style="font-size:10.5px;padding:3px 8px;text-transform:uppercase;">${p.appointment_status}</span>
+        </div>
+
+        <!-- Compact Preview -->
+        <div style="font-size:12px;color:var(--muted);background:var(--surface);padding:10px 12px;border-radius:8px;border:1px solid var(--line);margin-bottom:12px;">
+          <div><b>DOB:</b> ${p.dob} · <b>Gender:</b> ${p.gender}</div>
+          <div style="margin-top:3px;"><b>Location:</b> ${p.location}</div>
+        </div>
+
+        <!-- Action Button to View Full Profile Modal -->
+        <button class="btn-sm" style="width:100%;background:#0D9488;color:#fff;border:none;padding:7px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;" onclick="openFullPatientModal(${p.patient_id}, '${p.full_name.replace(/'/g, "\\'")}')">
+          👤 View Full Profile & Details
+        </button>
+      </div>
+    `).join('');
+  }
+}
+
 async function loadDoctorPatients(){
   try {
     const res = await fetch('/api/auth/doctor/patients', { headers: getAuthHeader() });
     if(res.ok){
       const patients = await res.json();
-      const container = document.getElementById('patientsContainer');
-      if(!patients || patients.length === 0){
-        container.innerHTML = '<div class="empty-box">No accepted or consulted patient profiles available currently.</div>';
-      } else {
-        container.innerHTML = patients.map((p, idx) => `
-          <div class="patient-card" style="background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px;box-shadow:0 2px 6px rgba(0,0,0,0.02);">
-            <!-- Header -->
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:10px;">
-              <div>
-                <div style="font-weight:700;font-size:14.5px;color:var(--ink);display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                  <span style="background:var(--pine-soft);color:var(--pine-deep);font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:12px;">Reg #${idx + 1}</span>
-                  ${p.full_name}
-                </div>
-                <div class="mono" style="font-size:11px;color:var(--muted);margin-top:2px;">(${p.patient_code})</div>
-              </div>
-              <span class="status-pill active" style="font-size:10.5px;padding:3px 8px;text-transform:uppercase;">${p.appointment_status}</span>
-            </div>
-
-            <!-- Compact Preview -->
-            <div style="font-size:12px;color:var(--muted);background:var(--surface);padding:10px 12px;border-radius:8px;border:1px solid var(--line);margin-bottom:12px;">
-              <div><b>DOB:</b> ${p.dob} · <b>Gender:</b> ${p.gender}</div>
-              <div style="margin-top:3px;"><b>Location:</b> ${p.location}</div>
-            </div>
-
-            <!-- Action Button to View Full Profile Modal -->
-            <button class="btn-sm" style="width:100%;background:#0D9488;color:#fff;border:none;padding:7px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;" onclick="openFullPatientModal(${p.patient_id}, '${p.full_name.replace(/'/g, "\\'")}')">
-              👤 View Full Profile & Details
-            </button>
-          </div>
-        `).join('');
-      }
+      _lastDocPatSig = JSON.stringify(patients);
+      renderDoctorPatientsList(patients);
     }
   } catch(e){ console.log(e); }
 }
@@ -1234,6 +1242,52 @@ async function deleteMyProfile(){
   } catch(e){ await showCustomAlert(e.message, 'Error', '⚠️'); }
 }
 
+let _lastDocAptSig = '';
+let _lastDocPatSig = '';
+let _lastDocProfSig = '';
+
+async function pollDoctorSilent() {
+  const editModal = document.getElementById('editProfileModal');
+  if (editModal && editModal.classList.contains('open')) return;
+
+  try {
+    const resProf = await fetch('/api/auth/doctor/profile', { headers: getAuthHeader() });
+    if (resProf.ok) {
+      const prof = await resProf.json();
+      const sig = JSON.stringify(prof);
+      if (sig !== _lastDocProfSig) {
+        _lastDocProfSig = sig;
+        renderDoctorProfile(prof);
+      }
+    }
+  } catch(e) {}
+
+  try {
+    const resApts = await fetch('/api/auth/doctor/appointments', { headers: getAuthHeader() });
+    if (resApts.ok) {
+      const apts = await resApts.json();
+      const sig = JSON.stringify(apts);
+      if (sig !== _lastDocAptSig) {
+        _lastDocAptSig = sig;
+        docAllAppointments = apts;
+        filterAppointments();
+      }
+    }
+  } catch(e) {}
+
+  try {
+    const resPats = await fetch('/api/auth/doctor/patients', { headers: getAuthHeader() });
+    if (resPats.ok) {
+      const pats = await resPats.json();
+      const sig = JSON.stringify(pats);
+      if (sig !== _lastDocPatSig) {
+        _lastDocPatSig = sig;
+        renderDoctorPatientsList(pats);
+      }
+    }
+  } catch(e) {}
+}
+
 function initDoctorPage(){
   loadDoctorProfile();
   loadDoctorAppointments();
@@ -1241,9 +1295,13 @@ function initDoctorPage(){
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initDoctorPage);
+  document.addEventListener('DOMContentLoaded', () => {
+    initDoctorPage();
+    setInterval(pollDoctorSilent, 2000);
+  });
 } else {
   initDoctorPage();
+  setInterval(pollDoctorSilent, 2000);
 }
 </script>
 </body>

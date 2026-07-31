@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Carewell — Log In</title>
+<title>Beacon AI — Log In</title>
 <script>
   (function(){
     const token = localStorage.getItem('beacon_token') || localStorage.getItem('access_token');
@@ -42,39 +42,41 @@
 </script>
 <style>
   :root{
-    --ink:#1E2A22; --paper:#EAF0EC; --surface:#FFFFFF; --line:#D7DFD9;
-    --pine:#33604F; --pine-deep:#25473A; --brick:#AE4436; --brick-soft:#F3DFDA;
-    --slate:#4A6E8C; --slate-soft:#DCE7EF; --muted:#6E7D75; --amber:#B9873A; --amber-soft:#F1E3CB;
+    --ink:#20042E; --paper:#FAF5EE; --surface:#FFFFFF; --line:#E6D5C3;
+    --pine:#804A8A; --pine-deep:#3A0353; --pine-soft:#F3E8F5; --brick:#C24141; --brick-soft:#FCEAEA;
+    --slate:#F59E51; --slate-soft:#FFF2E5; --muted:#6C5275; --amber:#F59E51; --amber-soft:#FFF2E5;
+    --amber-gold:#F8D299; --gold-deep:#D97E30;
     --radius:14px;
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
+  body{margin:0;background:linear-gradient(135deg, #FAF5EE 0%, #F5EAE0 100%);color:var(--ink);font-family:'Inter',sans-serif;}
   .mono{font-family:'JetBrains Mono',monospace;}
   a{color:inherit;text-decoration:none;}
   button{font-family:inherit;}
 
-  #view-auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 50% 20%,#F2F6F3 0%,var(--paper) 60%);}
-  .auth-card{width:100%;max-width:440px;background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:32px;box-shadow:0 20px 60px rgba(37,71,58,.08);}
-  .auth-brand{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:6px;}
-  .auth-brand .brand-mark{width:38px;height:38px;border-radius:10px;background:linear-gradient(160deg,#4C8A72,#2C5344);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:600;font-size:19px;color:#fff;}
-  .auth-brand .brand-name{font-family:'Fraunces',serif;font-size:22px;font-weight:600;}
+  #view-auth{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 50% 20%, #FAF5EE 0%, #F5EAE0 100%);}
+  .auth-card{width:100%;max-width:440px;background:var(--surface);border:2px solid #E6D5C3;border-radius:20px;padding:32px;box-shadow:0 20px 60px rgba(58,3,83,0.15);}
+  .auth-brand{display:flex;align-items:center;gap:12px;justify-content:center;margin-bottom:8px;}
+  .auth-brand .brand-mark{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg, #F59E51, #F8D299);color:#3A0353;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:800;font-size:22px;box-shadow:0 4px 12px rgba(245,158,81,0.4);}
+  .auth-brand .brand-name{font-family:'Fraunces',serif;font-size:24px;font-weight:700;color:#3A0353;}
   .auth-sub{text-align:center;color:var(--muted);font-size:13px;margin:0 0 24px;}
 
   .role-picker{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px;}
   .role-picker button{padding:12px 4px;border-radius:11px;border:1.5px solid var(--line);background:var(--paper);cursor:pointer;font-size:11.5px;font-weight:600;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:6px;}
   .role-picker button svg{width:18px;height:18px;}
-  .role-picker button.active{border-color:var(--pine);background:#DCE9E2;color:var(--pine-deep);}
+  .role-picker button.active{border-color:var(--amber);background:#FFF2E5;color:var(--pine-deep);}
 
-  .auth-tabs{display:flex;gap:6px;background:var(--paper);border-radius:10px;padding:4px;margin-bottom:18px;}
-  .auth-tabs button{flex:1;border:none;background:transparent;padding:8px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;}
-  .auth-tabs button.active{background:var(--pine-deep);color:#EFF3F0;}
+  .auth-tabs{display:flex;gap:6px;background:#F3E8F5;border-radius:12px;padding:5px;margin-bottom:20px;}
+  .auth-tabs button{flex:1;border:none;background:transparent;padding:10px;border-radius:9px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;transition:all 0.15s ease;}
+  .auth-tabs button.active{background:linear-gradient(135deg, #F59E51, #F8D299);color:#20042E;box-shadow:0 3px 10px rgba(245,158,81,0.35);}
 
   .field{margin-bottom:14px;}
-  .field label{display:block;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
-  .field input{width:100%;border:1px solid var(--line);border-radius:99px;padding:10px 14px;font-size:13.5px;font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);}
+  .field label{display:block;font-size:11px;font-weight:700;color:var(--pine-deep);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;}
+  .field input{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:11px 14px;font-size:13.5px;font-family:'Inter',sans-serif;background:var(--paper);color:var(--ink);transition:border-color 0.15s ease;}
+  .field input:focus{outline:none;border-color:var(--pine);background:#FFFFFF;}
 
-  .btn-primary{width:100%;background:var(--pine-deep);color:#EFF3F0;border:none;border-radius:10px;padding:12px;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:6px;transition:background .2s;}
-  .btn-primary:hover{background:var(--pine);}
+  .btn-primary{width:100%;background:linear-gradient(135deg, #3A0353 0%, #804A8A 100%);color:#FFFFFF;border:none;border-radius:10px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;box-shadow:0 4px 14px rgba(58,3,83,0.3);transition:transform 0.15s ease, box-shadow 0.15s ease;}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 18px rgba(58,3,83,0.4);}
 
   .form-msg{font-size:12px;text-align:center;margin-top:12px;min-height:16px;color:var(--brick);}
   .form-sublink{text-align:center;font-size:12px;margin-top:14px;color:var(--muted);}
@@ -86,8 +88,8 @@
 <div id="view-auth">
   <div class="auth-card">
     <div class="auth-brand">
-      <div class="brand-mark">C</div>
-      <div class="brand-name">Carewell</div>
+      <div class="brand-mark">B</div>
+      <div class="brand-name">Beacon AI</div>
     </div>
     <p class="auth-sub">Welcome back! Sign in to your portal.</p>
 

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Carewell — Caretaker Portal</title>
+<title>Beacon AI — Caretaker Portal</title>
 <script>
   (function(){
     const token = localStorage.getItem('beacon_token') || localStorage.getItem('access_token');
@@ -26,32 +26,33 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --ink:#1E1B4B; --paper:#F5F3FF; --surface:#FFFFFF; --line:#DDD6FE;
-    --pine:#6A5ACD; --pine-deep:#483D8B; --pine-soft:#F0EDFF; --brick:#AE4436; --brick-soft:#F3DFDA;
-    --slate:#4A6E8C; --slate-soft:#DCE7EF; --muted:#64748B; --amber:#B9873A; --amber-soft:#F1E3CB;
+    --ink:#20042E; --paper:#FAF5EE; --surface:#FFFFFF; --line:#E6D5C3;
+    --pine:#804A8A; --pine-deep:#3A0353; --pine-soft:#F3E8F5; --brick:#C24141; --brick-soft:#FCEAEA;
+    --slate:#F59E51; --slate-soft:#FFF2E5; --muted:#6C5275; --amber:#F59E51; --amber-soft:#FFF2E5;
+    --amber-gold:#F8D299; --gold-deep:#D97E30;
     --radius:14px;
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
+  body{margin:0;background:linear-gradient(135deg, #FAF5EE 0%, #F5EAE0 100%);color:var(--ink);font-family:'Inter',sans-serif;}
   .mono{font-family:'JetBrains Mono',monospace;}
 
   .app{display:grid;grid-template-columns:230px 1fr;width:100%;min-height:100vh;margin:0;}
 
   /* SIDEBAR */
-  .sidebar{background:var(--pine-deep);color:#EFF3F0;padding:28px 20px;display:flex;flex-direction:column;gap:26px;}
+  .sidebar{background:linear-gradient(180deg, #3A0353 0%, #2A023D 100%);color:#F8EBFB;padding:28px 20px;display:flex;flex-direction:column;gap:26px;border-right:2px solid #F59E51;}
   .brand{display:flex;align-items:center;gap:10px;}
-  .brand-mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(160deg,#6A5ACD,#483D8B);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:600;font-size:17px;}
-  .brand-name{font-family:'Fraunces',serif;font-size:17px;font-weight:600;}
-  .brand-sub{font-size:11px;color:#9FB6AB;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;}
+  .brand-mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg, #F59E51, #F8D299);color:#3A0353;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:800;font-size:19px;flex-shrink:0;box-shadow:0 3px 10px rgba(245,158,81,0.4);}
+  .brand-name{font-family:'Fraunces',serif;font-size:18px;font-weight:700;color:#FFFFFF;}
+  .brand-sub{font-size:11px;color:#F59E51;font-family:'JetBrains Mono',monospace;letter-spacing:.8px;font-weight:700;}
 
-  nav{display:flex;flex-direction:column;gap:3px;}
-  nav a{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:9px;color:#D7E4DE;text-decoration:none;font-size:13.5px;font-weight:500;}
+  nav{display:flex;flex-direction:column;gap:4px;}
+  nav a{display:flex;align-items:center;gap:11px;padding:10px 14px;border-radius:10px;color:#EAD5F0;text-decoration:none;font-size:13.5px;font-weight:600;transition:all 0.15s ease;}
   nav a svg{width:16px;height:16px;flex-shrink:0;}
-  nav a.active{background:#EFF3F0;color:var(--pine-deep);}
-  nav a:not(.active):hover{background:rgba(255,255,255,.08);}
+  nav a.active{background:linear-gradient(135deg, #F59E51, #F8D299);color:#20042E;font-weight:700;box-shadow:0 4px 12px rgba(245,158,81,0.35);}
+  nav a:not(.active):hover{background:rgba(245,158,81,0.18);color:#F8D299;}
   .sidebar-foot{margin-top:auto;}
-  .help-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:var(--radius);padding:14px;font-size:12.5px;color:#C7DACF;}
-  .help-card b{display:block;font-family:'Fraunces',serif;font-size:14px;color:#EFF3F0;margin-bottom:4px;}
+  .help-card{background:rgba(245,158,81,0.12);border:1px solid rgba(245,158,81,0.3);border-radius:var(--radius);padding:14px;font-size:12.5px;color:#FCE6CE;}
+  .help-card b{display:block;font-family:'Fraunces',serif;font-size:14px;color:#F59E51;margin-bottom:4px;}
 
   /* MAIN */
   main{padding:24px 26px;}
@@ -135,17 +136,18 @@
   <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="brand">
-      <div class="brand-mark">C</div>
+      <div class="brand-mark">B</div>
       <div>
-        <div class="brand-name">Carewell</div>
+        <div class="brand-name">Beacon AI</div>
         <div class="brand-sub">CARETAKER PORTAL</div>
       </div>
     </div>
 
     <nav>
-      <a href="/caretaker-dashboard" class="active" id="navOverviewBtn" onclick="switchCaretakerTab('overview'); return false;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Overview</span></a>
+      <a href="#sec-overview" class="active" id="navOverviewBtn" onclick="switchCaretakerTab('overview', event); return false;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg><span>Overview</span></a>
       <a href="/doctor-caretaker-list"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Directory</span></a>
-      <a href="#sec-patients" id="navPatientsBtn" onclick="switchCaretakerTab('patients'); return false;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><span>Patients List</span></a>
+      <a href="/caretaker-appointments" id="navAppointmentsBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg><span>Appointments</span></a>
+      <a href="#sec-patients" id="navPatientsBtn" onclick="switchCaretakerTab('patients', event); return false;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg><span>Patients List</span></a>
       <a href="/app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><span>Voice AI Engine</span></a>
       <a href="#" onclick="localStorage.clear(); window.location.href='/login';"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg><span>Logout</span></a>
     </nav>
@@ -182,6 +184,15 @@
                 <div>
                   <div class="p-name"><span id="cName">Loading profile...</span> <span class="p-code-badge" id="cCode">CAR-000000</span></div>
                   <div class="p-condition" id="cHours">Available 08:00 AM - 08:00 PM</div>
+                  <div style="margin-top:8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                    <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;">Today's Availability:</span>
+                    <select id="quickCaretakerAvailability" onchange="updateCaretakerQuickAvailability()" style="padding:5px 10px;border-radius:8px;border:1.5px solid var(--line);font-size:12px;font-weight:600;background:var(--paper);color:var(--ink);cursor:pointer;">
+                      <option value="Active Today">🟢 Active Today</option>
+                      <option value="On Leave Today">🔴 On Leave Today</option>
+                      <option value="On Break">🟡 On Break</option>
+                      <option value="Off Duty">⚪ Off Duty</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -252,6 +263,31 @@
               <div class="empty-box">No patients currently under your care.</div>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- APPOINTMENTS TAB (BELOW DIRECTORY) -->
+    <div id="sec-appointments" style="display:none;">
+      <div class="section-box">
+        <div class="section-head" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+          <div>
+            <h2 style="margin:0;">Doctor Appointments Schedule</h2>
+            <div style="font-size:12px;color:var(--muted);margin-top:2px;">View all doctor appointment details: Today, Upcoming, and Past visits</div>
+          </div>
+          <a href="/doctor-caretaker-list" class="btn-action" style="padding:6px 14px;font-size:12px;text-decoration:none;display:inline-flex;align-items:center;gap:4px;">➕ Book Doctor Visit</a>
+        </div>
+
+        <!-- Appointment Category Sub-Tabs (Today, Upcoming, Past, All) -->
+        <div style="display:flex;gap:8px;margin-bottom:14px;border-bottom:1px solid var(--line);padding-bottom:12px;flex-wrap:wrap;align-items:center;">
+          <button id="secApptTabToday" onclick="switchPersonalApptTab('today')" style="background:linear-gradient(135deg, #F59E51, #F8D299);color:#20042E;border:none;padding:5px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;">Today (0)</button>
+          <button id="secApptTabUpcoming" onclick="switchPersonalApptTab('upcoming')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Upcoming (0)</button>
+          <button id="secApptTabPast" onclick="switchPersonalApptTab('past')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">Past (0)</button>
+          <button id="secApptTabAll" onclick="switchPersonalApptTab('all')" style="background:var(--paper);color:var(--ink);border:1px solid var(--line);padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;">All Appointments (0)</button>
+        </div>
+
+        <div id="personalAppointmentsContainer">
+          <div class="empty-box">Loading doctor appointments...</div>
         </div>
       </div>
     </div>
@@ -535,6 +571,10 @@ async function loadCaretakerProfile(){
       document.getElementById('cHours').textContent = profileData.available_hours || '08:00 AM - 08:00 PM';
       document.getElementById('cGender').textContent = profileData.gender || 'Not provided';
 
+      if(profileData.availability_status && document.getElementById('quickCaretakerAvailability')){
+        document.getElementById('quickCaretakerAvailability').value = profileData.availability_status;
+      }
+
       if(profileData.profile_picture){
         document.getElementById('avatarContent').innerHTML = `<img src="${profileData.profile_picture}" style="width:100%;height:100%;object-fit:cover;image-rendering:-webkit-optimize-contrast;" />`;
       }
@@ -550,16 +590,176 @@ async function loadCaretakerProfile(){
         } catch(e){}
       }
     } else {
-      let detail = 'Your account no longer exists or has been deleted by Admin. Please sign up to create a new profile.';
-      try {
-        const err = await res.json();
-        if (err && err.detail) detail = err.detail;
-      } catch(e){}
-      localStorage.clear();
-      alert(detail);
-      window.location.href = '/login';
+      console.log('Failed to fetch caretaker profile:', res.status);
     }
   } catch(e){ console.log(e); }
+}
+
+async function updateCaretakerQuickAvailability(){
+  const val = document.getElementById('quickCaretakerAvailability').value;
+  try {
+    const res = await fetch('/api/auth/caretaker/profile', {
+      method: 'PUT',
+      headers: getAuthHeader(),
+      body: JSON.stringify({ availability_status: val })
+    });
+    if(res.ok){
+      profileData.availability_status = val;
+      alert('Availability status updated to: ' + val);
+    }
+  } catch(e){ console.log(e); }
+}
+
+function switchCaretakerTab(tab, event){
+  if (event) {
+    try { event.preventDefault(); } catch(e){}
+  }
+  const overviewSec = document.getElementById('sec-overview');
+  const appointmentsSec = document.getElementById('sec-appointments');
+  const patientsSec = document.getElementById('sec-patients');
+
+  const navOverviewBtn = document.getElementById('navOverviewBtn');
+  const navAppointmentsBtn = document.getElementById('navAppointmentsBtn');
+  const navPatientsBtn = document.getElementById('navPatientsBtn');
+
+  if(overviewSec) overviewSec.style.display = (tab === 'overview' ? 'block' : 'none');
+  if(appointmentsSec) appointmentsSec.style.display = (tab === 'appointments' ? 'block' : 'none');
+  if(patientsSec) patientsSec.style.display = (tab === 'patients' ? 'block' : 'none');
+
+  if(navOverviewBtn) navOverviewBtn.classList.toggle('active', tab === 'overview');
+  if(navAppointmentsBtn) navAppointmentsBtn.classList.toggle('active', tab === 'appointments');
+  if(navPatientsBtn) navPatientsBtn.classList.toggle('active', tab === 'patients');
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  if(tab === 'appointments'){
+    loadCaretakerPersonalAppointments();
+  }
+}
+
+let caretakerPersonalAppointments = [];
+let activePersonalApptTab = 'today';
+
+async function loadCaretakerPersonalAppointments(){
+  try {
+    const res = await fetch('/api/auth/patient/appointments', { headers: getAuthHeader() });
+    if(res.ok){
+      const apts = await res.json();
+      caretakerPersonalAppointments = apts || [];
+      renderCaretakerPersonalAppointments();
+    }
+  } catch(e){ console.log(e); }
+}
+
+function switchPersonalApptTab(tab){
+  activePersonalApptTab = tab;
+  ['today', 'upcoming', 'past', 'all'].forEach(t => {
+    const btn = document.getElementById('secApptTab' + t.charAt(0).toUpperCase() + t.slice(1));
+    if(btn){
+      if(t === tab){
+        btn.style.background = 'linear-gradient(135deg, #F59E51, #F8D299)';
+        btn.style.color = '#20042E';
+        btn.style.border = 'none';
+        btn.style.fontWeight = '700';
+      } else {
+        btn.style.background = 'var(--paper)';
+        btn.style.color = 'var(--ink)';
+        btn.style.border = '1px solid var(--line)';
+        btn.style.fontWeight = '600';
+      }
+    }
+  });
+  renderCaretakerPersonalAppointments();
+}
+
+function renderCaretakerPersonalAppointments(){
+  const container = document.getElementById('personalAppointmentsContainer');
+  if(!container) return;
+
+  const todayStr = getTodayString();
+
+  const countToday = caretakerPersonalAppointments.filter(a => a.appointment_date === todayStr).length;
+  const countUpcoming = caretakerPersonalAppointments.filter(a => a.appointment_date > todayStr && !['completed', 'missed', 'rejected', 'cancelled', 'canceled', 'cancelled_by_doctor'].includes((a.status||'').toLowerCase())).length;
+  const countPast = caretakerPersonalAppointments.filter(a => a.appointment_date < todayStr || ['completed', 'missed', 'rejected', 'cancelled', 'canceled', 'cancelled_by_doctor'].includes((a.status||'').toLowerCase())).length;
+  const countAll = caretakerPersonalAppointments.length;
+
+  const btnToday = document.getElementById('secApptTabToday');
+  const btnUpcoming = document.getElementById('secApptTabUpcoming');
+  const btnPast = document.getElementById('secApptTabPast');
+  const btnAll = document.getElementById('secApptTabAll');
+
+  if(btnToday) btnToday.textContent = `Today (${countToday})`;
+  if(btnUpcoming) btnUpcoming.textContent = `Upcoming (${countUpcoming})`;
+  if(btnPast) btnPast.textContent = `Past (${countPast})`;
+  if(btnAll) btnAll.textContent = `All Appointments (${countAll})`;
+
+  let filtered = caretakerPersonalAppointments.filter(a => {
+    const st = (a.status || 'pending').toLowerCase();
+    if(activePersonalApptTab === 'today'){
+      return a.appointment_date === todayStr;
+    } else if(activePersonalApptTab === 'upcoming'){
+      return a.appointment_date > todayStr && !['completed', 'missed', 'rejected', 'cancelled', 'canceled', 'cancelled_by_doctor'].includes(st);
+    } else if(activePersonalApptTab === 'past'){
+      return a.appointment_date < todayStr || ['completed', 'missed', 'rejected', 'cancelled', 'canceled', 'cancelled_by_doctor'].includes(st);
+    }
+    return true;
+  });
+
+  if(!filtered || filtered.length === 0){
+    container.innerHTML = `<div class="empty-box">No ${activePersonalApptTab} doctor appointments found.</div>`;
+    return;
+  }
+
+  container.innerHTML = filtered.map(a => {
+    const st = (a.status || 'pending').toLowerCase();
+    let bg = '#FEF3C7', fg = '#92400E';
+    if (st === 'accepted') { bg = '#D1FAE5'; fg = '#065F46'; }
+    else if (st === 'completed') { bg = '#DBEAFE'; fg = '#1E40AF'; }
+    else if (st === 'rejected' || st.startsWith('cancelled')) { bg = '#FEE2E2'; fg = '#991B1B'; }
+    else if (st === 'missed') { bg = '#FFEDD5'; fg = '#9A3412'; }
+
+    const isSelfVisit = a.booked_by === 'caretaker' || !a.patient || a.patient == profileData.user_id;
+    const visitTypeBadge = isSelfVisit ? 
+      `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:#FFF2E5;color:#3A0353;border:1px solid #F8D299;margin-left:6px;">👤 PERSONAL VISIT</span>` :
+      `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;background:#F3E8F5;color:#804A8A;border:1px solid #E6D5C3;margin-left:6px;">🩺 PATIENT VISIT: ${a.patient_name || 'Patient'}</span>`;
+
+    return `
+      <div style="padding:14px;border:1px solid var(--line);border-radius:12px;margin-bottom:12px;background:var(--surface);box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-weight:700;font-size:15px;color:var(--ink);">Dr. ${a.doctor_name || 'Doctor'} ${visitTypeBadge}</div>
+            <div style="font-size:12.5px;color:var(--muted);margin-top:4px;">Date: <b>${a.appointment_date}</b> · Slot: <b>${a.time_slot || '10:00 AM'}</b> · Reason: ${a.reason || 'Consultation'}</div>
+            <div style="font-size:12px;color:var(--pine-deep);margin-top:4px;font-weight:600;">Mode: ${a.appointment_type === 'online' ? '🟢 Online Video Call' : '📍 Offline Clinic Visit'}</div>
+          </div>
+          <span style="font-size:11px;font-weight:800;padding:4px 12px;border-radius:12px;background:${bg};color:${fg};text-transform:uppercase;">${st.replace(/_/g, ' ')}</span>
+        </div>
+
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding-top:10px;border-top:1px dashed var(--line);">
+          ${a.prescription_pdf ? `
+            <button onclick="openPrescriptionPDF('${a.prescription_pdf.replace(/'/g, "\\'")}', '${(a.prescription_name || 'Prescription').replace(/'/g, "\\'")}')" class="btn-sm" style="display:inline-flex;align-items:center;gap:4px;background:linear-gradient(135deg, #F59E51, #F8D299);color:#3A0353;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer;">
+              📄 View Prescription
+            </button>
+          ` : ''}
+
+          ${(a.appointment_type === 'online' && a.status === 'accepted') ? (
+            a.is_call_active ? `
+              <button onclick="joinVideoCall(${a.id})" class="btn-sm" style="display:inline-flex;align-items:center;gap:4px;background:#2563EB;color:white;border:none;padding:6px 12px;border-radius:6px;font-size:11.5px;font-weight:700;cursor:pointer;">
+                🎥 Join Video Call
+              </button>
+            ` : `
+              <span style="font-size:11.5px;color:var(--muted);font-style:italic;">Waiting for doctor to initiate call...</span>
+            `
+          ) : ''}
+
+          ${a.status === 'pending' ? `
+            <button onclick="cancelPatientAppointment(${a.id})" class="btn-sm" style="background:var(--brick);color:#fff;border:none;padding:5px 12px;border-radius:6px;font-size:11.5px;font-weight:600;cursor:pointer;">
+              ✕ Cancel Booking
+            </button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function getStatusBadgeHtml(st){
@@ -1365,11 +1565,11 @@ async function viewPatientModal(p){
           </div>
         </div>
 
-        <!-- Patient Doctor Appointments History -->
+        <!-- Patient Doctor Appointments (Active Only) -->
         <div style="margin-top:16px;">
-          <b style="color:var(--pine-deep);display:block;margin-bottom:8px;font-size:13.5px;">🗓️ Patient Doctor Appointments:</b>
+          <b style="color:var(--pine-deep);display:block;margin-bottom:8px;font-size:13.5px;">🗓️ Active Patient Doctor Appointments:</b>
           <div id="ctPatAptsContainer_${p.patient_id}">
-            <div class="empty-box" style="font-size:12px;">Loading patient doctor appointments...</div>
+            <div class="empty-box" style="font-size:12px;">Loading active patient doctor appointments...</div>
           </div>
         </div>
 
@@ -1545,11 +1745,16 @@ async function loadCaretakerPatientApts(patientId){
     const res = await fetch('/api/auth/patient/appointments', { headers: getAuthHeader() });
     if(res.ok){
       const apts = await res.json();
-      const patApts = (apts || []).filter(a => a.patient == patientId || a.patient_id == patientId);
-      if(!patApts || patApts.length === 0){
-        container.innerHTML = '<div class="empty-box" style="font-size:12px;">No doctor appointments booked yet.</div>';
+      const activeApts = (apts || []).filter(a => {
+        const isMatch = (a.patient == patientId || a.patient_id == patientId);
+        const st = (a.status || 'pending').toLowerCase();
+        const isInactive = ['completed', 'missed', 'rejected', 'cancelled', 'canceled', 'past'].includes(st);
+        return isMatch && !isInactive;
+      });
+      if(!activeApts || activeApts.length === 0){
+        container.innerHTML = '<div class="empty-box" style="font-size:12px;">No active doctor appointments.</div>';
       } else {
-        container.innerHTML = patApts.map(a => {
+        container.innerHTML = activeApts.map(a => {
           const st = (a.status || 'pending').toLowerCase();
           let bg = '#FEF3C7', fg = '#92400E';
           if (st === 'accepted') { bg = '#D1FAE5'; fg = '#065F46'; }
@@ -1869,6 +2074,11 @@ async function pollCaretakerAppointments(){
     const res = await fetch('/api/auth/patient/appointments', { headers: getAuthHeader() });
     if(res.ok){
       const apts = await res.json();
+      caretakerPersonalAppointments = apts || [];
+      const apptSec = document.getElementById('sec-appointments');
+      if(apptSec && apptSec.style.display !== 'none'){
+        renderCaretakerPersonalAppointments();
+      }
       (apts || []).forEach(a => {
         if(a.appointment_type === 'online') {
           if(a.is_call_active) {
@@ -1885,13 +2095,51 @@ async function pollCaretakerAppointments(){
   } catch(e){ console.log(e); }
 }
 
+let _lastCaretakerProfSig = '';
+
+async function pollCaretakerProfileSilent() {
+  try {
+    const resProf = await fetch('/api/auth/caretaker/profile', { headers: getAuthHeader() });
+    if (resProf.ok) {
+      const prof = await resProf.json();
+      const sig = JSON.stringify(prof);
+      if (sig !== _lastCaretakerProfSig) {
+        _lastCaretakerProfSig = sig;
+        loadCaretakerProfile();
+      }
+    }
+  } catch(e) {}
+}
+
+function initCaretakerPage(){
+  loadCaretakerProfile();
+  loadCaretakerRequests();
+  loadCaretakerPersonalAppointments();
+
+  const path = window.location.pathname;
+  const hash = window.location.hash;
+  const urlParams = new URLSearchParams(window.location.search);
+  const tabParam = urlParams.get('tab');
+
+  if (path.includes('caretaker-appointments') || hash === '#sec-appointments' || tabParam === 'appointments') {
+    switchCaretakerTab('appointments');
+  } else if (hash === '#sec-patients' || tabParam === 'patients') {
+    switchCaretakerTab('patients');
+  } else {
+    switchCaretakerTab('overview');
+  }
+}
+
 function startEmergencyPolling(){
   pollEmergencyAlerts();
-  emergencyPollTimer = setInterval(pollEmergencyAlerts, 15000);
-  
-  // Poll appointments for active call invitations
   pollCaretakerAppointments();
-  setInterval(pollCaretakerAppointments, 5000);
+  pollCaretakerProfileSilent();
+
+  setInterval(() => {
+    pollEmergencyAlerts();
+    pollCaretakerAppointments();
+    pollCaretakerProfileSilent();
+  }, 2000);
 }
 
 if (document.readyState === 'loading') {
@@ -1900,11 +2148,6 @@ if (document.readyState === 'loading') {
   initCaretakerPage();
   startEmergencyPolling();
 }
-
-// Silent background refresh every 2 seconds (no visible page reload)
-setInterval(() => {
-  initCaretakerPage();
-}, 2000);
 </script>
 </body>
 </html>

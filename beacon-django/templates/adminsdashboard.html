@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Carewell — Admin Console</title>
+<title>Beacon AI — Admin Console</title>
 <script>
   (function(){
     const token = localStorage.getItem('beacon_token') || localStorage.getItem('access_token');
@@ -26,33 +26,34 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --ink:#1E2A22; --paper:#EAF0EC; --surface:#FFFFFF; --line:#D7DFD9;
-    --pine:#33604F; --pine-deep:#25473A; --brick:#AE4436; --brick-soft:#F3DFDA;
-    --slate:#4A6E8C; --slate-soft:#DCE7EF; --muted:#6E7D75; --amber:#B9873A; --amber-soft:#F1E3CB;
+    --ink:#20042E; --paper:#FAF5EE; --surface:#FFFFFF; --line:#E6D5C3;
+    --pine:#804A8A; --pine-deep:#3A0353; --pine-soft:#F3E8F5; --brick:#C24141; --brick-soft:#FCEAEA;
+    --slate:#F59E51; --slate-soft:#FFF2E5; --muted:#6C5275; --amber:#F59E51; --amber-soft:#FFF2E5;
+    --amber-gold:#F8D299; --gold-deep:#D97E30;
     --radius:14px;
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
+  body{margin:0;background:linear-gradient(135deg, #FAF5EE 0%, #F5EAE0 100%);color:var(--ink);font-family:'Inter',sans-serif;}
   .mono{font-family:'JetBrains Mono',monospace;}
   button{font-family:inherit;}
   .app{display:grid;grid-template-columns:230px 1fr;width:100%;min-height:100vh;margin:0;}
 
   /* SIDEBAR */
-  .sidebar{background:var(--pine-deep);color:#EFF3F0;padding:28px 20px;display:flex;flex-direction:column;gap:30px;}
+  .sidebar{background:linear-gradient(180deg, #3A0353 0%, #2A023D 100%);color:#F8EBFB;padding:28px 20px;display:flex;flex-direction:column;gap:30px;border-right:2px solid #F59E51;}
   .brand{display:flex;align-items:center;gap:10px;}
-  .brand-mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(160deg,#4C8A72,#2C5344);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:600;font-size:17px;flex-shrink:0;}
-  .brand-name{font-family:'Fraunces',serif;font-size:17px;font-weight:600;}
-  .brand-sub{font-size:11px;color:#9FB6AB;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;}
-  nav{display:flex;flex-direction:column;gap:3px;}
-  nav button{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:99px;color:#D7E4DE;font-size:13.5px;font-weight:500;border:none;background:transparent;cursor:pointer;text-align:left;width:100%;position:relative;}
+  .brand-mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg, #F59E51, #F8D299);color:#3A0353;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:800;font-size:19px;flex-shrink:0;box-shadow:0 3px 10px rgba(245,158,81,0.4);}
+  .brand-name{font-family:'Fraunces',serif;font-size:18px;font-weight:700;color:#FFFFFF;}
+  .brand-sub{font-size:11px;color:#F59E51;font-family:'JetBrains Mono',monospace;letter-spacing:.8px;font-weight:700;}
+  nav{display:flex;flex-direction:column;gap:4px;}
+  nav button{display:flex;align-items:center;gap:11px;padding:10px 14px;border-radius:10px;color:#EAD5F0;font-size:13.5px;font-weight:600;border:none;background:transparent;cursor:pointer;text-align:left;width:100%;position:relative;transition:all 0.15s ease;}
   nav button svg{width:16px;height:16px;flex-shrink:0;}
-  nav button.active{background:#EFF3F0;color:var(--pine-deep);}
-  nav button:not(.active):hover{background:rgba(255,255,255,.08);}
-  .nav-count{margin-left:auto;font-size:10.5px;font-family:'JetBrains Mono',monospace;color:#9FB6AB;}
-  nav button.active .nav-count{color:var(--muted);}
+  nav button.active{background:linear-gradient(135deg, #F59E51, #F8D299);color:#20042E;font-weight:700;box-shadow:0 4px 12px rgba(245,158,81,0.35);}
+  nav button:not(.active):hover{background:rgba(245,158,81,0.18);color:#F8D299;}
+  .nav-count{margin-left:auto;font-size:10.5px;font-family:'JetBrains Mono',monospace;color:#F59E51;}
+  nav button.active .nav-count{color:#20042E;font-weight:800;}
   .sidebar-foot{margin-top:auto;}
-  .help-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:var(--radius);padding:14px;font-size:12.5px;color:#C7DACF;}
-  .help-card b{display:block;font-family:'Fraunces',serif;font-size:14px;color:#EFF3F0;margin-bottom:4px;}
+  .help-card{background:rgba(245,158,81,0.12);border:1px solid rgba(245,158,81,0.3);border-radius:var(--radius);padding:14px;font-size:12.5px;color:#FCE6CE;}
+  .help-card b{display:block;font-family:'Fraunces',serif;font-size:14px;color:#F59E51;margin-bottom:4px;}
 
   /* MAIN */
   main{padding:24px 26px;}
@@ -201,8 +202,8 @@
   <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="brand" style="cursor:pointer;" onclick="switchSection('overview')">
-      <div class="brand-mark">C</div>
-      <div><div class="brand-name">Carewell</div><div class="brand-sub">ADMIN CONSOLE</div></div>
+      <div class="brand-mark">B</div>
+      <div><div class="brand-name">Beacon AI</div><div class="brand-sub">ADMIN CONSOLE</div></div>
     </div>
     <nav>
       <button data-sec="patients" onclick="switchSection('patients')">
@@ -774,6 +775,34 @@ function showToast(msg){
   window._toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
 }
 
+let _lastAdminSig = '';
+
+async function fetchAdminData(force = false) {
+  try {
+    const uRes = await fetch('/api/auth/admin/users', { headers: getAuthHeader() });
+    if (uRes.ok) {
+      const uData = await uRes.json();
+      const sig = JSON.stringify(uData);
+
+      if (force || sig !== _lastAdminSig) {
+        _lastAdminSig = sig;
+        allUsers = uData;
+        renderOverview();
+        renderPatients();
+        renderDoctors();
+        renderCaretakers();
+      }
+    }
+  } catch(e) {}
+}
+
+async function pollAdminSilent() {
+  const modalBackdrop = document.getElementById('modalBackdrop');
+  if (modalBackdrop && modalBackdrop.classList.contains('open')) return;
+  if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT')) return;
+  await fetchAdminData(false);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const userRaw = localStorage.getItem('beacon_user');
   if(userRaw){
@@ -783,6 +812,7 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch(e){}
   }
   fetchAdminData();
+  setInterval(pollAdminSilent, 2000);
 });
 </script>
 </body>

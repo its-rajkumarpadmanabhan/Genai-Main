@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Carewell — Patient Profile</title>
+<title>Beacon AI — Patient Profile</title>
 <script>
   (function(){
     const token = localStorage.getItem('beacon_token') || localStorage.getItem('access_token');
@@ -26,30 +26,31 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --ink:#2D1800; --paper:#FFF8F0; --surface:#FFFFFF; --line:#FFE0B2;
-    --pine:#FF8C00; --pine-deep:#D96B00; --pine-soft:#FFF3E0; --brick:#AE4436; --brick-soft:#F3DFDA;
-    --slate:#4A6E8C; --slate-soft:#DCE7EF; --muted:#786452; --amber:#B9873A; --amber-soft:#F1E3CB;
+    --ink:#20042E; --paper:#FAF5EE; --surface:#FFFFFF; --line:#E6D5C3;
+    --pine:#804A8A; --pine-deep:#3A0353; --pine-soft:#F3E8F5; --brick:#C24141; --brick-soft:#FCEAEA;
+    --slate:#F59E51; --slate-soft:#FFF2E5; --muted:#6C5275; --amber:#F59E51; --amber-soft:#FFF2E5;
+    --amber-gold:#F8D299; --gold-deep:#D97E30;
     --radius:14px;
   }
   *{box-sizing:border-box;}
-  body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;}
+  body{margin:0;background:linear-gradient(135deg, #FAF5EE 0%, #F5EAE0 100%);color:var(--ink);font-family:'Inter',sans-serif;}
   .mono{font-family:'JetBrains Mono',monospace;}
 
   /* APP SHELL */
   .app{display:grid;grid-template-columns:230px 1fr;width:100%;min-height:100vh;margin:0;}
-  .sidebar{background:var(--pine-deep);color:#EFF3F0;padding:28px 20px;display:flex;flex-direction:column;gap:26px;}
+  .sidebar{background:linear-gradient(180deg, #3A0353 0%, #2A023D 100%);color:#F8EBFB;padding:28px 20px;display:flex;flex-direction:column;gap:26px;border-right:2px solid #F59E51;}
   .brand{display:flex;align-items:center;gap:10px;}
-  .brand-mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(160deg,#FF8C00,#D96B00);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:600;font-size:17px;flex-shrink:0;}
-  .brand-name{font-family:'Fraunces',serif;font-size:17px;font-weight:600;}
-  .brand-sub{font-size:11px;color:#9FB6AB;font-family:'JetBrains Mono',monospace;letter-spacing:.5px;}
-  nav{display:flex;flex-direction:column;gap:3px;}
-  nav a{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:9px;color:#D7E4DE;text-decoration:none;font-size:13.5px;font-weight:500;position:relative;}
+  .brand-mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg, #F59E51, #F8D299);color:#3A0353;display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:800;font-size:19px;flex-shrink:0;box-shadow:0 3px 10px rgba(245,158,81,0.4);}
+  .brand-name{font-family:'Fraunces',serif;font-size:18px;font-weight:700;color:#FFFFFF;}
+  .brand-sub{font-size:11px;color:#F59E51;font-family:'JetBrains Mono',monospace;letter-spacing:.8px;font-weight:700;}
+  nav{display:flex;flex-direction:column;gap:4px;}
+  nav a{display:flex;align-items:center;gap:11px;padding:10px 14px;border-radius:10px;color:#EAD5F0;text-decoration:none;font-size:13.5px;font-weight:600;position:relative;transition:all 0.15s ease;}
   nav a svg{width:16px;height:16px;flex-shrink:0;}
-  nav a.active{background:#EFF3F0;color:var(--pine-deep);}
-  nav a:not(.active):hover{background:rgba(255,255,255,.08);}
+  nav a.active{background:linear-gradient(135deg, #F59E51, #F8D299);color:#20042E;font-weight:700;box-shadow:0 4px 12px rgba(245,158,81,0.35);}
+  nav a:not(.active):hover{background:rgba(245,158,81,0.18);color:#F8D299;}
   .sidebar-foot{margin-top:auto;}
-  .help-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:var(--radius);padding:14px;font-size:12.5px;color:#C7DACF;}
-  .help-card b{display:block;font-family:'Fraunces',serif;font-size:14px;color:#EFF3F0;margin-bottom:4px;}
+  .help-card{background:rgba(245,158,81,0.12);border:1px solid rgba(245,158,81,0.3);border-radius:var(--radius);padding:14px;font-size:12.5px;color:#FCE6CE;}
+  .help-card b{display:block;font-family:'Fraunces',serif;font-size:14px;color:#F59E51;margin-bottom:4px;}
 
   /* MAIN */
   main{padding:24px 26px;}
@@ -57,8 +58,8 @@
   .breadcrumb{font-family:'Fraunces',serif;font-size:19px;font-weight:600;color:var(--muted);}
   .breadcrumb span{color:var(--ink);}
   .topbar-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
-  .btn-action{display:inline-flex;align-items:center;gap:7px;background:var(--pine-deep);color:#EFF3F0;border:none;border-radius:9px;padding:9px 14px;font-size:12.5px;font-weight:600;cursor:pointer;text-decoration:none;}
-  .btn-action.secondary{background:var(--surface);color:var(--ink);border:1px solid var(--line);}
+  .btn-action{display:inline-flex;align-items:center;gap:7px;background:linear-gradient(135deg, #F59E51, #F8D299);color:#20042E;border:1px solid #E2B276;border-radius:9px;padding:9px 14px;font-size:12.5px;font-weight:700;cursor:pointer;text-decoration:none;box-shadow:0 2px 6px rgba(245,158,81,0.25);}
+  .btn-action.secondary{background:#804A8A;color:#FFFFFF;border:none;}
   .btn-action.danger{background:var(--brick);color:#fff;}
   .btn-action svg{width:14px;height:14px;}
 
@@ -173,8 +174,8 @@
   <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="brand">
-      <div class="brand-mark">C</div>
-      <div><div class="brand-name">Carewell</div><div class="brand-sub">PATIENT PORTAL</div></div>
+      <div class="brand-mark">B</div>
+      <div><div class="brand-name">Beacon AI</div><div class="brand-sub">PATIENT PORTAL</div></div>
     </div>
     <nav>
       <a href="/patient-profile" class="active" id="navProfileBtn" onclick="switchPatientTab('profile'); return false;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>My Profile</span></a>
@@ -558,14 +559,7 @@ async function loadPatientProfile(){
         } catch(e){}
       }
     } else {
-      let detail = 'Your account no longer exists or has been deleted by Admin. Please sign up to create a new profile.';
-      try {
-        const err = await res.json();
-        if (err && err.detail) detail = err.detail;
-      } catch(e){}
-      localStorage.clear();
-      alert(detail);
-      window.location.href = '/login';
+      console.log('Failed to fetch patient profile:', res.status);
     }
   } catch(e){ console.log(e); }
 }
@@ -1073,35 +1067,56 @@ function renderPatientAppointments(){
   `).join('');
 }
 
+function renderMedicalDocumentsList(docs) {
+  const badge = document.getElementById('docCountBadge') || document.getElementById('docTotalBadge');
+  if(badge) badge.textContent = `${docs ? docs.length : 0} Files`;
+
+  const container = document.getElementById('medicalDocsList') || document.getElementById('docContainer') || document.getElementById('documentsContainer');
+  if(!container) return;
+
+  if(!docs || docs.length === 0){
+    container.innerHTML = '<div class="empty-box" style="padding:12px;font-size:12px;">No medical documents uploaded.</div>';
+    return;
+  }
+
+  container.innerHTML = docs.map(d => {
+    const fileSource = d.file_data && d.file_data.startsWith('data:') ? d.file_data : 'data:text/plain;charset=utf-8,' + encodeURIComponent(d.title + ' - ' + (d.notes||'Medical Record'));
+    const safeTitle = (d.title || 'Document').replace(/'/g, "\\'");
+    const dateStr = d.uploaded_at ? new Date(d.uploaded_at).toLocaleDateString() : '';
+    
+    // Format clean subtitle without repeating file title
+    let subText = dateStr ? `Uploaded ${dateStr}` : 'Medical Document';
+    if (d.notes && d.notes.trim() !== '' && d.notes !== d.title && d.notes !== d.file_name) {
+      subText = `${d.notes}${dateStr ? ' · ' + dateStr : ''}`;
+    }
+
+    return `
+      <div class="doc-row" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:10px;margin-bottom:6px;background:var(--paper);transition:all 0.15s ease;">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1;">
+          <div style="width:30px;height:30px;border-radius:7px;background:var(--pine-soft);color:var(--pine-deep);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M13 2v7h7"/></svg>
+          </div>
+          <div style="min-width:0;flex:1;">
+            <div style="font-weight:700;font-size:12px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${d.title}">${d.title}</div>
+            <div style="font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;">${subText}</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
+          <a href="${fileSource}" download="${d.file_name || d.title || 'medical_record.txt'}" class="btn-action secondary" style="padding:3px 8px;font-size:11px;font-weight:600;border-radius:6px;text-decoration:none;line-height:1.3;" title="Download File">Download</a>
+          <button onclick="deletePatientDocument(${d.id}, '${safeTitle}')" title="Delete Document" style="padding:3px 6px;font-size:11px;background:#FEE2E2;color:#DC2626;border:none;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;line-height:1.3;">🗑</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 async function loadMedicalDocuments(){
   try {
     const res = await fetch('/api/auth/patient/documents', { headers: getAuthHeader() });
     if(res.ok){
       const docs = await res.json();
-      const badge = document.getElementById('docCountBadge') || document.getElementById('docTotalBadge');
-      if(badge) badge.textContent = `${docs ? docs.length : 0} Files`;
-      const container = document.getElementById('medicalDocsList') || document.getElementById('docContainer');
-      if(container){
-        if(!docs || docs.length === 0){
-          container.innerHTML = '<div class="empty-box" style="padding:14px;">No medical documents uploaded.</div>';
-        } else {
-          container.innerHTML = docs.map(d => `
-            <div class="doc-row" style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;background:var(--paper);">
-              <div style="display:flex;align-items:center;gap:10px;">
-                <div class="file-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M13 2v7h7"/></svg></div>
-                <div>
-                  <div class="file-name" style="font-weight:700;font-size:13px;">${d.title}</div>
-                  <div class="file-sub" style="font-size:11.5px;color:var(--muted);">${d.notes || d.file_name} · ${new Date(d.uploaded_at).toLocaleDateString()}</div>
-                </div>
-              </div>
-              <div style="display:flex;gap:6px;align-items:center;">
-                <a href="${d.file_data && d.file_data.startsWith('data:') ? d.file_data : 'data:text/plain;charset=utf-8,' + encodeURIComponent(d.title + ' - ' + (d.notes||'Medical Record'))}" download="${d.file_name || 'medical_record.txt'}" class="btn-action secondary" style="padding:4px 10px;font-size:11.5px;text-decoration:none;">Download</a>
-                <button class="btn-action danger" onclick="deletePatientDocument(${d.id}, '${d.title.replace(/'/g, "\\'")}')" title="Delete Document" style="padding:5px 9px;font-size:13px;background:var(--brick);color:#fff;border:none;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;">🗑</button>
-              </div>
-            </div>
-          `).join('');
-        }
-      }
+      _lastPatientDocsSig = JSON.stringify(docs);
+      renderMedicalDocumentsList(docs);
     }
   } catch(e){ console.log(e); }
 }
@@ -1431,29 +1446,118 @@ function renderCalendar() {
   }
 }
 
+let _lastPatientAlertsSig = '';
+let _lastPatientDocsSig = '';
+let _lastPatientProfileSig = '';
+let _lastPatientAptsSig = '';
+
+async function pollPatientSilent() {
+  try {
+    const resProf = await fetch('/api/auth/patient/profile', { headers: getAuthHeader() });
+    if (resProf.ok) {
+      const prof = await resProf.json();
+      const sig = JSON.stringify(prof);
+      if (sig !== _lastPatientProfileSig) {
+        _lastPatientProfileSig = sig;
+        loadPatientProfile();
+      }
+    }
+  } catch(e) {}
+
+  try {
+    const resApts = await fetch('/api/auth/patient/appointments', { headers: getAuthHeader() });
+    if (resApts.ok) {
+      const apts = await resApts.json();
+      const sig = JSON.stringify(apts);
+      if (sig !== _lastPatientAptsSig) {
+        _lastPatientAptsSig = sig;
+        loadPatientAppointments();
+      }
+    }
+  } catch(e) {}
+
+  try {
+    const resAlerts = await fetch('/api/auth/patient/emergency-alerts', { headers: getAuthHeader() });
+    if (resAlerts.ok) {
+      const alerts = await resAlerts.json();
+      const sig = JSON.stringify(alerts);
+      if (sig !== _lastPatientAlertsSig) {
+        _lastPatientAlertsSig = sig;
+        const container = document.getElementById('emergencyAlertsContainer');
+        if (container) {
+          if (!alerts || alerts.length === 0) {
+            container.innerHTML = '<div class="empty-box">No health concerns recorded yet. Use the Voice AI Engine to get medical guidance — records will appear here automatically.</div>';
+          } else {
+            container.innerHTML = alerts.map(a => {
+              let borderColor = 'var(--line)', bgColor = 'var(--paper)', icon = 'ℹ️', label = 'Medical Concern';
+              if(a.severity === 'critical'){
+                borderColor = '#EF4444'; bgColor = '#FEF2F2'; icon = '🚨'; label = 'CRITICAL EMERGENCY';
+              } else if(a.severity === 'urgent'){
+                borderColor = '#F59E0B'; bgColor = '#FFFBEB'; icon = '⚠️'; label = 'URGENT MEDICAL NEED';
+              } else if(a.severity === 'moderate'){
+                borderColor = '#3B82F6'; bgColor = '#EFF6FF'; icon = '💊'; label = 'MEDICAL CONCERN';
+              }
+              const dt = new Date(a.created_at);
+              const dateStr = dt.toLocaleDateString() + ' · ' + dt.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+              const locationBtn = (a.latitude && a.longitude) ?
+                `<a href="https://www.google.com/maps?q=${a.latitude},${a.longitude}" target="_blank" style="font-size:11px;color:var(--pine);font-weight:600;text-decoration:none;">📍 View Location</a>` : '';
+
+              return `
+                <div style="border-left:4px solid ${borderColor};background:${bgColor};border-radius:10px;padding:14px 16px;margin-bottom:10px;border:1px solid var(--line);border-left:4px solid ${borderColor};">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap;">
+                    <div>
+                      <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+                        <span style="font-size:14px;">${icon}</span>
+                        <span style="font-size:11.5px;font-weight:700;color:${borderColor};text-transform:uppercase;letter-spacing:0.5px;">${label}</span>
+                        <span style="font-size:11px;color:var(--muted);font-weight:500;">${a.detected_specialty || ''}</span>
+                      </div>
+                      <div style="font-size:13px;color:var(--ink);font-weight:600;line-height:1.45;">${a.condition_summary}</div>
+                    </div>
+                    <div style="text-align:right;flex-shrink:0;">
+                      <div style="font-size:11px;color:var(--muted);font-weight:500;">${dateStr}</div>
+                      ${locationBtn}
+                    </div>
+                  </div>
+                  <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--line);font-size:12px;color:var(--muted);line-height:1.5;">
+                    <b style="color:var(--pine-deep);">AI Advice:</b> ${a.ai_advice || 'No specific advice recorded.'}
+                  </div>
+                </div>
+              `;
+            }).join('');
+          }
+        }
+      }
+    }
+  } catch(e) {}
+
+  try {
+    const resDocs = await fetch('/api/auth/patient/documents', { headers: getAuthHeader() });
+    if (resDocs.ok) {
+      const docs = await resDocs.json();
+      const sig = JSON.stringify(docs);
+      if (sig !== _lastPatientDocsSig) {
+        _lastPatientDocsSig = sig;
+        renderMedicalDocumentsList(docs);
+      }
+    }
+  } catch(e) {}
+}
+
 function initPatientPage(){
   loadPatientProfile();
   loadMedicalDocuments();
-  loadPatientAppointments();
   loadEmergencyAlerts();
-  
-  // Poll appointments every 5 seconds for incoming video call notifications
-  setInterval(loadPatientAppointments, 5000);
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initPatientPage);
+  document.addEventListener('DOMContentLoaded', () => {
+    initPatientPage();
+    setInterval(pollPatientSilent, 2000);
+  });
 } else {
   initPatientPage();
+  setInterval(pollPatientSilent, 2000);
 }
-
-// Silent background refresh every 2 seconds (no visible page reload)
-setInterval(() => {
-  loadPatientProfile();
-  loadMedicalDocuments();
-  loadPatientAppointments();
-  loadEmergencyAlerts();
-}, 2000);
 </script>
 </body>
 </html>

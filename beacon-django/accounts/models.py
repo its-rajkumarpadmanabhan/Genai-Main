@@ -161,6 +161,7 @@ class CaretakerProfile(models.Model):
     consultation_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     available_hours = models.CharField(max_length=100, default='24/7 Available')
     phone_number = models.CharField(max_length=20, blank=True, null=True)
+    availability_status = models.CharField(max_length=30, default='Active Today')
     rating_avg = models.FloatField(default=5.0)
     reviews_count = models.IntegerField(default=0)
 

@@ -40,6 +40,8 @@ urlpatterns = [
     path('admin-dashboard.html', never_cache(TemplateView.as_view(template_name='admin-dashboard.html')), name='admin-dashboard'),
     path('caretaker-dashboard', never_cache(TemplateView.as_view(template_name='caretaker-dashboard.html')), name='caretaker-dashboard_clean'),
     path('caretaker-dashboard.html', never_cache(TemplateView.as_view(template_name='caretaker-dashboard.html')), name='caretaker-dashboard'),
+    path('caretaker-appointments', never_cache(TemplateView.as_view(template_name='caretaker-appointments.html')), name='caretaker-appointments_clean'),
+    path('caretaker-appointments.html', never_cache(TemplateView.as_view(template_name='caretaker-appointments.html')), name='caretaker-appointments'),
     path('doctor-caretaker-list', never_cache(TemplateView.as_view(template_name='doctor caretaker list.html')), name='doctor-caretaker-list_clean'),
     path('doctor-caretaker-list.html', never_cache(TemplateView.as_view(template_name='doctor caretaker list.html')), name='doctor-caretaker-list'),
     path('doctor-patients-list', never_cache(TemplateView.as_view(template_name='doctor-patients-list.html')), name='doctor-patients-list_clean'),

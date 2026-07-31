@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Carewell — Doctor's Patients List</title>
+<title>Beacon AI — Doctor's Patients List</title>
 <script>
   (function(){
     const token = localStorage.getItem('beacon_token') || localStorage.getItem('access_token');
@@ -25,9 +25,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   :root{
-    --ink:#0F172A; --paper:#F0F6FF; --surface:#FFFFFF; --line:#CCE0FF;
-    --pine:#1E90FF; --pine-deep:#0056B3; --pine-soft:#E6F2FF; --brick:#AE4436; --brick-soft:#F3DFDA;
-    --slate:#4A6E8C; --slate-soft:#DCE7EF; --muted:#64748B; --amber:#B9873A; --amber-soft:#F1E3CB;
+    --ink:#250238; --paper:#F8F6FA; --surface:#FFFFFF; --line:#E5D5E8;
+    --pine:#804A8A; --pine-deep:#3A0353; --pine-soft:#F4EBF6; --brick:#C24141; --brick-soft:#FCEAEA;
+    --slate:#F59E51; --slate-soft:#FDF4E7; --muted:#6E5575; --amber:#F59E51; --amber-soft:#FDF4E7;
     --radius:16px;
   }
   *{box-sizing:border-box;}
@@ -301,8 +301,8 @@
   <!-- SIDEBAR -->
   <div class="sidebar">
     <div class="brand">
-      <div class="brand-mark">C</div>
-      <div><div class="brand-name">Carewell</div><div class="brand-sub">DOCTOR PORTAL</div></div>
+      <div class="brand-mark">B</div>
+      <div><div class="brand-name">Beacon AI</div><div class="brand-sub">DOCTOR PORTAL</div></div>
     </div>
     <nav>
       <a href="/doctor-profile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Doctor Profile</span></a>
@@ -680,7 +680,30 @@ function closeDocumentPreviewModal(){
   document.getElementById('documentViewerModal').classList.remove('open');
 }
 
-document.addEventListener('DOMContentLoaded', loadPatientsList);
+let _lastDocPatientsSig = '';
+
+async function pollDoctorPatientsSilent() {
+  const modal = document.getElementById('patientFullProfileModal');
+  if (modal && modal.classList.contains('open')) return;
+
+  try {
+    const res = await fetch('/api/auth/doctor/patients', { headers: getAuthHeader() });
+    if (res.ok) {
+      const pats = await res.json();
+      const sig = JSON.stringify(pats);
+      if (sig !== _lastDocPatientsSig) {
+        _lastDocPatientsSig = sig;
+        allDoctorPatients = pats;
+        if (typeof renderPatientsTable === 'function') renderPatientsTable(pats);
+      }
+    }
+  } catch(e) {}
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadPatientsList();
+  setInterval(pollDoctorPatientsSilent, 2000);
+});
 </script>
 </body>
 </html>
