@@ -305,83 +305,95 @@ class LoginView(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
-        serializer = LoginSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(
-                {'detail': 'Invalid request.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        identifier = serializer.validated_data['identifier'].strip().lower()
-        password = serializer.validated_data['password']
-
-        # Allow login by username OR email (case-insensitive)
-        user = User.objects.filter(
-            Q(username__iexact=identifier) | Q(email__iexact=identifier)
-        ).first()
-
-        if not user:
-            return Response(
-                {'detail': 'No user account found. Please sign up to create a new profile.'},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
-
-        if not user.check_password(password):
-            return Response(
-                {'detail': 'Invalid password. Please check your credentials.'},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
-
-        if not user.is_active:
-            from .models import SignupOTP
-            import datetime
-            has_pending_otp = SignupOTP.objects.filter(
-                user=user,
-                expires_at__gt=datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
-            ).exists()
-            if has_pending_otp:
+        try:
+            serializer = LoginSerializer(data=request.data)
+            if not serializer.is_valid():
                 return Response(
-                    {'detail': 'email_not_verified', 'email': user.email},
+                    {'detail': 'Invalid request.'},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            identifier = serializer.validated_data['identifier'].strip().lower()
+            password = serializer.validated_data['password']
+
+            # Allow login by username OR email (case-insensitive)
+            user = User.objects.filter(
+                Q(username__iexact=identifier) | Q(email__iexact=identifier)
+            ).first()
+
+            if not user:
+                return Response(
+                    {'detail': 'No user account found. Please sign up to create a new profile.'},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+
+            if not user.check_password(password):
+                return Response(
+                    {'detail': 'Invalid password. Please check your credentials.'},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+
+            if not user.is_active:
+                from .models import SignupOTP
+                import datetime
+                has_pending_otp = SignupOTP.objects.filter(
+                    user=user,
+                    expires_at__gt=datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc)
+                ).exists()
+                if has_pending_otp:
+                    return Response(
+                        {'detail': 'email_not_verified', 'email': user.email},
+                        status=status.HTTP_403_FORBIDDEN,
+                    )
+                return Response(
+                    {'detail': 'Your account has been deactivated. Please contact the administrator.'},
                     status=status.HTTP_403_FORBIDDEN,
                 )
+
+            # Sync email if profile has a different email
+            email_updated = False
+            if user.role == 'patient':
+                profile = getattr(user, 'patient_profile', None)
+                if profile and hasattr(profile, 'email') and profile.email:
+                    if profile.email != user.email:
+                        user.email = profile.email
+                        email_updated = True
+            elif user.role == 'doctor':
+                profile = getattr(user, 'doctor_profile', None)
+                if profile and hasattr(profile, 'email') and profile.email:
+                    if profile.email != user.email:
+                        user.email = profile.email
+                        email_updated = True
+            elif user.role == 'caretaker':
+                profile = getattr(user, 'caretaker_profile', None)
+                if profile and hasattr(profile, 'email') and profile.email:
+                    if profile.email != user.email:
+                        user.email = profile.email
+                        email_updated = True
+            if email_updated:
+                user.save()
+
+            # Trigger login confirmation email safely (don't crash login if mail fails)
+            try:
+                trigger_login_confirmation_email(user)
+            except Exception as mail_err:
+                print(f"[LOGIN EMAIL NOTICE] Email trigger failed: {mail_err}")
+
+            token = get_tokens_for_user(user)
+            sanitized_username = user.username.replace('_', '')
+            return Response({
+                'status': 'success',
+                'access_token': token,
+                'user': {'id': user.id, 'username': sanitized_username, 'email': user.email, 'role': user.role},
+            })
+        except Exception as e:
+            import traceback
+            print(f"[LOGIN 500 ERROR] {e}")
+            traceback.print_exc()
             return Response(
-                {'detail': 'Your account has been deactivated. Please contact the administrator.'},
-                status=status.HTTP_403_FORBIDDEN,
+                {'detail': f'Server error during login: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
-        # Sync email if profile has a different email
-        email_updated = False
-        if user.role == 'patient':
-            profile = getattr(user, 'patient_profile', None)
-            if profile and hasattr(profile, 'email') and profile.email:
-                if profile.email != user.email:
-                    user.email = profile.email
-                    email_updated = True
-        elif user.role == 'doctor':
-            profile = getattr(user, 'doctor_profile', None)
-            if profile and hasattr(profile, 'email') and profile.email:
-                if profile.email != user.email:
-                    user.email = profile.email
-                    email_updated = True
-        elif user.role == 'caretaker':
-            profile = getattr(user, 'caretaker_profile', None)
-            if profile and hasattr(profile, 'email') and profile.email:
-                if profile.email != user.email:
-                    user.email = profile.email
-                    email_updated = True
-        if email_updated:
-            user.save()
-
-        # Trigger login confirmation email
-        trigger_login_confirmation_email(user)
-
-        token = get_tokens_for_user(user)
-        sanitized_username = user.username.replace('_', '')
-        return Response({
-            'status': 'success',
-            'access_token': token,
-            'user': {'id': user.id, 'username': sanitized_username, 'email': user.email, 'role': user.role},
-        })
 
 
 # ── Me & Self Delete ─────────────────────────────────────────────────────────

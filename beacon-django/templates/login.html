@@ -149,7 +149,8 @@
       if(ct.includes('application/json')){
         data = await res.json();
       } else {
-        throw new Error('Invalid credentials or server error (' + res.status + ').');
+        const rawText = await res.text();
+        data = { detail: rawText.includes('detail') ? rawText : ('Server Error (' + res.status + '). Please check server database/logs.') };
       }
 
       if(!res.ok){
@@ -161,7 +162,7 @@
           btn.textContent = 'Log in';
           return;
         }
-        throw new Error(data.detail || 'Login failed.');
+        throw new Error(data.detail || ('Login failed with status ' + res.status));
       }
 
       localStorage.setItem('beacon_token', data.access_token);
