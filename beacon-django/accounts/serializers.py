@@ -234,6 +234,11 @@ class AppointmentSerializer(serializers.ModelSerializer):
 
     def get_patient_name(self, obj):
         if obj.patient:
+            if obj.patient.role == 'caretaker':
+                from .models import CaretakerProfile
+                c_prof = CaretakerProfile.objects.filter(user=obj.patient).first()
+                c_name = c_prof.full_name if (c_prof and c_prof.full_name) else obj.patient.username
+                return f"{c_name} (Self Caretaker)"
             from .models import PatientProfile
             p_prof = PatientProfile.objects.filter(user=obj.patient).first()
             return p_prof.full_name if (p_prof and p_prof.full_name) else obj.patient.username
@@ -255,6 +260,10 @@ class AppointmentSerializer(serializers.ModelSerializer):
 
     def get_patient_code(self, obj):
         if obj.patient:
+            if obj.patient.role == 'caretaker':
+                from .models import CaretakerProfile
+                c_prof = CaretakerProfile.objects.filter(user=obj.patient).first()
+                return c_prof.caretaker_code if (c_prof and hasattr(c_prof, 'caretaker_code') and c_prof.caretaker_code) else 'CTK-SELF'
             from .models import PatientProfile
             p_prof = PatientProfile.objects.filter(user=obj.patient).first()
             return p_prof.patient_code if p_prof else None

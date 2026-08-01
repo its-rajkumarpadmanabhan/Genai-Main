@@ -31,7 +31,7 @@ from .emails import (
     trigger_account_deleted_email,
 )
 from .models import (
-    PasswordResetToken, DoctorProfile, PatientProfile, CaretakerProfile,
+    CustomUser, PasswordResetToken, DoctorProfile, PatientProfile, CaretakerProfile,
     Appointment, CaretakerRequest, MedicalDocument, EmergencyAlert
 )
 from .serializers import (
@@ -436,8 +436,8 @@ class PatientVisitedDoctorsView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if request.user.role not in ['patient', 'admin'] and not request.user.is_staff:
-            return Response({'detail': 'Patient access required.'}, status=status.HTTP_403_FORBIDDEN)
+        if request.user.role not in ['patient', 'caretaker', 'admin'] and not request.user.is_staff:
+            return Response({'detail': 'Patient or Caretaker access required.'}, status=status.HTTP_403_FORBIDDEN)
 
         import datetime
         from .models import Appointment, DoctorProfile
@@ -990,26 +990,40 @@ class PatientProfileView(APIView):
         if request.user.role not in ['patient', 'admin'] and not request.user.is_staff:
             return Response({'detail': 'Patient access required.'}, status=status.HTTP_403_FORBIDDEN)
         profile, _ = PatientProfile.objects.get_or_create(user=request.user)
-        for k, v in request.data.items():
-            if hasattr(profile, k):
-                setattr(profile, k, v)
-        profile.save()
+        try:
+            for k, v in request.data.items():
+                if k in ['id', 'user', 'patient_code', 'assigned_caretaker']:
+                    continue
+                if k == 'dob':
+                    if not v or (isinstance(v, str) and not v.strip()):
+                        v = None
+                if hasattr(profile, k):
+                    setattr(profile, k, v)
+            profile.save()
 
-        # Sync back to User model
-        sync_user = False
-        if profile.full_name and profile.full_name != request.user.username:
-            request.user.username = profile.full_name
-            sync_user = True
-        if getattr(profile, 'phone_number', None) and profile.phone_number != request.user.mobile_number:
-            request.user.mobile_number = profile.phone_number
-            sync_user = True
-        if getattr(profile, 'email', None) and profile.email != request.user.email:
-            request.user.email = profile.email
-            sync_user = True
-        if sync_user:
-            request.user.save()
-        from .serializers import PatientProfileSerializer
-        return Response(PatientProfileSerializer(profile).data)
+            # Sync back to User model safely
+            sync_user = False
+            if profile.full_name and profile.full_name != request.user.username:
+                request.user.username = profile.full_name
+                sync_user = True
+            if getattr(profile, 'phone_number', None) and profile.phone_number != request.user.mobile_number:
+                request.user.mobile_number = profile.phone_number
+                sync_user = True
+            if getattr(profile, 'email', None) and profile.email and profile.email != request.user.email:
+                new_email = profile.email.strip()
+                if new_email:
+                    if CustomUser.objects.filter(email=new_email).exclude(id=request.user.id).exists():
+                        return Response({'detail': 'This email address is already registered to another account.'}, status=status.HTTP_400_BAD_REQUEST)
+                    request.user.email = new_email
+                    sync_user = True
+
+            if sync_user:
+                request.user.save()
+
+            from .serializers import PatientProfileSerializer
+            return Response(PatientProfileSerializer(profile).data)
+        except Exception as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class MedicalDocumentView(APIView):
@@ -1228,8 +1242,21 @@ class AppointmentBookingView(APIView):
         appointment_type = request.data.get('appointment_type', 'offline')
 
         patient_user = request.user
-        if booked_by == 'caretaker' and request.data.get('patient_id'):
-            patient_user = User.objects.filter(id=request.data.get('patient_id')).first() or request.user
+        if request.user.role == 'caretaker' or booked_by == 'caretaker':
+            booked_by = 'caretaker'
+            target_patient_id = request.data.get('patient_id')
+            if target_patient_id and str(target_patient_id) not in ['personal', 'self', str(request.user.id)]:
+                target_user = User.objects.filter(id=target_patient_id).first()
+                if not target_user:
+                    return Response({'detail': 'Target patient not found.'}, status=status.HTTP_404_NOT_FOUND)
+                from .models import PatientProfile, CaretakerRequest
+                is_assigned = PatientProfile.objects.filter(user=target_user, assigned_caretaker=request.user).exists()
+                is_connected = CaretakerRequest.objects.filter(caretaker=request.user, patient=target_user, status='accepted').exists()
+                if not (is_assigned or is_connected or request.user.is_staff or request.user.role == 'admin'):
+                    return Response({'detail': 'You can only book appointments for patients currently under your care.'}, status=status.HTTP_403_FORBIDDEN)
+                patient_user = target_user
+            else:
+                patient_user = request.user
 
         # Enforce rule: Time slot must fall strictly within doctor's Available Hours
         if time_slot:
@@ -1918,7 +1945,12 @@ class CaretakerRequestsView(APIView):
             creq.status = new_status
             creq.save()
             if new_status == 'accepted':
-                PatientProfile.objects.filter(user=creq.patient).update(assigned_caretaker=request.user)
+                prof, _ = PatientProfile.objects.get_or_create(
+                    user=creq.patient,
+                    defaults={'full_name': creq.patient.username, 'phone_number': creq.patient.mobile_number}
+                )
+                prof.assigned_caretaker = request.user
+                prof.save()
             return Response({'status': 'success', 'new_status': creq.status})
         return Response({'detail': 'Invalid status.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -1931,32 +1963,21 @@ class CaretakerEditRequestView(APIView):
     def post(self, request):
         if request.user.role not in ['caretaker', 'admin'] and not request.user.is_staff:
             return Response({'detail': 'Caretaker access required.'}, status=status.HTTP_403_FORBIDDEN)
-
-        from .models import CaretakerEditRequest, PatientProfile
+        
+        from .models import PatientProfile, CaretakerEditRequest
         patient_id = request.data.get('patient_id')
-        
-        patient_profile = PatientProfile.objects.filter(user_id=patient_id).first()
+        patient_profile = PatientProfile.objects.filter(user_id=patient_id, assigned_caretaker=request.user).first()
         if not patient_profile:
-            patient_profile = PatientProfile.objects.filter(id=patient_id).first()
+            return Response({'detail': 'Active assigned patient profile not found.'}, status=status.HTTP_404_NOT_FOUND)
 
-        if not patient_profile:
-            return Response({'detail': 'Patient profile not found.'}, status=status.HTTP_404_NOT_FOUND)
-
-        if patient_profile.assigned_caretaker != request.user and request.user.role != 'admin':
-            return Response({'detail': 'You can only edit profiles of your assigned patients.'}, status=status.HTTP_403_FORBIDDEN)
-
-        updatable_fields = [
-            'full_name', 'dob', 'gender', 'marital_status', 'phone_number', 
-            'location', 'languages', 'insurance_details', 'emergency_contact_name', 
-            'emergency_contact_phone', 'medical_history_notes'
-        ]
-        for field in updatable_fields:
-            if field in request.data:
-                val = request.data[field]
-                if val == '' and field == 'dob':
-                    val = None
-                setattr(patient_profile, field, val)
-        
+        for k, v in request.data.items():
+            if k in ['patient_id', 'id', 'user', 'assigned_caretaker', 'patient_code']:
+                continue
+            if k == 'dob':
+                if not v or (isinstance(v, str) and not v.strip()):
+                    v = None
+            if hasattr(patient_profile, k):
+                setattr(patient_profile, k, v)
         patient_profile.save()
 
         changes = request.data.get('proposed_changes', 'Patient profile updated by caretaker')
@@ -1980,11 +2001,38 @@ class CaretakerPatientsListView(APIView):
         if request.user.role not in ['caretaker', 'admin'] and not request.user.is_staff:
             return Response({'detail': 'Caretaker access required.'}, status=status.HTTP_403_FORBIDDEN)
         
+        from django.db.models import Q
         from .models import CustomUser, PatientProfile, CaretakerRequest, Appointment
-        active_profiles = PatientProfile.objects.filter(assigned_caretaker=request.user)
+        # Sync accepted requests to guarantee patient profiles exist and have assigned_caretaker set
+        accepted_patient_ids = CaretakerRequest.objects.filter(caretaker=request.user, status='accepted').values_list('patient_id', flat=True)
+        for pid in accepted_patient_ids:
+            p_user = CustomUser.objects.filter(id=pid).first()
+            if p_user:
+                p_prof, _ = PatientProfile.objects.get_or_create(
+                    user=p_user,
+                    defaults={'full_name': p_user.username, 'phone_number': p_user.mobile_number}
+                )
+                if p_prof.assigned_caretaker != request.user:
+                    p_prof.assigned_caretaker = request.user
+                    p_prof.save()
+
+        active_profiles = PatientProfile.objects.filter(
+            Q(assigned_caretaker=request.user) | Q(user_id__in=accepted_patient_ids)
+        ).distinct()
         
         all_past_reqs = CaretakerRequest.objects.filter(caretaker=request.user).values_list('patient_id', flat=True)
         unlinked_profiles = PatientProfile.objects.filter(user_id__in=all_past_reqs).exclude(assigned_caretaker=request.user).distinct()
+
+        def clean_emergency_contact(p):
+            n = (p.emergency_contact_name or '').strip()
+            ph = (p.emergency_contact_phone or '').strip()
+            if n and ph and ph.lower() != 'null':
+                return f"{n} ({ph})"
+            elif n:
+                return n
+            elif ph and ph.lower() != 'null':
+                return ph
+            return 'Not provided'
 
         active_results = []
         for p in active_profiles:
@@ -2001,7 +2049,7 @@ class CaretakerPatientsListView(APIView):
                 'location': p.location or 'Not provided',
                 'languages': p.languages or 'Not provided',
                 'insurance_details': p.insurance_details or 'Not provided',
-                'emergency_contact': f"{p.emergency_contact_name or ''} ({p.emergency_contact_phone or ''})".strip() or 'Not provided',
+                'emergency_contact': clean_emergency_contact(p),
                 'medical_history_notes': p.medical_history_notes or 'No notes provided',
                 'profile_picture': p.user.profile_picture,
                 'assignment_status': 'active'
@@ -2024,7 +2072,8 @@ class CaretakerPatientsListView(APIView):
                     d_prof = getattr(d_user, 'doctor_profile', None)
                     raw_name = d_prof.full_name if (d_prof and d_prof.full_name) else d_user.username
                     doc_name = re.sub(r'^(Dr\.|DR\.|Dr|DR)\s*', '', raw_name, flags=re.IGNORECASE).strip()
-                    dept = d_prof.major_department if d_prof else 'General Medicine'
+                    raw_dept = (d_prof.major_department or 'General Medicine') if d_prof else 'General Medicine'
+                    dept = raw_dept if (raw_dept and raw_dept.lower() != 'null') else 'General Medicine'
                     last_visit_apt = Appointment.objects.filter(patient=p.user, doctor=d_user).order_by('-appointment_date').first()
                     last_date_str = str(last_visit_apt.appointment_date) if last_visit_apt else 'N/A'
                     visited_doctors.append({
@@ -2049,7 +2098,7 @@ class CaretakerPatientsListView(APIView):
                 'location': p.location or 'Not provided',
                 'languages': p.languages or 'Not provided',
                 'insurance_details': p.insurance_details or 'Not provided',
-                'emergency_contact': f"{p.emergency_contact_name or ''} ({p.emergency_contact_phone or ''})".strip() or 'Not provided',
+                'emergency_contact': clean_emergency_contact(p),
                 'medical_history_notes': p.medical_history_notes or 'No notes provided',
                 'last_working_date': last_work_str,
                 'visited_doctors': visited_doctors,

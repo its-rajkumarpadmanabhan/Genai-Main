@@ -1210,19 +1210,20 @@ function closeEditModal(){ document.getElementById('editModal').classList.remove
 
 async function saveProfile(e){
   e.preventDefault();
+  const dobVal = document.getElementById('inputDob').value;
   const payload = {
-    full_name: document.getElementById('inputName').value,
-    dob: document.getElementById('inputDob').value || null,
+    full_name: document.getElementById('inputName').value.trim(),
+    dob: dobVal && dobVal.trim() ? dobVal.trim() : null,
     gender: document.getElementById('inputGender').value,
     marital_status: document.getElementById('inputMarital').value,
-    phone_number: document.getElementById('inputPhone').value,
-    email: document.getElementById('inputEmail').value,
-    location: document.getElementById('inputLocation').value,
-    languages: document.getElementById('inputLang').value,
-    insurance_details: document.getElementById('inputInsurance').value,
-    emergency_contact_name: document.getElementById('inputEmName').value,
-    emergency_contact_phone: document.getElementById('inputEmPhone').value,
-    medical_history_notes: document.getElementById('inputHistory').value,
+    phone_number: document.getElementById('inputPhone').value.trim(),
+    email: document.getElementById('inputEmail').value.trim(),
+    location: document.getElementById('inputLocation').value.trim(),
+    languages: document.getElementById('inputLang').value.trim(),
+    insurance_details: document.getElementById('inputInsurance').value.trim(),
+    emergency_contact_name: document.getElementById('inputEmName').value.trim(),
+    emergency_contact_phone: document.getElementById('inputEmPhone').value.trim(),
+    medical_history_notes: document.getElementById('inputHistory').value.trim(),
   };
   try {
     const res = await fetch('/api/auth/patient/profile', {
@@ -1234,9 +1235,14 @@ async function saveProfile(e){
       closeEditModal();
       loadPatientProfile();
     } else {
-      await showCustomAlert('Failed to save profile.', 'Error', '⚠️');
+      let errMsg = 'Failed to save profile.';
+      try {
+        const err = await res.json();
+        errMsg = err.detail || err.message || (typeof err === 'string' ? err : errMsg);
+      } catch(_){}
+      await showCustomAlert(errMsg, 'Error', '⚠️');
     }
-  } catch(err){ await showCustomAlert(err.message, 'Error', '⚠️'); }
+  } catch(err){ await showCustomAlert(err.message || 'Network error occurred.', 'Error', '⚠️'); }
 }
 
 function openDocModal(){ document.getElementById('docModal').classList.add('open'); }

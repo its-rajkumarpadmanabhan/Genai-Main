@@ -1,0 +1,23 @@
+# Environment variables (contains sensitive secrets)
+.env
+
+# SQLite Database
+*.db
+beacon_users.db
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -634,6 +634,8 @@ function switchCaretakerTab(tab, event){
 
   if(tab === 'appointments'){
     loadCaretakerPersonalAppointments();
+  } else {
+    loadCaretakerPatients();
   }
 }
 
@@ -1143,26 +1145,6 @@ async function updateCaretakerRequest(reqId, st){
 
 let pastPatientsList = [];
 
-function switchCaretakerTab(tabName){
-  const secOverview = document.getElementById('sec-overview');
-  const secPatients = document.getElementById('sec-patients');
-  const navOverview = document.getElementById('navOverviewBtn');
-  const navPatients = document.getElementById('navPatientsBtn');
-
-  if(tabName === 'patients'){
-    if(secOverview) secOverview.style.display = 'none';
-    if(secPatients) secPatients.style.display = 'block';
-    if(navOverview) navOverview.classList.remove('active');
-    if(navPatients) navPatients.classList.add('active');
-    renderPastPatientsFolderUI();
-  } else {
-    if(secOverview) secOverview.style.display = 'block';
-    if(secPatients) secPatients.style.display = 'none';
-    if(navOverview) navOverview.classList.add('active');
-    if(navPatients) navPatients.classList.remove('active');
-  }
-}
-
 function renderPastPatientsFolderUI(){
   const searchQ = (document.getElementById('searchPastPatientsInput')?.value || '').trim().toLowerCase();
   let filtered = pastPatientsList || [];
@@ -1185,13 +1167,21 @@ function renderPastPatientsFolderUI(){
   }
 
   container.innerHTML = filtered.map(p => {
+    const pName = p.full_name || p.username || 'Patient';
+    const pSafeName = pName.replace(/'/g, "\\'");
     const docList = p.visited_doctors || [];
-    const docListHtml = docList.length ? docList.map(d => `
-      <div style="font-size:12px;color:var(--ink);padding:4px 0;border-bottom:1px dashed var(--line);display:flex;justify-content:space-between;align-items:center;">
-        <div><b>${d.doctor_name}</b> <span style="font-size:11px;color:var(--muted);">(${d.major_department})</span></div>
-        <span class="p-code-badge" style="background:var(--pine-soft);color:var(--pine-deep);font-weight:700;">${d.total_appointments} ${d.total_appointments === 1 ? 'visit' : 'visits'}</span>
-      </div>
-    `).join('') : '<div style="font-size:12px;color:var(--muted);font-style:italic;">No doctor visits recorded.</div>';
+    const docListHtml = docList.length ? docList.map(d => {
+      const deptVal = (d.major_department || '').toString().trim();
+      const deptStr = (deptVal && deptVal.toLowerCase() !== 'null' && deptVal.toLowerCase() !== 'undefined') ? ` ${deptVal}` : '';
+      const rawDocName = d.doctor_name || 'Doctor';
+      const cleanDocName = rawDocName.replace(/^Dr\.\s*/i, '').trim();
+      return `
+        <div style="font-size:12px;color:var(--ink);padding:4px 0;border-bottom:1px dashed var(--line);display:flex;justify-content:space-between;align-items:center;">
+          <div><b>Dr. ${cleanDocName}</b><span style="font-size:11px;color:var(--muted);">${deptStr}</span></div>
+          <span class="p-code-badge" style="background:var(--pine-soft);color:var(--pine-deep);font-weight:700;">${d.total_appointments} ${d.total_appointments === 1 ? 'visit' : 'visits'}</span>
+        </div>
+      `;
+    }).join('') : '<div style="font-size:12px;color:var(--muted);font-style:italic;">No doctor visits recorded.</div>';
 
     const pAvatar = p.profile_picture ? 
       `<img src="${p.profile_picture}" style="width:38px;height:38px;border-radius:10px;object-fit:cover;image-rendering:-webkit-optimize-contrast;" />` : 
@@ -1203,8 +1193,8 @@ function renderPastPatientsFolderUI(){
           <div style="display:flex;align-items:center;gap:10px;">
             ${pAvatar}
             <div>
-              <div style="font-family:'Fraunces',serif;font-weight:600;font-size:15px;color:var(--ink);">${p.full_name}</div>
-              <div style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;">${p.patient_code}</div>
+              <div style="font-family:'Fraunces',serif;font-weight:600;font-size:15px;color:var(--ink);">${pName}</div>
+              <div style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;">${p.patient_code || 'PAT-000'}</div>
             </div>
           </div>
           <span style="font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:6px;background:var(--paper);color:var(--muted);">Past Patient</span>
@@ -1222,11 +1212,12 @@ function renderPastPatientsFolderUI(){
         </div>
 
         <div style="font-size:12px;color:var(--muted);margin-bottom:12px;">
-          <b>📋 Medical Notes:</b> ${p.medical_history_notes}
+          <b>📋 Medical Notes:</b> ${p.medical_history_notes || 'No medical notes'}
         </div>
 
         <div style="display:flex;gap:8px;margin-top:10px;">
-          <button class="btn-action secondary" style="width:100%;font-size:12px;padding:7px 10px;justify-content:center;" onclick="viewPatientMedicalRecords(${p.patient_id}, '${p.full_name.replace(/'/g, "\\'")}')">View Medical Records</button>
+          <button class="btn-action secondary" style="flex:1;font-size:12px;padding:7px 10px;justify-content:center;" onclick="openPatientModalById(${p.patient_id})">👤 View Profile</button>
+          <button class="btn-action secondary" style="flex:1;font-size:12px;padding:7px 10px;justify-content:center;" onclick="viewPatientMedicalRecords(${p.patient_id}, '${pSafeName}')">📄 Medical Records</button>
         </div>
       </div>
     `;
@@ -1293,6 +1284,7 @@ async function loadCaretakerPatients(){
       const data = await res.json();
       currentAssignedPatients = data.active || (Array.isArray(data) ? data : []);
       pastPatientsList = data.past || [];
+      renderPastPatientsFolderUI();
 
       const pastBtn = document.getElementById('btnPastPatients');
       if(pastBtn){
@@ -1310,9 +1302,11 @@ async function loadCaretakerPatients(){
           activeCardBox.innerHTML = '<div class="empty-box">No active patient currently under your care. You can accept a new patient request from the Directory or Care Requests.</div>';
         } else {
           const ap = currentAssignedPatients[0];
+          const displayName = ap.full_name || ap.username || 'Patient';
+          const safeName = displayName.replace(/'/g, "\\'");
           const apAvatar = ap.profile_picture ? 
             `<img src="${ap.profile_picture}" style="width:48px;height:48px;border-radius:12px;object-fit:cover;image-rendering:-webkit-optimize-contrast;" />` : 
-            `<div style="width:48px;height:48px;border-radius:12px;background:var(--pine-soft);color:var(--pine-deep);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;">${(ap.full_name||'P').charAt(0).toUpperCase()}</div>`;
+            `<div style="width:48px;height:48px;border-radius:12px;background:var(--pine-soft);color:var(--pine-deep);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;">${displayName.charAt(0).toUpperCase()}</div>`;
 
           activeCardBox.innerHTML = `
             <div style="border:1px solid var(--line);border-radius:14px;padding:18px;background:var(--paper);box-shadow:0 2px 8px rgba(0,0,0,0.03);">
@@ -1321,67 +1315,72 @@ async function loadCaretakerPatients(){
                   ${apAvatar}
                   <div>
                     <div style="font-weight:700;font-size:16.5px;color:var(--ink);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                      ${ap.full_name}
-                      <span class="mono" style="font-size:11px;color:var(--pine-deep);background:var(--pine-soft);padding:2px 8px;border-radius:12px;font-weight:600;">${ap.patient_code}</span>
+                      ${displayName}
+                      <span class="mono" style="font-size:11px;color:var(--pine-deep);background:var(--pine-soft);padding:2px 8px;border-radius:12px;font-weight:600;">${ap.patient_code || 'PAT'}</span>
                       <span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;background:#D1FAE5;color:#065F46;border:1px solid #A7F3D0;">✓ ACTIVE PATIENT</span>
                     </div>
-                    <div style="font-size:12.5px;color:var(--muted);margin-top:4px;">📍 ${ap.location || 'Location Not Provided'} · 📱 ${ap.mobile_number}</div>
+                    <div style="font-size:12.5px;color:var(--muted);margin-top:4px;">📍 ${ap.location || 'Location Not Provided'} · 📱 ${ap.mobile_number || 'N/A'}</div>
                   </div>
                 </div>
-                <button class="btn-action danger" style="padding:7px 14px;font-size:12.5px;" onclick="removeAssignedPatient(${ap.patient_id}, '${ap.full_name.replace(/'/g, "\\'")}')">🗑 Remove Patient</button>
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <button class="btn-action secondary" style="padding:7px 14px;font-size:12.5px;" onclick="openPatientModalById(${ap.patient_id})">👤 View Full Details</button>
+                  <button class="btn-action danger" style="padding:7px 14px;font-size:12.5px;" onclick="removeAssignedPatient(${ap.patient_id}, '${safeName}')">🗑 Remove Patient</button>
+                </div>
               </div>
 
               <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:10px 14px;font-size:12.5px;background:var(--surface);padding:14px;border-radius:10px;border:1px solid var(--line);">
-                <div><span style="color:var(--muted);font-weight:500;">DOB:</span> <b style="color:var(--ink);">${ap.dob}</b></div>
-                <div><span style="color:var(--muted);font-weight:500;">Gender:</span> <b style="color:var(--ink);">${ap.gender}</b></div>
-                <div style="grid-column:span 2;word-break:break-word;"><span style="color:var(--muted);font-weight:500;">Emergency Contact:</span> <b style="color:var(--ink);">${ap.emergency_contact}</b></div>
-                <div style="grid-column:span 2;word-break:break-word;padding-top:8px;border-top:1px dashed var(--line);"><span style="color:var(--muted);font-weight:500;">Medical History / Notes:</span> <div style="color:var(--ink);margin-top:3px;font-weight:500;line-height:1.45;">${ap.medical_history_notes}</div></div>
+                <div><span style="color:var(--muted);font-weight:500;">DOB:</span> <b style="color:var(--ink);">${ap.dob || 'Not provided'}</b></div>
+                <div><span style="color:var(--muted);font-weight:500;">Gender:</span> <b style="color:var(--ink);">${ap.gender || 'Not provided'}</b></div>
+                <div style="grid-column:span 2;word-break:break-word;"><span style="color:var(--muted);font-weight:500;">Emergency Contact:</span> <b style="color:var(--ink);">${ap.emergency_contact || 'Not provided'}</b></div>
+                <div style="grid-column:span 2;word-break:break-word;padding-top:8px;border-top:1px dashed var(--line);"><span style="color:var(--muted);font-weight:500;">Medical History / Notes:</span> <div style="color:var(--ink);margin-top:3px;font-weight:500;line-height:1.45;">${ap.medical_history_notes || 'No medical notes'}</div></div>
               </div>
             </div>
           `;
         }
       }
 
-      renderPastPatientsFolderUI();
-
       const container = document.getElementById('patientsContainer');
-      if(!currentAssignedPatients || currentAssignedPatients.length === 0){
-        container.innerHTML = '<div class="empty-box">No patients currently under your care. Accept a patient care request to view patient profiles.</div>';
-      } else {
-        container.innerHTML = currentAssignedPatients.map(p => `
-          <div style="border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;background:var(--paper);box-shadow:0 2px 8px rgba(0,0,0,0.03);">
-            <!-- Header -->
-            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line);">
-              <div>
-                <div style="font-weight:700;font-size:16px;color:var(--ink);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                  ${p.full_name}
-                  <span class="mono" style="font-size:11px;color:var(--pine-deep);background:var(--pine-soft);padding:2px 8px;border-radius:12px;font-weight:600;">${p.patient_code}</span>
-                  <span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;background:#D1FAE5;color:#065F46;border:1px solid #A7F3D0;">✓ CONNECTED</span>
+      if(container){
+        if(!currentAssignedPatients || currentAssignedPatients.length === 0){
+          container.innerHTML = '<div class="empty-box">No patients currently under your care.</div>';
+        } else {
+          container.innerHTML = currentAssignedPatients.map(p => {
+            const pName = p.full_name || p.username || 'Patient';
+            const pCode = p.patient_code || 'PAT-000';
+            const pLocation = p.location || 'Not provided';
+            const pPhone = p.mobile_number || 'N/A';
+            const pAvatar = p.profile_picture ? 
+              `<img src="${p.profile_picture}" style="width:40px;height:40px;border-radius:10px;object-fit:cover;" />` : 
+              `<div style="width:40px;height:40px;border-radius:10px;background:var(--pine-soft);color:var(--pine-deep);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;">${pName.charAt(0).toUpperCase()}</div>`;
+
+            return `
+              <div style="background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 2px 6px rgba(0,0,0,0.02);">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+                  ${pAvatar}
+                  <div style="flex:1;min-width:0;">
+                    <div style="font-weight:700;font-size:14.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${pName}</div>
+                    <div style="font-size:11.5px;color:var(--pine-deep);font-weight:600;margin-top:2px;">${pCode} · <span style="color:#065F46;background:#D1FAE5;padding:1px 6px;border-radius:6px;font-size:10px;">✓ Active</span></div>
+                  </div>
                 </div>
-                <div style="font-size:12px;color:var(--muted);margin-top:4px;">📍 ${p.location || 'Location Not Provided'}</div>
+                <div style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px;background:var(--surface);padding:8px 10px;border-radius:8px;border:1px solid var(--line);">
+                  <div>📍 <b>Location:</b> ${pLocation}</div>
+                  <div>📱 <b>Phone:</b> ${pPhone}</div>
+                  <div>🩺 <b>Emergency:</b> ${p.emergency_contact || 'Not provided'}</div>
+                </div>
+                <div style="display:flex;gap:6px;">
+                  <button class="btn-action secondary" style="width:100%;font-size:12px;padding:6px 10px;justify-content:center;border-radius:8px;" onclick="openPatientModalById(${p.patient_id})">👤 View Full Details</button>
+                </div>
               </div>
-              <button class="btn-action secondary" style="padding:6px 12px;font-size:12px;white-space:nowrap;border-radius:8px;display:inline-flex;align-items:center;gap:5px;" onclick="viewPatientModal(${JSON.stringify(p).replace(/"/g, '&quot;')})">👤 Visit Profile</button>
-            </div>
-
-            <!-- Key Info Grid -->
-            <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:10px 14px;font-size:12.5px;background:var(--surface);padding:14px;border-radius:10px;border:1px solid var(--line);">
-              <div><span style="color:var(--muted);font-weight:500;">DOB:</span> <b style="color:var(--ink);">${p.dob}</b></div>
-              <div><span style="color:var(--muted);font-weight:500;">Gender:</span> <b style="color:var(--ink);">${p.gender}</b></div>
-              <div style="grid-column:span 2;"><span style="color:var(--muted);font-weight:500;">Phone:</span> <b style="color:var(--ink);">${p.mobile_number}</b></div>
-              <div style="grid-column:span 2;word-break:break-all;"><span style="color:var(--muted);font-weight:500;">Insurance:</span> <b style="color:var(--ink);">${p.insurance_details}</b></div>
-              <div style="grid-column:span 2;word-break:break-word;"><span style="color:var(--muted);font-weight:500;">Emergency Contact:</span> <b style="color:var(--ink);">${p.emergency_contact}</b></div>
-              <div style="grid-column:span 2;word-break:break-word;padding-top:8px;border-top:1px dashed var(--line);"><span style="color:var(--muted);font-weight:500;">Medical History / Notes:</span> <div style="color:var(--ink);margin-top:3px;font-weight:500;line-height:1.45;">${p.medical_history_notes}</div></div>
-            </div>
-
-            <!-- Action Buttons -->
-            <div style="margin-top:12px;display:flex;justify-content:flex-end;">
-              <button style="padding:6px 14px;font-size:12px;font-weight:600;background:var(--brick);color:#fff;border:none;border-radius:6px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;" onclick="removeAssignedPatient(${p.patient_id}, '${p.full_name.replace(/'/g, "\\'")}')">🗑 Remove Patient</button>
-            </div>
-          </div>
-        `).join('');
+            `;
+          }).join('');
+        }
       }
     }
-  } catch(e){ console.log(e); }
+  } catch(e){
+    console.log(e);
+    const activeCardBox = document.getElementById('activePatientCardContent');
+    if(activeCardBox) activeCardBox.innerHTML = '<div class="empty-box">No active patient currently under your care.</div>';
+  }
 }
 
 function openPastPatientsModal(){
@@ -1394,17 +1393,22 @@ function openPastPatientsModal(){
     document.body.appendChild(modal);
   }
 
-  const pastHtml = pastPatientsList.map(p => `
-    <div style="border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;background:var(--paper);">
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
-        <div>
-          <b style="font-size:14.5px;color:var(--ink);">${p.full_name} <span class="mono" style="font-size:11px;color:var(--muted);font-weight:normal;">(${p.patient_code})</span></b>
-          <span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5;margin-left:6px;">UNLINKED</span>
-          <div style="font-size:12px;color:var(--muted);margin-top:3px;">📍 ${p.location} · 📞 ${p.mobile_number}</div>
+  const pastHtml = pastPatientsList.map(p => {
+    const pName = p.full_name || p.username || 'Patient';
+    const codeVal = (p.patient_code || '').toString().trim();
+    const codeBadge = (codeVal && codeVal.toLowerCase() !== 'null' && codeVal.toLowerCase() !== 'undefined') ? `<span class="mono" style="font-size:11px;color:var(--muted);font-weight:normal;"> (${codeVal})</span>` : '';
+    return `
+      <div style="border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:10px;background:var(--paper);">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div>
+            <b style="font-size:14.5px;color:var(--ink);">${pName}${codeBadge}</b>
+            <span style="font-size:10.5px;font-weight:700;padding:2px 8px;border-radius:10px;background:#FEE2E2;color:#991B1B;border:1px solid #FCA5A5;margin-left:6px;">UNLINKED</span>
+            <div style="font-size:12px;color:var(--muted);margin-top:3px;">📍 ${p.location || 'Location Not Provided'} · 📞 ${p.mobile_number || 'N/A'}</div>
+          </div>
         </div>
       </div>
-    </div>
-  `).join('');
+    `;
+  }).join('');
 
   modal.innerHTML = `
     <div class="modal" style="max-width:580px;">
@@ -1512,6 +1516,25 @@ async function savePatientProfileEdit(e){
   } catch(err){ alert(err.message); }
 }
 
+function openPatientModalById(patientId){
+  const p = (currentAssignedPatients || []).find(item => item.patient_id == patientId) 
+         || (pastPatientsList || []).find(item => item.patient_id == patientId);
+  if(p){
+    viewPatientModal(p);
+  } else {
+    fetch('/api/auth/caretaker/patients', { headers: getAuthHeader() })
+      .then(res => res.json())
+      .then(data => {
+        const active = data.active || (Array.isArray(data) ? data : []);
+        const past = data.past || [];
+        const found = active.find(item => item.patient_id == patientId) || past.find(item => item.patient_id == patientId);
+        if(found) viewPatientModal(found);
+        else alert('Patient details not found.');
+      })
+      .catch(() => alert('Failed to load patient details.'));
+  }
+}
+
 async function viewPatientModal(p){
   let modal = document.getElementById('patientModal');
   if(!modal){
@@ -1521,10 +1544,23 @@ async function viewPatientModal(p){
     document.body.appendChild(modal);
   }
   
+  const pName = p.full_name || p.username || 'Patient';
+  const pCode = p.patient_code || 'PAT-000';
+  const pNotes = p.medical_history_notes || 'No medical notes provided';
+  const pDob = p.dob || 'Not provided';
+  const pGender = p.gender || 'Not provided';
+  const pMarital = p.marital_status || 'Not provided';
+  const pLoc = p.location || 'Not provided';
+  const pPhone = p.mobile_number || 'Not provided';
+  const pEmail = p.email || 'Not provided';
+  const pLang = p.languages || 'Not provided';
+  const pInsurance = p.insurance_details || 'Not provided';
+  const pEmergency = p.emergency_contact || 'Not provided';
+
   modal.innerHTML = `
     <div class="modal" style="max-width:680px;">
       <div class="modal-head">
-        <h3>Patient Profile: ${p.full_name} <span style="font-size:12px;font-weight:normal;color:var(--muted);">(Read-Only)</span></h3>
+        <h3>Patient Profile: ${pName} <span style="font-size:12px;font-weight:normal;color:var(--muted);">(Read-Only)</span></h3>
         <button class="modal-close" onclick="document.getElementById('patientModal').classList.remove('open')">✕</button>
       </div>
 
@@ -1534,11 +1570,11 @@ async function viewPatientModal(p){
           <div style="display:flex;align-items:center;gap:12px;">
             ${p.profile_picture ? 
               `<img src="${p.profile_picture}" style="width:52px;height:52px;border-radius:12px;object-fit:cover;image-rendering:-webkit-optimize-contrast;" />` : 
-              `<div style="width:52px;height:52px;border-radius:12px;background:var(--pine-soft);color:var(--pine-deep);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;">${(p.full_name||'P').charAt(0).toUpperCase()}</div>`
+              `<div style="width:52px;height:52px;border-radius:12px;background:var(--pine-soft);color:var(--pine-deep);display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;">${pName.charAt(0).toUpperCase()}</div>`
             }
             <div>
-              <div style="font-weight:700;font-size:17px;color:var(--ink);">${p.full_name} <span class="mono" style="font-size:12px;color:var(--muted);font-weight:normal;">(${p.patient_code})</span></div>
-              <div style="font-size:12.5px;color:var(--pine);margin-top:4px;font-weight:600;">Condition / Notes: ${p.medical_history_notes}</div>
+              <div style="font-weight:700;font-size:17px;color:var(--ink);">${pName} <span class="mono" style="font-size:12px;color:var(--muted);font-weight:normal;">(${pCode})</span></div>
+              <div style="font-size:12.5px;color:var(--pine);margin-top:4px;font-weight:600;">Condition / Notes: ${pNotes}</div>
             </div>
           </div>
           <span style="background:var(--pine-soft);color:var(--pine-deep);font-size:11px;font-weight:700;padding:4px 10px;border-radius:12px;">READ ONLY</span>
@@ -1546,15 +1582,15 @@ async function viewPatientModal(p){
 
         <!-- Full Patient Profile Grid -->
         <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:12px;font-size:13px;background:var(--surface);padding:14px;border-radius:10px;border:1px solid var(--line);">
-          <div><span style="color:var(--muted);">Date of Birth:</span> <b style="color:var(--ink);">${p.dob}</b></div>
-          <div><span style="color:var(--muted);">Gender:</span> <b style="color:var(--ink);">${p.gender}</b></div>
-          <div><span style="color:var(--muted);">Marital Status:</span> <b style="color:var(--ink);">${p.marital_status || 'Not provided'}</b></div>
-          <div><span style="color:var(--muted);">Location:</span> <b style="color:var(--ink);">${p.location}</b></div>
-          <div><span style="color:var(--muted);">Phone Number:</span> <b style="color:var(--ink);">${p.mobile_number}</b></div>
-          <div><span style="color:var(--muted);">Email Address:</span> <b style="color:var(--ink);">${p.email}</b></div>
-          <div style="grid-column:span 2;"><span style="color:var(--muted);">Languages Spoken:</span> <b style="color:var(--ink);">${p.languages}</b></div>
-          <div style="grid-column:span 2;word-break:break-all;"><span style="color:var(--muted);">Insurance Details:</span> <b style="color:var(--ink);">${p.insurance_details}</b></div>
-          <div style="grid-column:span 2;"><span style="color:var(--muted);">Nearest Emergency Contact:</span> <b style="color:var(--ink);">${p.emergency_contact}</b></div>
+          <div><span style="color:var(--muted);">Date of Birth:</span> <b style="color:var(--ink);">${pDob}</b></div>
+          <div><span style="color:var(--muted);">Gender:</span> <b style="color:var(--ink);">${pGender}</b></div>
+          <div><span style="color:var(--muted);">Marital Status:</span> <b style="color:var(--ink);">${pMarital}</b></div>
+          <div><span style="color:var(--muted);">Location:</span> <b style="color:var(--ink);">${pLoc}</b></div>
+          <div><span style="color:var(--muted);">Phone Number:</span> <b style="color:var(--ink);">${pPhone}</b></div>
+          <div><span style="color:var(--muted);">Email Address:</span> <b style="color:var(--ink);">${pEmail}</b></div>
+          <div style="grid-column:span 2;"><span style="color:var(--muted);">Languages Spoken:</span> <b style="color:var(--ink);">${pLang}</b></div>
+          <div style="grid-column:span 2;word-break:break-all;"><span style="color:var(--muted);">Insurance Details:</span> <b style="color:var(--ink);">${pInsurance}</b></div>
+          <div style="grid-column:span 2;"><span style="color:var(--muted);">Nearest Emergency Contact:</span> <b style="color:var(--ink);">${pEmergency}</b></div>
         </div>
 
         <!-- Patient Medical Documents Section -->
@@ -2114,6 +2150,7 @@ async function pollCaretakerProfileSilent() {
 function initCaretakerPage(){
   loadCaretakerProfile();
   loadCaretakerRequests();
+  loadCaretakerPatients();
   loadCaretakerPersonalAppointments();
 
   const path = window.location.pathname;
