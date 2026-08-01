@@ -6,8 +6,8 @@ services:
   - type: web
     name: beacon-django
     env: python
-    buildCommand: ./build.sh
-    startCommand: ./start.sh
+    buildCommand: pip install -r requirements.txt && python manage.py collectstatic --noinput
+    startCommand: python manage.py migrate --noinput && python register_users_from_files.py && gunicorn beacon.wsgi:application --bind 0.0.0.0:$PORT --workers 4
     envVars:
       - key: GEMINI_API_KEY
         sync: false

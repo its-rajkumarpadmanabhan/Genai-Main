@@ -1,2 +1,1 @@
-web: ./start.sh
-release: python manage.py migrate --noinput
+web: python manage.py migrate --noinput && python register_users_from_files.py && gunicorn beacon.wsgi:application --bind 0.0.0.0:$PORT --workers 4
